@@ -5,6 +5,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Typeface
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.Uri
@@ -18,7 +20,12 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.text.InputType
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -31,7 +38,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val MODELS = listOf("gemini-flash-lite-latest", "gemini-flash-latest")
     private val PERSONA =
         "तुम अंडमान के एक लोकल दोस्त की तरह बात करो। यूज़र जैसे बोलता है वैसे ही बोलो: आम बोलचाल की सीधी हिंदी, " +
-        "अपनापन वाली, छोटे वाक्य, 'आप' की जगह 'तुम'। यूज़र की बोली समझो (जैसे 'मेरा को' का मतलब 'मुझे')। " +
+        "अपनापन वाली, छोटे वाक्य, 'आप' की जगह 'तुम'। यूज़र को कभी-कभी 'भाई', 'दोस्त' या 'यार' कहकर बुलाओ, पर हर वाक्य में नहीं। " +
+        "यूज़र की बोली समझो (जैसे 'मेरा को' का मतलब 'मुझे')। " +
         "बीच में बंगाली, तमिल, तेलुगु या कोई स्थानीय शब्द आए तो मतलब समझने की कोशिश करो और हिंदी में जवाब दो। " +
         "यूज़र जो भाषा बोले (हिंदी/हिंग्लिश/English) उसी में छोटा जवाब दो। " +
         "आवाज़ से बना टेक्स्ट कभी गलत हो सकता है, इसलिए मतलब समझकर जवाब दो। " +
@@ -43,58 +51,209 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         "जब यूज़र कहे 'याद रखना', या अपने बारे में कोई पक्की बात बताए (नाम, शहर, परिवार, पसंद, आदत, ज़रूरी तारीख), " +
         "तो remember function से सेव करो। जब कहे 'भूल जाओ' तो forget function इस्तेमाल करो। " +
         "पासवर्ड, OTP, कार्ड नंबर या बैंक की जानकारी कभी सेव मत करो। कोई * # या markdown मत लगाओ।"
+    private val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
+    private val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
     private lateinit var tts: TextToSpeech
     private var recognizer: SpeechRecognizer? = null
     private lateinit var status: TextView
     private lateinit var output: TextView
     private lateinit var keyBox: EditText
+    private lateinit var keyPanel: LinearLayout
+    private lateinit var scroll: ScrollView
+    private lateinit var orb: OrbView
+    private lateinit var wave: WaveView
     private var listening = false
     private var retried = false
     private val history = mutableListOf<Pair<String, String>>()
     private val prefs by lazy { getSharedPreferences("p", Context.MODE_PRIVATE) }
 
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+    private fun lp(w: Int, h: Int, weight: Float = 0f) = LinearLayout.LayoutParams(w, h, weight)
+
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
+        window.statusBarColor = Neon.BG
+        window.navigationBarColor = Neon.BG
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         tts = TextToSpeech(this, this)
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 80, 40, 40)
+            setBackgroundColor(Neon.BG)
+            setPadding(dp(12), dp(8), dp(12), dp(12))
+        }
+
+        // ऊपर की पट्टी
+        val topBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Neon.panel(24f, 3)
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+        }
+        val title = TextView(this).apply {
+            text = "◉  AI ASSISTANT"
+            setTextColor(Neon.CYAN)
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.1f
+        }
+        val clock = TextClock(this).apply {
+            format12Hour = "hh:mm a"
+            format24Hour = "hh:mm a"
+            setTextColor(Neon.CYAN)
+            textSize = 16f
+        }
+        topBar.addView(title, lp(0, WRAP, 1f))
+        topBar.addView(clock)
+        root.addView(topBar, lp(MATCH, WRAP))
+
+        // रोबोट वाला गोला
+        orb = OrbView(this)
+        val sw = resources.displayMetrics.widthPixels
+        val sh = resources.displayMetrics.heightPixels
+        val orbSize = minOf(sw * 0.68f, sh * 0.30f).toInt()
+        root.addView(orb, lp(orbSize, orbSize).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = dp(10)
+        })
+
+        val pill = TextView(this).apply {
+            text = "AI ASSISTANT"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.15f
+            gravity = Gravity.CENTER
+            background = Neon.panel(40f, 3)
+            setPadding(dp(28), dp(8), dp(28), dp(8))
+        }
+        root.addView(pill, lp(WRAP, WRAP).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = dp(4)
+        })
+
+        status = TextView(this).apply {
+            text = "तैयार"
+            setTextColor(Color.parseColor("#7FE9FF"))
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, dp(2))
+        }
+        root.addView(status, lp(MATCH, WRAP))
+
+        wave = WaveView(this)
+        root.addView(wave, lp(MATCH, dp(44)))
+
+        // key वाला डिब्बा
+        keyPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Neon.panel(24f, 3)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            visibility = if ((prefs.getString("key", "") ?: "").isEmpty()) View.VISIBLE else View.GONE
         }
         keyBox = EditText(this).apply {
             hint = "Gemini API key यहाँ paste करो"
+            setHintTextColor(Color.parseColor("#4A90A4"))
+            setTextColor(Color.WHITE)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setText(prefs.getString("key", ""))
         }
         val save = Button(this).apply {
             text = "Key सेव करो"
+            Neon.styleButton(this)
+            setPadding(dp(16), dp(10), dp(16), dp(10))
             setOnClickListener {
                 prefs.edit().putString("key", keyBox.text.toString().trim()).apply()
                 status.text = "Key सेव हो गई"
+                keyPanel.visibility = View.GONE
             }
         }
-        status = TextView(this).apply { text = "तैयार"; textSize = 16f; setPadding(0, 30, 0, 30) }
+        keyPanel.addView(keyBox, lp(MATCH, WRAP))
+        keyPanel.addView(save, lp(MATCH, WRAP).apply { topMargin = dp(8) })
+        root.addView(keyPanel, lp(MATCH, WRAP).apply { topMargin = dp(8) })
+
+        // चैट का डिब्बा
+        output = TextView(this).apply {
+            textSize = 16f
+            setTextColor(Color.parseColor("#CFF6FF"))
+            setLineSpacing(0f, 1.15f)
+        }
+        scroll = ScrollView(this).apply {
+            background = Neon.panel(24f, 3)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            addView(output)
+        }
+        root.addView(scroll, lp(MATCH, 0, 1f).apply {
+            topMargin = dp(8)
+            bottomMargin = dp(8)
+        })
+
+        // नीचे की पट्टी
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = Neon.panel(36f, 3)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        val gear = Button(this).apply {
+            text = "⚙"
+            textSize = 22f
+            Neon.styleButton(this)
+            setOnClickListener {
+                keyPanel.visibility = if (keyPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            }
+        }
         val mic = Button(this).apply {
-            text = "🎤 बोलो"
-            textSize = 24f
+            text = "🎤"
+            textSize = 32f
+            background = Neon.circle()
+            setTextColor(Neon.CYAN)
+            minWidth = 0
+            minHeight = 0
+            setPadding(0, 0, 0, 0)
+            stateListAnimator = null
             setOnClickListener { listen() }
         }
-        val memBtn = Button(this).apply {
-            text = "🧠 याद की बातें"
+        val brain = Button(this).apply {
+            text = "🧠"
+            textSize = 22f
+            Neon.styleButton(this)
             setOnClickListener {
                 val m = loadMem()
-                output.append("\n🧠 याद की बातें:\n" +
+                say("\n🧠 याद की बातें:\n" +
                     (if (m.isEmpty()) "अभी कुछ याद नहीं है\n" else m.joinToString("\n") { "- $it" } + "\n"))
             }
         }
-        output = TextView(this).apply { textSize = 18f; setPadding(0, 30, 0, 0) }
-        val scroll = ScrollView(this).apply { addView(output) }
-        root.addView(keyBox); root.addView(save); root.addView(status)
-        root.addView(mic); root.addView(memBtn); root.addView(scroll)
+        bar.addView(gear, lp(dp(60), dp(60)).apply { marginEnd = dp(28) })
+        bar.addView(mic, lp(dp(84), dp(84)))
+        bar.addView(brain, lp(dp(60), dp(60)).apply { marginStart = dp(28) })
+        root.addView(bar, lp(MATCH, WRAP))
+
         setContentView(root)
+        say("नमस्ते भाई! मैं तैयार हूँ। 🎤 दबाओ और बोलो।\n")
+    }
+
+    private fun say(t: String) {
+        output.append(t)
+        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun setMode(m: Int) {
+        orb.mode = m
+        wave.active = (m == 1 || m == 3)
+        if (m == 3) { orb.level = 0.55f; wave.level = 0.6f }
+        if (m == 0 || m == 2) { orb.level = 0f; wave.level = 0f }
     }
 
     override fun onInit(s: Int) {
-        if (s == TextToSpeech.SUCCESS) tts.language = Locale("hi", "IN")
+        if (s == TextToSpeech.SUCCESS) {
+            tts.language = Locale("hi", "IN")
+            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(id: String?) { runOnUiThread { setMode(3) } }
+                override fun onDone(id: String?) { runOnUiThread { setMode(0) } }
+                override fun onError(id: String?) { runOnUiThread { setMode(0) } }
+            })
+        }
     }
 
     override fun onRequestPermissionsResult(c: Int, p: Array<out String>, r: IntArray) {
@@ -109,9 +268,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         recognizer?.destroy()
         val r = SpeechRecognizer.createSpeechRecognizer(this)
         r.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(p: Bundle?) { status.text = "बोलो..." }
+            override fun onReadyForSpeech(p: Bundle?) { status.text = "बोलो..."; setMode(1) }
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(v: Float) {}
+            override fun onRmsChanged(v: Float) {
+                val l = ((v + 2f) / 12f).coerceIn(0f, 1f)
+                orb.level = l
+                wave.level = l
+            }
             override fun onBufferReceived(b: ByteArray?) {}
             override fun onEndOfSpeech() { listening = false }
             override fun onEvent(t: Int, p: Bundle?) {}
@@ -128,15 +291,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                         startListen()
                     }, 400)
                 } else if (e == 7 || e == 6) {
+                    setMode(0)
                     status.text = "कुछ सुनाई नहीं दिया, फिर 🎤 दबाओ"
                 } else {
+                    setMode(0)
                     status.text = "सुन नहीं पाया (error $e), फिर 🎤 दबाओ"
                 }
             }
             override fun onResults(res: Bundle?) {
                 listening = false
                 val t = res?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (t != null) ask(t) else status.text = "कुछ सुनाई नहीं दिया"
+                if (t != null) ask(t) else { setMode(0); status.text = "कुछ सुनाई नहीं दिया" }
             }
         })
         recognizer = r
@@ -153,6 +318,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
         listening = true
         status.text = "सुन रहा हूँ..."
+        setMode(1)
         recognizer?.startListening(i)
     }
 
@@ -271,9 +437,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun ask(q: String) {
         val key = prefs.getString("key", "") ?: ""
-        if (key.isEmpty()) { status.text = "पहले API key सेव करो"; return }
+        if (key.isEmpty()) {
+            setMode(0)
+            status.text = "पहले ⚙ दबाकर API key सेव करो"
+            keyPanel.visibility = View.VISIBLE
+            return
+        }
+        setMode(2)
         status.text = "सोच रहा हूँ..."
-        output.append("\nतुम: $q\n")
+        say("\nतुम: $q\n")
         thread {
             try {
                 val contents = JSONArray()
@@ -306,8 +478,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 }
                 if (code != 200) {
                     runOnUiThread {
-                        output.append("\nError $code: ${resp.take(200)}\n")
+                        say("\nError $code: ${resp.take(200)}\n")
                         status.text = "तैयार"
+                        setMode(0)
                     }
                     return@thread
                 }
@@ -335,13 +508,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     }
                     val reply = (if (results.isNotEmpty()) results.joinToString(". ")
                         else texts.toString().trim()).ifEmpty { "ठीक है" }
-                    output.append("\nAI: $reply\n")
+                    say("\nAI: $reply\n")
                     status.text = "तैयार"
                     history.add(Pair(q, reply))
-                    tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "r")
+                    val sr = tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "r")
+                    if (sr != TextToSpeech.SUCCESS) setMode(0)
                 }
             } catch (e: Exception) {
-                runOnUiThread { status.text = "Error: ${e.message}" }
+                runOnUiThread {
+                    status.text = "Error: ${e.message}"
+                    setMode(0)
+                }
             }
         }
     }
