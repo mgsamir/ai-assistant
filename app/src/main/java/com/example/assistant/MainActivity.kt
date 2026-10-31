@@ -6,10 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.text.InputType
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -25,6 +28,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private lateinit var status: TextView
     private lateinit var output: TextView
     private lateinit var keyBox: EditText
+    private var listening = false
+    private var retried = false
     private val prefs by lazy { getSharedPreferences("p", Context.MODE_PRIVATE) }
 
     override fun onCreate(b: Bundle?) {
@@ -36,8 +41,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
         keyBox = EditText(this).apply {
             hint = "Gemini API key यहाँ paste करो"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setText(prefs.getString("key", ""))
-            setSingleLine()
         }
         val save = Button(this).apply {
             text = "Key सेव करो"
@@ -68,6 +73,57 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         if (r.isNotEmpty() && r[0] == PackageManager.PERMISSION_GRANTED) listen()
     }
 
+    private fun makeRecognizer() {
+        recognizer?.destroy()
+        val r = SpeechRecognizer.createSpeechRecognizer(this)
+        r.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(p: Bundle?) { status.text = "बोलो..." }
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(v: Float) {}
+            override fun onBufferReceived(b: ByteArray?) {}
+            override fun onEndOfSpeech() { listening = false }
+            override fun onEvent(t: Int, p: Bundle?) {}
+            override fun onPartialResults(p: Bundle?) {
+                val t = p?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                if (!t.isNullOrEmpty()) status.text = "सुन रहा हूँ: $t"
+            }
+            override fun onError(e: Int) {
+                listening = false
+                if ((e == 11 || e == 5 || e == 8) && !retried) {
+                    retried = true
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        makeRecognizer()
+                        startListen()
+                    }, 400)
+                } else if (e == 7 || e == 6) {
+                    status.text = "कुछ सुनाई नहीं दिया, फिर 🎤 दबाओ"
+                } else {
+                    status.text = "सुन नहीं पाया (error $e), फिर 🎤 दबाओ"
+                }
+            }
+            override fun onResults(res: Bundle?) {
+                listening = false
+                val t = res?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                if (t != null) ask(t) else status.text = "कुछ सुनाई नहीं दिया"
+            }
+        })
+        recognizer = r
+    }
+
+    private fun startListen() {
+        tts.stop()
+        val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+        }
+        listening = true
+        status.text = "सुन रहा हूँ..."
+        recognizer?.startListening(i)
+    }
+
     private fun listen() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1); return
@@ -75,28 +131,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             status.text = "Speech recognition नहीं मिला"; return
         }
-        recognizer?.destroy()
-        recognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        recognizer?.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(p: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(v: Float) {}
-            override fun onBufferReceived(b: ByteArray?) {}
-            override fun onEndOfSpeech() {}
-            override fun onPartialResults(p: Bundle?) {}
-            override fun onEvent(t: Int, p: Bundle?) {}
-            override fun onError(e: Int) { status.text = "सुन नहीं पाया (error $e), फिर कोशिश करो" }
-            override fun onResults(r: Bundle?) {
-                val text = r?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (text != null) ask(text) else status.text = "कुछ सुनाई नहीं दिया"
-            }
-        })
-        val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
+        if (listening) {
+            recognizer?.stopListening(); return
         }
-        recognizer?.startListening(i)
-        status.text = "सुन रहा हूँ..."
+        retried = false
+        if (recognizer == null) makeRecognizer()
+        startListen()
     }
 
     private fun ask(q: String) {
@@ -108,7 +148,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             try {
                 val body = JSONObject()
                     .put("system_instruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text",
-                        "तुम एक दोस्ताना वॉइस असिस्टेंट हो। यूज़र की भाषा (हिंदी/हिंग्लिश/English) में छोटा जवाब दो। कोई * # या markdown मत लगाओ।"))))
+                        "तुम एक दोस्ताना वॉइस असिस्टेंट हो। यूज़र की भाषा (हिंदी/हिंग्लिश/English) में छोटा जवाब दो। आवाज़ से बना टेक्स्ट कभी गलत हो सकता है, इसलिए मतलब समझकर जवाब दो। कोई * # या markdown मत लगाओ।"))))
                     .put("contents", JSONArray().put(JSONObject()
                         .put("role", "user")
                         .put("parts", JSONArray().put(JSONObject().put("text", q)))))
