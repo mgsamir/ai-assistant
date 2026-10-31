@@ -1,59 +1,41 @@
-package com.example.assistant
+import requests
 
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
+def get_smart_weather(user_query, latitude=10.5833, longitude=92.5167):
+    # ओपन-मेटियो (Open-Meteo) फ्री वेदर API से लाइव डेटा फेच करना (GPS कोऑर्डिनेट्स के आधार पर)
+    api_url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current_weather=true"
+    
+    response = requests.get(api_url)
+    if response.status_code != 200:
+        return "क्षमा करें, अभी मौसम की जानकारी नहीं मिल पा रही है।"
+    
+    data = response.json()
+    current = data.get("current_weather", {})
+    temp = current.get("temperature", 28) # तापमान (Celsius)
+    windspeed = current.get("windspeed", 10) # हवा की गति (km/h)
+    weathercode = current.get("weathercode", 0) # मौसम का कोड
+    
+    # यूजर के सवाल को समझना (Query Intent Checking)
+    query = user_query.lower()
+    
+    # यदि यूजर ने तापमान या डिग्री से जुड़ा सवाल पूछा है
+    if "टेम्परेचर" in query or "temperature" in query or "डिग्री" in query or "गर्मी" in query or "ठंडा" in query:
+        return f"यहाँ का अभी का तापमान लगभग {temp}°C है, और हवा की गति {windspeed} किलोमीटर प्रति घंटा है।"
+    
+    # यदि यूजर ने सामान्य मौसम पूछा है (बारिश, धूप, हवा, तूफान या आम हाल)
+    else:
+        # मौसम कोड के आधार पर स्थिति तय करना
+        if weathercode >= 51 and weathercode <= 67:
+            return "आज बारिश होने की संभावना है या बारिश हो रही है, अपना ध्यान रखें।"
+        elif weathercode >= 95:
+            return "आज मौसम खराब है, तेज हवा या तूफान चल रहा है।"
+        elif temp > 32:
+            return "आज अच्छी खासी धूप है और काफी गर्मी है।"
+        else:
+            return "आज मौसम बिल्कुल साफ है, सुहाना दिन है और धूप खिली हुई है।"
 
-object Weather {
-    private fun get(u: String): String {
-        val c = URL(u).openConnection() as HttpURLConnection
-        c.connectTimeout = 10000
-        c.readTimeout = 10000
-        return c.inputStream.bufferedReader().readText()
-    }
+# --- उदाहरण के लिए टेस्टिंग ---
+# यदि आप पूछें: "आज अंडमान/हटवे का मौसम कैसा है?"
+# आउटपुट आएगा: "आज मौसम बिल्कुल साफ है..." या "आज बारिश होने की संभावना है..."
 
-    private fun desc(code: Int): String = when (code) {
-        0 -> "आसमान साफ है"
-        1, 2 -> "हल्के बादल हैं"
-        3 -> "बादल छाए हैं"
-        45, 48 -> "कोहरा है"
-        in 51..57 -> "बूंदाबांदी हो रही है"
-        in 61..67 -> "बारिश हो रही है"
-        in 71..77 -> "बर्फबारी हो रही है"
-        in 80..82 -> "तेज बौछारें पड़ रही हैं"
-        in 95..99 -> "आंधी-तूफान है"
-        else -> "मौसम मिला-जुला है"
-    }
-
-    fun getSmartWeather(query: String, city: String): String {
-        if (city.isBlank()) return "कौन सी जगह का मौसम बताऊँ?"
-        return try {
-            val g = JSONObject(get("https://geocoding-api.open-meteo.com/v1/search?count=1&language=hi&name=" + URLEncoder.encode(city, "UTF-8")))
-            val arr = g.optJSONArray("results")
-            if (arr == null || arr.length() == 0) return "$city नाम की जगह नहीं मिली।"
-            
-            val p = arr.getJSONObject(0)
-            val lat = p.getDouble("latitude")
-            val lon = p.getDouble("longitude")
-            val name = p.optString("name", city)
-
-            val w = JSONObject(get("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,wind_speed_10m"))
-            val cur = w.getJSONObject("current")
-            val temp = cur.getDouble("temperature_2m")
-            val wind = cur.getDouble("wind_speed_10m")
-            val code = cur.getInt("weather_code")
-
-            val q = query.lowercase()
-            // अगर यूजर टेम्परेचर या डिग्री पूछेगा तो नंबर और वैल्यू बताएगा
-            if (q.contains("temperature") || q.contains("temp") || q.contains("degree") || q.contains("डिग्री") || q.contains("टेम्परेचर") || q.contains("गर्मी") || q.contains("ठंडा")) {
-                "यहाँ $name का अभी का तापमान ${temp}°C है और हवा की गति $wind किमी/घंटा है।"
-            } else {
-                // आम बोलचाल में मौसम की स्थिति बताएगा
-                "आज $name में ${desc(code)}।"
-            }
-        } catch (e: Exception) {
-            "मौसम की जानकारी लाने में त्रुटि हुई।"
-        }
-    }
-}
+# यदि आप पूछें: "यहाँ का टेम्परेचर कितना है?"
+# आउटपुट आएगा: "यहाँ का अभी का तापमान लगभग 29°C है..."
