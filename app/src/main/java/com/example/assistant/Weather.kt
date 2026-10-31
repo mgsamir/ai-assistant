@@ -4,7 +4,6 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import kotlin.math.roundToInt
 
 object Weather {
     private fun get(u: String): String {
@@ -22,41 +21,39 @@ object Weather {
         in 51..57 -> "बूंदाबांदी हो रही है"
         in 61..67 -> "बारिश हो रही है"
         in 71..77 -> "बर्फबारी हो रही है"
-        in 80..82 -> "तेज़ बौछारें पड़ रही हैं"
+        in 80..82 -> "तेज बौछारें पड़ रही हैं"
         in 95..99 -> "आंधी-तूफान है"
         else -> "मौसम मिला-जुला है"
     }
 
-    fun today(city: String): String {
-        if (city.isBlank()) return "कौन से शहर का मौसम बताऊँ?"
+    fun getSmartWeather(query: String, city: String): String {
+        if (city.isBlank()) return "कौन सी जगह का मौसम बताऊँ?"
         return try {
-            val g = JSONObject(get(
-                "https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&name=" +
-                    URLEncoder.encode(city, "UTF-8")))
+            val g = JSONObject(get("https://geocoding-api.open-meteo.com/v1/search?count=1&language=hi&name=" + URLEncoder.encode(city, "UTF-8")))
             val arr = g.optJSONArray("results")
-            if (arr == null || arr.length() == 0) return "$city नाम की जगह नहीं मिली"
+            if (arr == null || arr.length() == 0) return "$city नाम की जगह नहीं मिली।"
+            
             val p = arr.getJSONObject(0)
             val lat = p.getDouble("latitude")
             val lon = p.getDouble("longitude")
             val name = p.optString("name", city)
-            val w = JSONObject(get(
-                "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                    "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m" +
-                    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
-                    "&timezone=auto&forecast_days=1"))
+
+            val w = JSONObject(get("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,wind_speed_10m"))
             val cur = w.getJSONObject("current")
-            val day = w.getJSONObject("daily")
-            val t = cur.getDouble("temperature_2m").roundToInt()
-            val feels = cur.getDouble("apparent_temperature").roundToInt()
-            val hum = cur.getDouble("relative_humidity_2m").roundToInt()
-            val wind = cur.getDouble("wind_speed_10m").roundToInt()
-            val d = desc(cur.getInt("weather_code"))
-            val mx = day.getJSONArray("temperature_2m_max").getDouble(0).roundToInt()
-            val mn = day.getJSONArray("temperature_2m_min").getDouble(0).roundToInt()
-            val rain = day.getJSONArray("precipitation_probability_max").optInt(0)
-            "${name} में अभी ${t} डिग्री है और ${d}। महसूस ${feels} डिग्री जैसा हो रहा है, उमस ${hum}% और हवा ${wind} किमी प्रति घंटा। आज कम से कम ${mn} और ज़्यादा से ज़्यादा ${mx} डिग्री रहेगा, बारिश की संभावना ${rain}%।"
+            val temp = cur.getDouble("temperature_2m")
+            val wind = cur.getDouble("wind_speed_10m")
+            val code = cur.getInt("weather_code")
+
+            val q = query.lowercase()
+            // अगर यूजर टेम्परेचर या डिग्री पूछेगा तो नंबर और वैल्यू बताएगा
+            if (q.contains("temperature") || q.contains("temp") || q.contains("degree") || q.contains("डिग्री") || q.contains("टेम्परेचर") || q.contains("गर्मी") || q.contains("ठंडा")) {
+                "यहाँ $name का अभी का तापमान ${temp}°C है और हवा की गति $wind किमी/घंटा है।"
+            } else {
+                // आम बोलचाल में मौसम की स्थिति बताएगा
+                "आज $name में ${desc(code)}।"
+            }
         } catch (e: Exception) {
-            "मौसम नहीं मिल पाया: ${e.message}"
+            "मौसम की जानकारी लाने में त्रुटि हुई।"
         }
     }
 }
