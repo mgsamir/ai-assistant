@@ -19,7 +19,7 @@ import java.util.Locale
 import kotlin.concurrent.thread
 
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
-    private val MODEL = private val MODEL = "gemini-flash-lite-latest"
+    private val MODEL = "gemini-flash-lite-latest"
     private lateinit var tts: TextToSpeech
     private var recognizer: SpeechRecognizer? = null
     private lateinit var status: TextView
