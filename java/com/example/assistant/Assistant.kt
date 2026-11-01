@@ -430,6 +430,8 @@ Never save passwords, OTPs, card numbers or bank details.
         f.put(fn("forget", "Forget a remembered fact",
             JSONObject().put("keyword", str("Main word of the fact to forget. Use ALL to forget everything")),
             listOf("keyword")))
+                f.put(fn("set_ambient", "Turn always-listening mode on or off. Use when the user says hamesha suno, always listen, sunte raho (on) or sunna band karo (off)",
+            JSONObject().put("on", flag("true to listen always, false to stop")), listOf("on")))
         f.put(fn("stop_assistant", "Completely stop and close this assistant when the user asks it to quit",
             JSONObject().put("reason", str("Why, can be empty")), listOf()))
         return JSONArray().put(JSONObject().put("function_declarations", f))
