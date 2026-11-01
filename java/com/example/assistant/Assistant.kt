@@ -168,7 +168,12 @@ Never save passwords, OTPs, card numbers or bank details.
             if (running && ambient && !listening && !busy) beginListen()
         }, delay)
     }
-
+    // टाइप करके भेजा हुआ सवाल
+    fun sendText(q: String) {
+        if (q.isBlank() || busy) return
+        awaiting = 0L
+        ask(q.trim())
+    }
     // मिक/ऑर्ब बटन दबाने पर
     fun talk() {
         awaiting = SystemClock.uptimeMillis() + 8000
