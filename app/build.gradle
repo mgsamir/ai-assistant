@@ -3,7 +3,7 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 android {
-        signingConfigs {
+    signingConfigs {
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
