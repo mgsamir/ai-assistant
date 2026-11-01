@@ -646,6 +646,13 @@ Never save passwords, OTPs, card numbers or bank details.
                 "open_settings" -> openSettings(a.optString("page", "general"))
                 "remember" -> remember(a.getString("fact"))
                 "forget" -> forget(a.getString("keyword"))
+                                "set_ambient" -> {
+                    val on = a.optBoolean("on", true)
+                    setAmbient(on)
+                    if (on) Reply("Ab main hamesha sununga. Pehle assistant bolo, phir baat karo",
+                        "अब मैं हमेशा सुनूँगा। पहले असिस्टेंट बोलो, फिर बात करो")
+                    else Reply("Hamesha sunna band kar diya", "हमेशा सुनना बंद कर दिया")
+                                }
                 "stop_assistant" -> {
                     main.postDelayed({ onQuit?.invoke() }, 3000)
                     Reply("Band ho raha hoon, phir milte hain", "बंद हो रहा हूँ, फिर मिलते हैं")
