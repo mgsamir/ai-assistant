@@ -434,7 +434,28 @@ Never save passwords, OTPs, card numbers or bank details.
             JSONObject().put("reason", str("Why, can be empty")), listOf()))
         return JSONArray().put(JSONObject().put("function_declarations", f))
     }
+    // "haan bilkul" जैसे फालतू शुरुआती शब्द हटाता है
+    private val FILLERS = listOf("haan bilkul", "haan ji", "ji haan", "haan", "han", "bilkul", "zaroor", "jaroor",
+        "theek hai", "thik hai", "samajh gaya", "sure", "of course",
+        "हाँ बिल्कुल", "हां बिल्कुल", "हाँ जी", "हां जी", "हाँ", "हां", "बिल्कुल", "ज़रूर", "जरूर", "ठीक है", "समझ गया")
 
+    private fun stripFiller(x: String): String {
+        var s = x.trim()
+        var again = true
+        while (again) {
+            again = false
+            val low = s.lowercase()
+            for (f in FILLERS) {
+                if (low.startsWith(f) && (low.length == f.length || !low[f.length].isLetter())) {
+                    s = s.substring(f.length).trimStart(',', '.', '!', ' ', '-', '।')
+                    again = true
+                    break
+                }
+            }
+        }
+        if (s.isEmpty()) return x.trim()
+        return s.substring(0, 1).uppercase() + s.substring(1)
+    }
     // मॉडल का जवाब "S: ..." (स्क्रीन) और "V: ..." (आवाज़) में बाँटता है
     private fun parseReply(raw: String): Reply {
         val t = raw.replace("*", "").trim()
