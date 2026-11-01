@@ -37,7 +37,7 @@ interface UiCb {
     fun onLevel(l: Float)
 }
 
-// पूरा दिमाग यहाँ है: सुनना, AI से बात, बोलना, फोन के काम, याद
+    private val WAKE = listOf("jarvis", "hey jarvis", "javis", "jarvish", "जार्विस", "जारविस", "जर्विस", "जार्वीस", "जार्विश", "हे जार्विस")
 class Assistant(private val app: Context) : TextToSpeech.OnInitListener {
     private val MODELS = listOf("gemini-flash-lite-latest", "gemini-flash-latest")
 
