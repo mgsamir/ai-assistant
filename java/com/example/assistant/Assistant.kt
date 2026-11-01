@@ -485,7 +485,7 @@ Never save passwords, OTPs, card numbers or bank details.
         if (s.isEmpty() && v.isEmpty()) return Reply(t, t)
         if (s.isEmpty()) s = v
         if (v.isEmpty()) v = s
-        return Reply(s, v)
+                return Reply(stripFiller(s), stripFiller(v))
     }
 
     private fun apiError(code: Int, body: String): Reply {
