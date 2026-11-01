@@ -36,21 +36,26 @@ import kotlin.concurrent.thread
 
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val MODELS = listOf("gemini-flash-lite-latest", "gemini-flash-latest")
-    private val PERSONA =
-        "तुम अंडमान के एक लोकल दोस्त की तरह बात करो। यूज़र जैसे बोलता है वैसे ही बोलो: आम बोलचाल की सीधी हिंदी, " +
-        "अपनापन वाली, छोटे वाक्य, 'आप' की जगह 'तुम'। यूज़र को कभी-कभी 'भाई', 'दोस्त' या 'यार' कहकर बुलाओ, पर हर वाक्य में नहीं। " +
-        "यूज़र की बोली समझो (जैसे 'मेरा को' का मतलब 'मुझे')। " +
-        "बीच में बंगाली, तमिल, तेलुगु या कोई स्थानीय शब्द आए तो मतलब समझने की कोशिश करो और हिंदी में जवाब दो। " +
-        "यूज़र जो भाषा बोले (हिंदी/हिंग्लिश/English) उसी में छोटा जवाब दो। " +
-        "आवाज़ से बना टेक्स्ट कभी गलत हो सकता है, इसलिए मतलब समझकर जवाब दो। " +
-        "जब यूज़र फोन का कोई काम माँगे (कॉल, अलार्म, टाइमर, ऐप खोलना, मैसेज, टॉर्च, सेटिंग) " +
-        "तो सिर्फ बात मत करो, दिए गए function इस्तेमाल करो। " +
-        "मौसम पूछे तो हमेशा get_weather function इस्तेमाल करो, चाहे जगह छोटी हो, गाँव हो या द्वीप (जैसे Little Andaman, Hut Bay, Diglipur)। कभी मत कहो कि मौसम की जानकारी नहीं है, function खुद ढूँढ लेगा। Google मत खोलो। शहर का नाम अंग्रेज़ी में लिखो। अगर यूज़र का शहर याद की बातों में है तो वही लो, वरना पूछो। " +
-        "web_search सिर्फ तब इस्तेमाल करो जब यूज़र खुद कहे 'Google पर खोजो'। " +
-        "जिन चीज़ों की लाइव जानकारी तुम्हारे पास नहीं है (खबर, स्कोर, भाव) उनके बारे में साफ कहो कि लाइव जानकारी नहीं है, और पूछो कि Google पर खोलूँ क्या। " +
-        "जब यूज़र कहे 'याद रखना', या अपने बारे में कोई पक्की बात बताए (नाम, शहर, परिवार, पसंद, आदत, ज़रूरी तारीख), " +
-        "तो remember function से सेव करो। जब कहे 'भूल जाओ' तो forget function इस्तेमाल करो। " +
-        "पासवर्ड, OTP, कार्ड नंबर या बैंक की जानकारी कभी सेव मत करो। कोई * # या markdown मत लगाओ।"
+
+    private val PERSONA = """
+You are a friendly voice assistant who talks like a local friend from the Andaman Islands.
+Speak casual, everyday Hindi the way a friend talks. Use short sentences. Say "tum", never "aap". Call the user "bhai", "dost" or "yaar" once in a while, not in every sentence.
+Understand the way the user speaks (for example "mera ko" means "mujhe"). If words from Bengali, Tamil, Telugu or another local language appear, work out the meaning and answer in Hindi.
+Voice-to-text can be wrong, so work out the meaning instead of taking every word literally.
+NEVER start a reply with filler such as "haan", "haan bilkul", "bilkul", "zaroor", "samajh gaya", "theek hai", "sure" or "of course". Start directly with the answer. Keep replies short, 1 to 3 sentences, unless the user asks for detail.
+ALWAYS write every reply as exactly two lines:
+S: the reply in Hinglish, meaning Hindi written in English (Roman) letters, for the screen
+V: the same reply in Hindi Devanagari script, for the voice
+If the user speaks English, write both lines in English.
+Never use markdown, asterisks, hashes or emojis.
+When the user asks for a phone action (call, alarm, timer, open app, message, torch, settings), do not just talk: use the provided functions.
+For weather ALWAYS use the get_weather function, even for small places, villages and islands (like Little Andaman, Hut Bay, Diglipur). Never say weather information is unavailable. Write the place name in English. If the user's city is in the remembered facts use it, otherwise ask.
+Use web_search only when the user himself asks to search on Google.
+For live things you cannot know (news, scores, prices) say plainly that you have no live information and ask if you should open Google.
+When the user says "yaad rakhna" or tells you a lasting fact about himself (name, city, family, likes, habits, important dates), save it with the remember function. When he says "bhool jao", use the forget function.
+Never save passwords, OTPs, card numbers or bank details.
+""".trimIndent()
+
     private val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
     private val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
     private lateinit var tts: TextToSpeech
@@ -133,7 +138,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         })
 
         status = TextView(this).apply {
-            text = "तैयार"
+            text = "Taiyaar"
             setTextColor(Color.parseColor("#7FE9FF"))
             textSize = 14f
             gravity = Gravity.CENTER
@@ -152,21 +157,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             visibility = if ((prefs.getString("key", "") ?: "").isEmpty()) View.VISIBLE else View.GONE
         }
         keyBox = EditText(this).apply {
-            hint = "Gemini API key यहाँ paste करो"
+            hint = "Gemini API key yahan paste karo"
             setHintTextColor(Color.parseColor("#4A90A4"))
             setTextColor(Color.WHITE)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setText(prefs.getString("key", ""))
         }
         val save = Button(this).apply {
-            text = "Key सेव करो"
+            text = "Key save karo"
             Neon.styleButton(this)
             setPadding(dp(16), dp(10), dp(16), dp(10))
-            setOnClickListener {
-                prefs.edit().putString("key", keyBox.text.toString().trim()).apply()
-                status.text = "Key सेव हो गई"
-                keyPanel.visibility = View.GONE
-            }
+            setOnClickListener { saveKey() }
         }
         keyPanel.addView(keyBox, lp(MATCH, WRAP))
         keyPanel.addView(save, lp(MATCH, WRAP).apply { topMargin = dp(8) })
@@ -214,26 +215,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             stateListAnimator = null
             setOnClickListener { listen() }
         }
-        val brain = Button(this).apply {
-            text = "🧠"
-            textSize = 22f
-            Neon.styleButton(this)
-            setOnClickListener {
-                val m = loadMem()
-                say("\n🧠 याद की बातें:\n" +
-                    (if (m.isEmpty()) "अभी कुछ याद नहीं है\n" else m.joinToString("\n") { "- $it" } + "\n"))
-            }
-        }
         bar.addView(gear, lp(dp(60), dp(60)).apply { marginEnd = dp(28) })
         bar.addView(mic, lp(dp(84), dp(84)))
-        bar.addView(brain, lp(dp(60), dp(60)).apply { marginStart = dp(28) })
+        bar.addView(View(this), lp(dp(60), dp(60)).apply { marginStart = dp(28) })
         root.addView(bar, lp(MATCH, WRAP))
 
         setContentView(root)
-        say("नमस्ते भाई! मैं तैयार हूँ। 🎤 दबाओ और बोलो।\n")
     }
 
-    private fun say(t: String) {
+    private fun appendOut(t: String) {
         output.append(t)
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
@@ -259,7 +249,67 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     override fun onRequestPermissionsResult(c: Int, p: Array<out String>, r: IntArray) {
         super.onRequestPermissionsResult(c, p, r)
         if (r.isNotEmpty() && r[0] == PackageManager.PERMISSION_GRANTED) {
-            if (c == 1) listen() else status.text = "इजाज़त मिल गई, अब दोबारा बोलो"
+            if (c == 1) listen() else status.text = "Permission mil gayi, ab dobara bolo"
+        }
+    }
+
+    // ---------- API key ----------
+    private fun cleanKey(s: String): String = s.filter { !it.isWhitespace() && it != '"' && it != '\'' }
+
+    private fun saveKey() {
+        val k = cleanKey(keyBox.text.toString())
+        keyBox.setText(k)
+        prefs.edit().putString("key", k).apply()
+        if (k.isEmpty()) {
+            status.text = "Key khaali hai, pehle paste karo"
+            return
+        }
+        status.text = "Key jaanch raha hoon..."
+        thread {
+            val res = checkKey(k)
+            runOnUiThread {
+                status.text = res.first
+                if (res.second) keyPanel.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun checkKey(k: String): Pair<String, Boolean> {
+        return try {
+            val c = URL("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1")
+                .openConnection() as HttpURLConnection
+            c.setRequestProperty("x-goog-api-key", k)
+            c.connectTimeout = 10000
+            c.readTimeout = 10000
+            when (val code = c.responseCode) {
+                200 -> Pair("Key sahi hai, ab mic dabao", true)
+                400, 401, 403 -> Pair("Ye key galat hai. AI Studio se dobara copy karke paste karo", false)
+                else -> Pair("Key check nahi ho paayi (code $code). Thodi der baad try karo", false)
+            }
+        } catch (e: Exception) {
+            Pair("Internet check karo, key check nahi ho paayi", false)
+        }
+    }
+
+    private fun apiError(code: Int, body: String): Reply {
+        return when {
+            code == 400 && body.contains("API key", ignoreCase = true) ->
+                Reply("API key galat hai. Neeche gear dabao aur nayi key paste karo.",
+                    "एपीआई की गलत है। नीचे गियर दबाओ और नई की पेस्ट करो।")
+            code == 400 ->
+                Reply("Request mein kuch gadbad hai.", "रिक्वेस्ट में कुछ गड़बड़ है।")
+            code == 403 ->
+                Reply("Is key ko permission nahi mili. AI Studio mein nayi key banao.",
+                    "इस की को परमिशन नहीं मिली। नई की बनाओ।")
+            code == 429 ->
+                Reply("Free limit ho gayi ya bahut tez ho gaya. Thodi der baad try karo.",
+                    "फ्री लिमिट हो गई है। थोड़ी देर बाद कोशिश करो।")
+            code == 503 ->
+                Reply("Google ka model abhi busy hai. Thodi der baad try karo.",
+                    "गूगल का मॉडल अभी व्यस्त है। थोड़ी देर बाद कोशिश करो।")
+            else ->
+                Reply("Error $code aaya. Thodi der baad try karo.",
+                    "कुछ गड़बड़ हो गई। थोड़ी देर बाद कोशिश करो।")
         }
     }
 
@@ -268,7 +318,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         recognizer?.destroy()
         val r = SpeechRecognizer.createSpeechRecognizer(this)
         r.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(p: Bundle?) { status.text = "बोलो..."; setMode(1) }
+            override fun onReadyForSpeech(p: Bundle?) { status.text = "Bolo..."; setMode(1) }
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(v: Float) {
                 val l = ((v + 2f) / 12f).coerceIn(0f, 1f)
@@ -280,7 +330,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             override fun onEvent(t: Int, p: Bundle?) {}
             override fun onPartialResults(p: Bundle?) {
                 val t = p?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (!t.isNullOrEmpty()) status.text = "सुन रहा हूँ: $t"
+                if (!t.isNullOrEmpty()) status.text = "Sun raha hoon: $t"
             }
             override fun onError(e: Int) {
                 listening = false
@@ -292,16 +342,21 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     }, 400)
                 } else if (e == 7 || e == 6) {
                     setMode(0)
-                    status.text = "कुछ सुनाई नहीं दिया, फिर 🎤 दबाओ"
+                    status.text = "Kuch sunai nahi diya, phir mic dabao"
                 } else {
                     setMode(0)
-                    status.text = "सुन नहीं पाया (error $e), फिर 🎤 दबाओ"
+                    status.text = "Sun nahi paaya (error $e), phir mic dabao"
                 }
             }
             override fun onResults(res: Bundle?) {
                 listening = false
                 val t = res?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (t != null) ask(t) else { setMode(0); status.text = "कुछ सुनाई नहीं दिया" }
+                if (t != null) {
+                    ask(t)
+                } else {
+                    setMode(0)
+                    status.text = "Kuch sunai nahi diya"
+                }
             }
         })
         recognizer = r
@@ -317,7 +372,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
         }
         listening = true
-        status.text = "सुन रहा हूँ..."
+        status.text = "Sun raha hoon..."
         setMode(1)
         recognizer?.startListening(i)
     }
@@ -327,7 +382,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1); return
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            status.text = "Speech recognition नहीं मिला"; return
+            status.text = "Speech recognition nahi mila"; return
         }
         if (listening) {
             recognizer?.stopListening(); return
@@ -352,34 +407,35 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         prefs.edit().putString("mem", JSONArray(list).toString()).apply()
     }
 
-    private fun remember(fact: String): String {
+    private fun remember(fact: String): Reply {
         val f = fact.trim()
-        if (f.isEmpty()) return "क्या याद रखना है, समझ नहीं आया"
+        if (f.isEmpty()) return Reply("Kya yaad rakhna hai, samajh nahi aaya", "क्या याद रखना है, समझ नहीं आया")
         val m = loadMem()
         if (!m.contains(f)) m.add(f)
         while (m.size > 100) m.removeAt(0)
         saveMem(m)
-        return "ठीक है, याद रख लिया"
+        return Reply("Theek hai, yaad rakh liya", "ठीक है, याद रख लिया")
     }
 
-    private fun forget(word: String): String {
+    private fun forget(word: String): Reply {
         val w = word.trim().lowercase()
-        if (w.isEmpty()) return "क्या भूलना है, समझ नहीं आया"
+        if (w.isEmpty()) return Reply("Kya bhoolna hai, samajh nahi aaya", "क्या भूलना है, समझ नहीं आया")
         val m = loadMem()
         if (w == "all") {
             saveMem(emptyList())
-            return "सब कुछ भूल गया"
+            return Reply("Sab kuch bhool gaya", "सब कुछ भूल गया")
         }
         val keep = m.filter { !it.lowercase().contains(w) }
         saveMem(keep)
         val n = m.size - keep.size
-        return if (n > 0) "$n बात भूल गया" else "ऐसी कोई बात याद नहीं थी"
+        return if (n > 0) Reply("$n baat bhool gaya", "$n बात भूल गया")
+        else Reply("Aisi koi baat yaad nahi thi", "ऐसी कोई बात याद नहीं थी")
     }
 
     private fun systemText(): String {
         val mem = loadMem()
         if (mem.isEmpty()) return PERSONA
-        return PERSONA + "\n\nयूज़र के बारे में जो बातें याद हैं:\n" + mem.joinToString("\n") { "- $it" }
+        return PERSONA + "\n\nFacts remembered about the user:\n" + mem.joinToString("\n") { "- $it" }
     }
 
     // ---------- AI से बात ----------
@@ -393,59 +449,102 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun tools(): JSONArray {
         val f = JSONArray()
-        f.put(fn("open_app", "फोन में कोई ऐप खोलो",
-            JSONObject().put("app_name", str("ऐप का नाम अंग्रेज़ी में, जैसे WhatsApp, YouTube, Camera")),
+        f.put(fn("open_app", "Open an app on the phone",
+            JSONObject().put("app_name", str("App name in English, for example WhatsApp, YouTube, Camera")),
             listOf("app_name")))
-        f.put(fn("set_alarm", "अलार्म लगाओ (24 घंटे वाला समय)",
-            JSONObject().put("hour", num("घंटा 0 से 23"))
-                .put("minute", num("मिनट 0 से 59"))
-                .put("label", str("अलार्म का नाम")),
+        f.put(fn("set_alarm", "Set an alarm (24 hour time)",
+            JSONObject().put("hour", num("Hour 0 to 23"))
+                .put("minute", num("Minute 0 to 59"))
+                .put("label", str("Alarm label")),
             listOf("hour", "minute")))
-        f.put(fn("set_timer", "टाइमर लगाओ",
-            JSONObject().put("seconds", num("कुल सेकंड")), listOf("seconds")))
-        f.put(fn("call_contact", "किसी को फोन कॉल करो",
-            JSONObject().put("name_or_number", str("कॉन्टैक्ट का नाम जैसा यूज़र ने बोला, या फोन नंबर")),
+        f.put(fn("set_timer", "Start a timer",
+            JSONObject().put("seconds", num("Total seconds")), listOf("seconds")))
+        f.put(fn("call_contact", "Make a phone call",
+            JSONObject().put("name_or_number", str("Contact name as the user said it, or a phone number")),
             listOf("name_or_number")))
-        f.put(fn("whatsapp_message", "किसी को WhatsApp मैसेज लिखो",
-            JSONObject().put("name_or_number", str("कॉन्टैक्ट का नाम जैसा यूज़र ने बोला, या फोन नंबर"))
-                .put("message", str("भेजने वाला मैसेज")),
+        f.put(fn("whatsapp_message", "Write a WhatsApp message to someone",
+            JSONObject().put("name_or_number", str("Contact name as the user said it, or a phone number"))
+                .put("message", str("Message text")),
             listOf("name_or_number", "message")))
-        f.put(fn("send_sms", "किसी को SMS लिखो",
-            JSONObject().put("name_or_number", str("कॉन्टैक्ट का नाम जैसा यूज़र ने बोला, या फोन नंबर"))
-                .put("message", str("भेजने वाला मैसेज")),
+        f.put(fn("send_sms", "Write an SMS to someone",
+            JSONObject().put("name_or_number", str("Contact name as the user said it, or a phone number"))
+                .put("message", str("Message text")),
             listOf("name_or_number", "message")))
-        f.put(fn("flashlight", "टॉर्च चालू या बंद करो",
-            JSONObject().put("on", flag("true चालू, false बंद")), listOf("on")))
-        f.put(fn("get_weather", "किसी शहर का आज का मौसम बताओ (तापमान, उमस, बारिश)",
-            JSONObject().put("city", str("शहर का नाम अंग्रेज़ी में, जैसे Port Blair। यूज़र ने न बताया हो तो याद की बातों से उसका शहर लो")),
+        f.put(fn("flashlight", "Turn the torch on or off",
+            JSONObject().put("on", flag("true to turn on, false to turn off")), listOf("on")))
+        f.put(fn("get_weather", "Get today's weather for any place, even a small village or island",
+            JSONObject().put("city", str("Place name in English, for example Little Andaman or Port Blair. If the user did not say, use the city from the remembered facts")),
             listOf("city")))
-        f.put(fn("web_search", "Google खोलकर कुछ खोजो। सिर्फ तब जब यूज़र खुद कहे Google पर खोजो",
-            JSONObject().put("query", str("खोजने वाली बात")), listOf("query")))
-        f.put(fn("youtube_search", "YouTube पर कुछ खोजो या चलाओ",
-            JSONObject().put("query", str("खोजने वाली बात")), listOf("query")))
-        f.put(fn("open_settings", "फोन की सेटिंग खोलो",
-            JSONObject().put("page", str("wifi, bluetooth, location, display, sound या general")),
+        f.put(fn("web_search", "Open Google and search. Only when the user himself asks to search on Google",
+            JSONObject().put("query", str("What to search")), listOf("query")))
+        f.put(fn("youtube_search", "Search or play something on YouTube",
+            JSONObject().put("query", str("What to search")), listOf("query")))
+        f.put(fn("open_settings", "Open phone settings",
+            JSONObject().put("page", str("wifi, bluetooth, location, display, sound or general")),
             listOf("page")))
-        f.put(fn("remember", "यूज़र की कोई बात हमेशा के लिए याद रखो",
-            JSONObject().put("fact", str("याद रखने वाली बात, एक छोटे साफ वाक्य में")),
+        f.put(fn("remember", "Remember a lasting fact about the user forever",
+            JSONObject().put("fact", str("The fact, as one short clear sentence")),
             listOf("fact")))
-        f.put(fn("forget", "याद की हुई कोई बात भूल जाओ",
-            JSONObject().put("keyword", str("भूलने वाली बात का मुख्य शब्द। सब कुछ भूलना हो तो ALL")),
+        f.put(fn("forget", "Forget a remembered fact",
+            JSONObject().put("keyword", str("Main word of the fact to forget. Use ALL to forget everything")),
             listOf("keyword")))
         return JSONArray().put(JSONObject().put("function_declarations", f))
+    }
+
+    // मॉडल का जवाब "S: ..." (स्क्रीन) और "V: ..." (आवाज़) में बाँटता है
+    private fun parseReply(raw: String): Reply {
+        val t = raw.replace("*", "").trim()
+        if (t.isEmpty()) return Reply("Ho gaya.", "हो गया।")
+        var s = ""
+        var v = ""
+        var cur = 0
+        val tag = Regex("^([SV])\\s*:\\s*(.*)$")
+        for (line in t.lines()) {
+            val l = line.trim()
+            if (l.isEmpty()) continue
+            val m = tag.find(l)
+            if (m != null) {
+                if (m.groupValues[1] == "S") {
+                    cur = 1
+                    s = m.groupValues[2].trim()
+                } else {
+                    cur = 2
+                    v = m.groupValues[2].trim()
+                }
+            } else if (cur == 2) {
+                v = (v + " " + l).trim()
+            } else {
+                s = (s + " " + l).trim()
+            }
+        }
+        if (s.isEmpty() && v.isEmpty()) return Reply(t, t)
+        if (s.isEmpty()) s = v
+        if (v.isEmpty()) v = s
+        return Reply(s, v)
+    }
+
+    private fun deliver(r: Reply, q: String, save: Boolean) {
+        appendOut("\nAI: ${r.text}\n")
+        status.text = "Taiyaar"
+        if (save) {
+            history.add(Pair(q, "S: ${r.text}\nV: ${r.voice}"))
+            while (history.size > 12) history.removeAt(0)
+        }
+        val sr = tts.speak(r.voice, TextToSpeech.QUEUE_FLUSH, null, "r")
+        if (sr != TextToSpeech.SUCCESS) setMode(0)
     }
 
     private fun ask(q: String) {
         val key = prefs.getString("key", "") ?: ""
         if (key.isEmpty()) {
             setMode(0)
-            status.text = "पहले ⚙ दबाकर API key सेव करो"
+            status.text = "Pehle gear dabakar API key save karo"
             keyPanel.visibility = View.VISIBLE
             return
         }
         setMode(2)
-        status.text = "सोच रहा हूँ..."
-        say("\nतुम: $q\n")
+        status.text = "Soch raha hoon..."
+        appendOut("\nTum: $q\n")
         thread {
             try {
                 val contents = JSONArray()
@@ -468,6 +567,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     val c = URL("https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent")
                         .openConnection() as HttpURLConnection
                     c.requestMethod = "POST"
+                    c.connectTimeout = 15000
+                    c.readTimeout = 40000
                     c.setRequestProperty("Content-Type", "application/json")
                     c.setRequestProperty("x-goog-api-key", key)
                     c.doOutput = true
@@ -477,10 +578,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     if (code != 503 && code != 429) break
                 }
                 if (code != 200) {
+                    val er = apiError(code, resp)
                     runOnUiThread {
-                        say("\nError $code: ${resp.take(200)}\n")
-                        status.text = "तैयार"
                         setMode(0)
+                        deliver(er, q, false)
                     }
                     return@thread
                 }
@@ -496,7 +597,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     }
                 }
                 // मौसम जैसे इंटरनेट वाले काम यहीं पीछे (background) में होते हैं
-                val pre = HashMap<Int, String>()
+                val pre = HashMap<Int, Reply>()
                 calls.forEachIndexed { idx, c ->
                     if (c.getString("name") == "get_weather") {
                         pre[idx] = Weather.today(c.optJSONObject("args")?.optString("city", "") ?: "")
@@ -506,25 +607,24 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     val results = calls.mapIndexed { idx, c ->
                         pre[idx] ?: runAction(c.getString("name"), c.optJSONObject("args") ?: JSONObject())
                     }
-                    val reply = (if (results.isNotEmpty()) results.joinToString(". ")
-                        else texts.toString().trim()).ifEmpty { "ठीक है" }
-                    say("\nAI: $reply\n")
-                    status.text = "तैयार"
-                    history.add(Pair(q, reply))
-                    val sr = tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "r")
-                    if (sr != TextToSpeech.SUCCESS) setMode(0)
+                    val r = if (results.isNotEmpty()) {
+                        Reply(results.joinToString(". ") { it.text }, results.joinToString(". ") { it.voice })
+                    } else {
+                        parseReply(texts.toString())
+                    }
+                    deliver(r, q, true)
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    status.text = "Error: ${e.message}"
                     setMode(0)
+                    status.text = "Error: ${e.message}"
                 }
             }
         }
     }
 
     // ---------- फोन के काम ----------
-    private fun runAction(name: String, a: JSONObject): String {
+    private fun runAction(name: String, a: JSONObject): Reply {
         return try {
             when (name) {
                 "open_app" -> openApp(a.getString("app_name"))
@@ -535,34 +635,35 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 "send_sms" -> sms(a.getString("name_or_number"), a.optString("message", ""))
                 "flashlight" -> torch(a.optBoolean("on", true))
                 "web_search" -> openUrl("https://www.google.com/search?q=" + Uri.encode(a.getString("query")),
-                    "Google पर खोज रहा हूँ")
+                    Reply("Google par khoj raha hoon", "गूगल पर खोज रहा हूँ"))
                 "youtube_search" -> openUrl("https://www.youtube.com/results?search_query=" + Uri.encode(a.getString("query")),
-                    "YouTube पर खोज रहा हूँ")
+                    Reply("YouTube par khoj raha hoon", "यूट्यूब पर खोज रहा हूँ"))
                 "open_settings" -> openSettings(a.optString("page", "general"))
                 "remember" -> remember(a.getString("fact"))
                 "forget" -> forget(a.getString("keyword"))
-                else -> "ये काम मुझे अभी नहीं आता"
+                else -> Reply("Ye kaam mujhe abhi nahi aata", "ये काम मुझे अभी नहीं आता")
             }
         } catch (e: Exception) {
-            "नहीं हो पाया: ${e.message}"
+            Reply("Nahi ho paaya: ${e.message}", "नहीं हो पाया")
         }
     }
 
-    private fun openApp(name: String): String {
+    private fun openApp(name: String): Reply {
         val pm = packageManager
         val q = name.lowercase().trim()
         val apps = pm.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
         val m = apps.firstOrNull { it.loadLabel(pm).toString().lowercase() == q }
             ?: apps.firstOrNull { it.loadLabel(pm).toString().lowercase().contains(q) }
-            ?: return "$name नाम का ऐप नहीं मिला"
+            ?: return Reply("$name naam ka app nahi mila", "$name नाम का ऐप नहीं मिला")
         val li = pm.getLaunchIntentForPackage(m.activityInfo.packageName)
-            ?: return "$name खुल नहीं पाया"
+            ?: return Reply("$name khul nahi paaya", "$name खुल नहीं पाया")
         startActivity(li)
-        return "${m.loadLabel(pm)} खोल रहा हूँ"
+        val label = m.loadLabel(pm).toString()
+        return Reply("$label khol raha hoon", "$label खोल रहा हूँ")
     }
 
-    private fun setAlarm(h: Int, m: Int, label: String): String {
+    private fun setAlarm(h: Int, m: Int, label: String): Reply {
         val i = Intent(AlarmClock.ACTION_SET_ALARM)
             .putExtra(AlarmClock.EXTRA_HOUR, h)
             .putExtra(AlarmClock.EXTRA_MINUTES, m)
@@ -570,15 +671,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
         startActivity(i)
         val mm = "%02d".format(m)
-        return "अलार्म $h:$mm के लिए सेट कर दिया"
+        return Reply("Alarm $h:$mm ke liye set kar diya", "अलार्म $h:$mm के लिए सेट कर दिया")
     }
 
-    private fun setTimer(sec: Int): String {
+    private fun setTimer(sec: Int): Reply {
         val i = Intent(AlarmClock.ACTION_SET_TIMER)
             .putExtra(AlarmClock.EXTRA_LENGTH, sec)
             .putExtra(AlarmClock.EXTRA_SKIP_UI, true)
         startActivity(i)
-        return "$sec सेकंड का टाइमर लगा दिया"
+        return Reply("$sec second ka timer laga diya", "$sec सेकंड का टाइमर लगा दिया")
     }
 
     private fun findNumber(q: String): String? {
@@ -597,18 +698,22 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         return null
     }
 
-    private fun callContact(who: String): String {
+    private fun noNumber(who: String) = Reply(
+        "$who ka number nahi mila. Contacts ki permission dekho ya number bolo",
+        "$who का नंबर नहीं मिला। कॉन्टैक्ट्स की परमिशन देखो या नंबर बोलो")
+
+    private fun callContact(who: String): Reply {
         if (checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.CALL_PHONE), 3)
-            return "कॉल की इजाज़त दो, फिर दोबारा बोलो"
+            return Reply("Call ki permission do, phir dobara bolo", "कॉल की परमिशन दो, फिर दोबारा बोलो")
         }
-        val num = findNumber(who) ?: return "$who का नंबर नहीं मिला। कॉन्टैक्ट्स की इजाज़त देखो या नंबर बोलो"
+        val num = findNumber(who) ?: return noNumber(who)
         startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:" + Uri.encode(num))))
-        return "$who को कॉल लगा रहा हूँ"
+        return Reply("$who ko call laga raha hoon", "$who को कॉल लगा रहा हूँ")
     }
 
-    private fun whatsapp(who: String, msg: String): String {
-        val num = findNumber(who) ?: return "$who का नंबर नहीं मिला। कॉन्टैक्ट्स की इजाज़त देखो या नंबर बोलो"
+    private fun whatsapp(who: String, msg: String): Reply {
+        val num = findNumber(who) ?: return noNumber(who)
         var d = num.filter { it.isDigit() }
         if (d.length == 10) d = "91$d"
         else if (d.length == 11 && d.startsWith("0")) d = "91" + d.drop(1)
@@ -618,32 +723,34 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         } catch (e: Exception) {
             startActivity(Intent(Intent.ACTION_VIEW, url))
         }
-        return "WhatsApp खोल दिया, मैसेज लिख दिया है, भेजने के लिए send दबाओ"
+        return Reply("WhatsApp khol diya, message likh diya hai, bhejne ke liye send dabao",
+            "व्हाट्सऐप खोल दिया, मैसेज लिख दिया है, भेजने के लिए सेंड दबाओ")
     }
 
-    private fun sms(who: String, msg: String): String {
-        val num = findNumber(who) ?: return "$who का नंबर नहीं मिला। कॉन्टैक्ट्स की इजाज़त देखो या नंबर बोलो"
+    private fun sms(who: String, msg: String): Reply {
+        val num = findNumber(who) ?: return noNumber(who)
         val i = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + Uri.encode(num)))
             .putExtra("sms_body", msg)
         startActivity(i)
-        return "SMS तैयार है, भेजने के लिए send दबाओ"
+        return Reply("SMS taiyaar hai, bhejne ke liye send dabao", "एसएमएस तैयार है, भेजने के लिए सेंड दबाओ")
     }
 
-    private fun torch(on: Boolean): String {
+    private fun torch(on: Boolean): Reply {
         val cm = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         val id = cm.cameraIdList.firstOrNull {
             cm.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-        } ?: return "इस फोन में फ्लैश नहीं मिला"
+        } ?: return Reply("Is phone mein flash nahi mila", "इस फोन में फ्लैश नहीं मिला")
         cm.setTorchMode(id, on)
-        return if (on) "टॉर्च चालू कर दी" else "टॉर्च बंद कर दी"
+        return if (on) Reply("Torch chalu kar di", "टॉर्च चालू कर दी")
+        else Reply("Torch band kar di", "टॉर्च बंद कर दी")
     }
 
-    private fun openUrl(url: String, msg: String): String {
+    private fun openUrl(url: String, msg: Reply): Reply {
         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         return msg
     }
 
-    private fun openSettings(page: String): String {
+    private fun openSettings(page: String): Reply {
         val action = when (page.lowercase()) {
             "wifi" -> Settings.ACTION_WIFI_SETTINGS
             "bluetooth" -> Settings.ACTION_BLUETOOTH_SETTINGS
@@ -653,7 +760,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             else -> Settings.ACTION_SETTINGS
         }
         startActivity(Intent(action))
-        return "सेटिंग खोल दी"
+        return Reply("Settings khol di", "सेटिंग खोल दी")
     }
 
     override fun onDestroy() {
