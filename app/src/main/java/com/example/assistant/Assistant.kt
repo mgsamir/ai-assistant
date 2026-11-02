@@ -591,7 +591,6 @@ Never save passwords, OTPs, card numbers or bank details.
                         resp = ""
                     }
                 }
-                }
                 if (code != 200) {
                     val er = apiError(code, resp)
                     main.post {
