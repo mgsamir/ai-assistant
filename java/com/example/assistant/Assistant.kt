@@ -376,11 +376,13 @@ Never save passwords, OTPs, card numbers or bank details.
         else Reply("Aisi koi baat yaad nahi thi", "ऐसी कोई बात याद नहीं थी")
     }
 
-    private fun systemText(): String {
+        private fun systemText(): String {
         val mem = loadMem()
-        if (mem.isEmpty()) return PERSONA
-        return PERSONA + "\n\nFacts remembered about the user:\n" + mem.joinToString("\n") { "- $it" }
-    }
+        val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", Locale.ENGLISH).format(java.util.Date())
+        val base = PERSONA + "\n\nCurrent date and time on the user's phone: " + now
+        if (mem.isEmpty()) return base
+        return base + "\n\nFacts remembered about the user:\n" + mem.joinToString("\n") { "- $it" }
+        }
 
     // ---------- AI से बात ----------
     private fun str(d: String) = JSONObject().put("type", "STRING").put("description", d)
