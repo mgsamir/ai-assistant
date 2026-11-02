@@ -570,7 +570,7 @@ Never save passwords, OTPs, card numbers or bank details.
                     .put("contents", contents)
                 var code = 0
                 var resp = ""
-                                val t0 = SystemClock.uptimeMillis()
+                val t0 = SystemClock.uptimeMillis()
                 for (m in MODELS) {
                     if (SystemClock.uptimeMillis() - t0 > 40000) break
                     try {
