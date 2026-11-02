@@ -117,7 +117,7 @@ Never save passwords, OTPs, card numbers or bank details.
     fun start() {
         if (ambient) scheduleListen(500)
     }
-
+        @JvmName("applyAmbientMode")
     fun setAmbient(on: Boolean) {
         ambient = on
         prefs.edit().putBoolean("ambient", on).apply()
