@@ -39,7 +39,7 @@ interface UiCb {
 
     private val WAKE = listOf("jarvis", "hey jarvis", "javis", "jarvish", "जार्विस", "जारविस", "जर्विस", "जार्वीस", "जार्विश", "हे जार्विस")
 class Assistant(private val app: Context) : TextToSpeech.OnInitListener {
-    private val MODELS = listOf("gemini-flash-lite-latest", "gemini-flash-latest")
+        private val MODELS = listOf("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash", "gemini-2.5-flash")
 
     // "assistant" जैसा शब्द बोलने पर ही ambient मोड में जवाब देता है
     private val WAKE = listOf("assistant", "asistant", "jarvis", "असिस्टेंट", "असिस्टैंट", "एसिस्टेंट", "जार्विस", "जारविस", "सुनो", "ओए")
@@ -568,14 +568,14 @@ Never save passwords, OTPs, card numbers or bank details.
                         .openConnection() as HttpURLConnection
                     c.requestMethod = "POST"
                     c.connectTimeout = 15000
-                    c.readTimeout = 40000
+                    c.readTimeout = 20000
                     c.setRequestProperty("Content-Type", "application/json")
                     c.setRequestProperty("x-goog-api-key", key)
                     c.doOutput = true
                     c.outputStream.use { it.write(body.toString().toByteArray()) }
                     code = c.responseCode
                     resp = (if (code == 200) c.inputStream else c.errorStream).bufferedReader().readText()
-                    if (code != 503 && code != 429) break
+                                                            if (code == 200 || code == 401 || code == 403 || (code == 400 && resp.contains("API key", ignoreCase = true))) break
                 }
                 if (code != 200) {
                     val er = apiError(code, resp)
