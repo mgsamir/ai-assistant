@@ -175,7 +175,7 @@ class MainActivity : Activity() {
             setPadding(dp(24), dp(5), dp(24), dp(5))
         }
         center.addView(pill, lp(WRAP, WRAP).apply { topMargin = dp(2) })
-        status = label("Taiyaar", 13f, DIM, false)
+                status = label("Taiyaar v44", 13f, DIM, false)
         status.gravity = Gravity.CENTER
         center.addView(status, lp(MATCH, WRAP).apply { topMargin = dp(2) })
         wave = WaveView(this)
