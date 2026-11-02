@@ -128,7 +128,7 @@ Never save passwords, OTPs, card numbers or bank details.
             try { recognizer?.cancel() } catch (e: Exception) { }
             listening = false
             mode(0)
-            status("Taiyaar")
+            
         }
     }
 
@@ -523,7 +523,7 @@ Never save passwords, OTPs, card numbers or bank details.
 
     private fun deliver(r: Reply, q: String, save: Boolean) {
         chat("\nAI: ${r.text}\n")
-        status("Taiyaar")
+        
         if (save) {
             history.add(Pair(q, "S: ${r.text}\nV: ${r.voice}"))
             while (history.size > 12) history.removeAt(0)
