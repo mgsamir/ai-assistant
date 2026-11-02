@@ -501,6 +501,9 @@ Never save passwords, OTPs, card numbers or bank details.
 
     private fun apiError(code: Int, body: String): Reply {
         return when {
+                        code == 0 ->
+                Reply("Jawab nahi aaya. Net ya Google ka model dheema hai, dobara bolo.",
+                    "जवाब नहीं आया। नेट या गूगल का मॉडल धीमा है, दोबारा बोलो।")
             code == 400 && body.contains("API key", ignoreCase = true) ->
                 Reply("API key galat hai. App kholkar gear dabao aur nayi key paste karo.",
                     "एपीआई की गलत है। ऐप खोलकर गियर दबाओ और नई की पेस्ट करो।")
@@ -567,19 +570,27 @@ Never save passwords, OTPs, card numbers or bank details.
                     .put("contents", contents)
                 var code = 0
                 var resp = ""
+                                val t0 = SystemClock.uptimeMillis()
                 for (m in MODELS) {
-                    val c = URL("https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent")
-                        .openConnection() as HttpURLConnection
-                    c.requestMethod = "POST"
-                    c.connectTimeout = 15000
-                    c.readTimeout = 20000
-                    c.setRequestProperty("Content-Type", "application/json")
-                    c.setRequestProperty("x-goog-api-key", key)
-                    c.doOutput = true
-                    c.outputStream.use { it.write(body.toString().toByteArray()) }
-                    code = c.responseCode
-                    resp = (if (code == 200) c.inputStream else c.errorStream).bufferedReader().readText()
-                                                            if (code == 200 || code == 401 || code == 403 || (code == 400 && resp.contains("API key", ignoreCase = true))) break
+                    if (SystemClock.uptimeMillis() - t0 > 40000) break
+                    try {
+                        val c = URL("https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent")
+                            .openConnection() as HttpURLConnection
+                        c.requestMethod = "POST"
+                        c.connectTimeout = 8000
+                        c.readTimeout = 12000
+                        c.setRequestProperty("Content-Type", "application/json")
+                        c.setRequestProperty("x-goog-api-key", key)
+                        c.doOutput = true
+                        c.outputStream.use { it.write(body.toString().toByteArray()) }
+                        code = c.responseCode
+                        resp = (if (code == 200) c.inputStream else c.errorStream).bufferedReader().readText()
+                        if (code == 200 || code == 401 || code == 403 || (code == 400 && resp.contains("API key", ignoreCase = true))) break
+                    } catch (e: Exception) {
+                        code = 0
+                        resp = ""
+                    }
+                }
                 }
                 if (code != 200) {
                     val er = apiError(code, resp)
