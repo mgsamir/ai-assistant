@@ -439,6 +439,8 @@ Never save passwords, OTPs, card numbers or bank details.
         f.put(fn("forget", "Forget a remembered fact",
             JSONObject().put("keyword", str("Main word of the fact to forget. Use ALL to forget everything")),
             listOf("keyword")))
+                f.put(fn("wake_screen", "Turn the phone screen on (wake up the display) when the user says screen on karo, display chalu karo, phone jagao",
+            JSONObject().put("seconds", num("How many seconds to keep it on, default 20")), listOf()))
                 f.put(fn("set_ambient", "Turn always-listening mode on or off. Use when the user says hamesha suno, always listen, sunte raho (on) or sunna band karo (off)",
             JSONObject().put("on", flag("true to listen always, false to stop")), listOf("on")))
         f.put(fn("stop_assistant", "Completely stop and close this assistant when the user asks it to quit",
@@ -663,6 +665,7 @@ Never save passwords, OTPs, card numbers or bank details.
                 "youtube_search" -> openUrl("https://www.youtube.com/results?search_query=" + Uri.encode(a.getString("query")),
                     Reply("YouTube par khoj raha hoon", "यूट्यूब पर खोज रहा हूँ"))
                 "open_settings" -> openSettings(a.optString("page", "general"))
+                "wake_screen" -> wakeScreen(a.optInt("seconds", 20))
                 "remember" -> remember(a.getString("fact"))
                 "forget" -> forget(a.getString("keyword"))
                                 "set_ambient" -> {
@@ -710,11 +713,21 @@ Never save passwords, OTPs, card numbers or bank details.
         if (pkg == app.packageName) {
             return Reply("Mujhe band karna ho to bolo: band ho ja", "मुझे बंद करना हो तो बोलो: बंद हो जा")
         }
-        val am = app.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        am.killBackgroundProcesses(pkg)
-        return Reply("$label ko background se band kar diya", "$label को बैकग्राउंड से बंद कर दिया")
+                val am = app.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        go(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
+        main.postDelayed({ try { am.killBackgroundProcesses(pkg) } catch (e: Exception) { } }, 1500)
+        main.postDelayed({ try { am.killBackgroundProcesses(pkg) } catch (e: Exception) { } }, 4000)
+        return Reply("$label band kar raha hoon", "$label बंद कर रहा हूँ")
     }
-
+    @Suppress("DEPRECATION")
+    private fun wakeScreen(sec: Int): Reply {
+        val pm = app.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val wl = pm.newWakeLock(
+            android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            "assistant:wake")
+        wl.acquire(sec.coerceIn(5, 120) * 1000L)
+        return Reply("Screen on kar di", "स्क्रीन चालू कर दी")
+    }
     private fun setAlarm(h: Int, m: Int, label: String): Reply {
         val i = Intent(AlarmClock.ACTION_SET_ALARM)
             .putExtra(AlarmClock.EXTRA_HOUR, h)
