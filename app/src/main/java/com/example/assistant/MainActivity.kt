@@ -314,7 +314,7 @@ class MainActivity : Activity() {
 
         setContentView(root)
         netTv.text = ambientText(ambientSw.isChecked)
-        showPage(if ((prefs.getString("key", "") ?: "").isEmpty()) 2 else 0)
+        showPage(if (Keys.get(prefs).isEmpty()) 2 else 0)
 
         // ज़रूरी permissions, फिर सर्विस शुरू
         val need = mutableListOf(

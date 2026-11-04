@@ -17,7 +17,18 @@ jobs:
           gradle-version: 8.7
       - name: Restore signing key
         run: base64 -d app/debug.keystore.b64 > app/debug.keystore
+      - name: Check Gemini key
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::warning::GEMINI_API_KEY secret khaali hai, app mein key haath se daalni padegi"
+          else
+            echo "Gemini key mil gayi"
+          fi
       - run: gradle assembleDebug --no-daemon
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       - uses: actions/upload-artifact@v4
         with:
           name: my-assistant-apk

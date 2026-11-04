@@ -543,7 +543,7 @@ Never save passwords, OTPs, card numbers or bank details.
     }
 
     private fun ask(q: String) {
-        val key = prefs.getString("key", "") ?: ""
+        val key = Keys.get(prefs)
         if (key.isEmpty()) {
             mode(0)
             status("Pehle app kholkar gear dabao aur API key save karo")
