@@ -262,7 +262,7 @@ class MainActivity : Activity() {
             text = "Hamesha suno (wake word bolo)"
             setTextColor(Color.WHITE)
             textSize = 14f
-            isChecked = prefs.getBoolean("ambient", false)
+            isChecked = false
             setOnCheckedChangeListener { _, on -> setAmb(on) }
         }
         val stop = Button(this).apply {
@@ -274,7 +274,6 @@ class MainActivity : Activity() {
         }
         keyPanel.addView(keyBox, lp(MATCH, WRAP))
         keyPanel.addView(save, lp(MATCH, WRAP).apply { topMargin = dp(6) })
-        keyPanel.addView(ambientSw, lp(MATCH, WRAP).apply { topMargin = dp(10) })
         keyPanel.addView(stop, lp(MATCH, WRAP).apply { topMargin = dp(10) })
         val settingsScroll = ScrollView(this)
         settingsScroll.addView(keyPanel)
@@ -295,8 +294,6 @@ class MainActivity : Activity() {
             setPadding(dp(10), dp(6), dp(10), dp(6))
         }
         val m = dp(4)
-        bar.addView(iconBtn("👂", 44, 18f) { setAmb(!ambientSw.isChecked) },
-            lp(dp(44), dp(44)).apply { leftMargin = m; rightMargin = m })
         bar.addView(iconBtn("⌨", 44, 18f) { typeDialog() },
             lp(dp(44), dp(44)).apply { leftMargin = m; rightMargin = m })
         bar.addView(iconBtn("📷", 44, 16f) { soon() },
@@ -372,7 +369,7 @@ class MainActivity : Activity() {
 
     // ---------- बटन ----------
     private fun ambientText(on: Boolean): String =
-        if (on) "Hamesha suno: CHALU" else "Hamesha suno: BAND"
+        "Mic dabao, tabhi sunta hoon"
 
     private fun setAmb(on: Boolean) {
         val e = AssistantService.engine

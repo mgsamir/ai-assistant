@@ -87,7 +87,9 @@ Never save passwords, OTPs, card numbers or bank details.
     private val history = mutableListOf<Pair<String, String>>()
 
     init {
-        ambient = prefs.getBoolean("ambient", false)
+        // Hamesha sunne wala mode band hai. Mic sirf button dabane par sunta hai.
+        ambient = false
+        prefs.edit().putBoolean("ambient", false).apply()
     }
 
     // ---------- UI को खबर ----------
@@ -119,17 +121,9 @@ Never save passwords, OTPs, card numbers or bank details.
     }
         @JvmName("applyAmbientMode")
     fun setAmbient(on: Boolean) {
-        ambient = on
-        prefs.edit().putBoolean("ambient", on).apply()
-        if (on) {
-            status("Hamesha sun raha hoon. Bolo: assistant")
-            if (!listening && !busy) scheduleListen(200)
-        } else {
-            try { recognizer?.cancel() } catch (e: Exception) { }
-            listening = false
-            mode(0)
-            
-        }
+        // Hamesha sunna band hai, isliye "on" ko ignore karte hain
+        ambient = false
+        prefs.edit().putBoolean("ambient", false).apply()
     }
 
     fun shutdown() {
@@ -441,8 +435,6 @@ Never save passwords, OTPs, card numbers or bank details.
             listOf("keyword")))
                 f.put(fn("wake_screen", "Turn the phone screen on (wake up the display) when the user says screen on karo, display chalu karo, phone jagao",
             JSONObject().put("seconds", num("How many seconds to keep it on, default 20")), listOf()))
-                f.put(fn("set_ambient", "Turn always-listening mode on or off. Use when the user says hamesha suno, always listen, sunte raho (on) or sunna band karo (off)",
-            JSONObject().put("on", flag("true to listen always, false to stop")), listOf("on")))
         f.put(fn("stop_assistant", "Completely stop and close this assistant when the user asks it to quit",
             JSONObject().put("reason", str("Why, can be empty")), listOf()))
         return JSONArray().put(JSONObject().put("function_declarations", f))
@@ -668,13 +660,6 @@ Never save passwords, OTPs, card numbers or bank details.
                 "wake_screen" -> wakeScreen(a.optInt("seconds", 20))
                 "remember" -> remember(a.getString("fact"))
                 "forget" -> forget(a.getString("keyword"))
-                                "set_ambient" -> {
-                    val on = a.optBoolean("on", true)
-                    setAmbient(on)
-                    if (on) Reply("Ab main hamesha sununga. Pehle assistant bolo, phir baat karo",
-                        "अब मैं हमेशा सुनूँगा। पहले असिस्टेंट बोलो, फिर बात करो")
-                    else Reply("Hamesha sunna band kar diya", "हमेशा सुनना बंद कर दिया")
-                                }
                 "stop_assistant" -> {
                     main.postDelayed({ onQuit?.invoke() }, 3000)
                     Reply("Band ho raha hoon, phir milte hain", "बंद हो रहा हूँ, फिर मिलते हैं")
