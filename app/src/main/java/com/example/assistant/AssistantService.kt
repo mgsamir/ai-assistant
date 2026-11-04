@@ -18,7 +18,7 @@ import android.os.IBinder
 class AssistantService : Service() {
     companion object {
         var engine: Assistant? = null
-        const val CH = "assistant"
+        const val CH = "assistant_quiet"
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -57,7 +57,7 @@ class AssistantService : Service() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(
-                NotificationChannel(CH, "AI Assistant", NotificationManager.IMPORTANCE_LOW))
+                NotificationChannel(CH, "AI Assistant", NotificationManager.IMPORTANCE_MIN))
         }
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
@@ -68,6 +68,7 @@ class AssistantService : Service() {
         b.setSmallIcon(android.R.drawable.ic_btn_speak_now)
         b.setContentTitle("AI Assistant chal raha hai")
         b.setContentText("Band karne ke liye Stop dabao")
+        b.setShowWhen(false)
         b.setContentIntent(open)
         b.setOngoing(true)
         b.addAction(Notification.Action.Builder(
