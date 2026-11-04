@@ -318,7 +318,6 @@ class MainActivity : Activity() {
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.CALL_PHONE)
-        if (Build.VERSION.SDK_INT >= 33) need.add("android.permission.POST_NOTIFICATIONS")
         val missing = need.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) {
             requestPermissions(missing.toTypedArray(), 1)
@@ -398,13 +397,12 @@ class MainActivity : Activity() {
     }
 
     private fun quitAll() {
-        startService(Intent(this, AssistantService::class.java).setAction("STOP"))
+        AssistantService.stop()
         finish()
     }
 
     private fun startSvc() {
-        val i = Intent(this, AssistantService::class.java)
-        if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
+        AssistantService.ensure(this)
     }
 
     override fun onRequestPermissionsResult(c: Int, p: Array<out String>, r: IntArray) {
@@ -426,6 +424,11 @@ class MainActivity : Activity() {
     override fun onStop() {
         AssistantService.engine?.listeners?.remove(cb)
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        if (isFinishing) AssistantService.stop()
+        super.onDestroy()
     }
 
     // सर्विस थोड़ी देर में तैयार होती है, इसलिए कुछ बार दोबारा कोशिश
