@@ -166,6 +166,7 @@ Never save passwords, OTPs, card numbers or bank details.
         }, delay)
     }
     // Jawab ke neeche speaker dabane par wahi jawab dobara bolo (dobara dabane par ruk jao)
+    fun isBusy(): Boolean = busy
     fun replay(screenText: String) {
         if (busy) {
             try { tts.stop() } catch (e: Exception) { }

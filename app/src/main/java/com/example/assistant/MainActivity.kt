@@ -33,6 +33,7 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -156,8 +157,8 @@ class MainActivity : Activity() {
     private val cb = object : UiCb {
         override fun onStatus(s: String) {}
         override fun onChat(s: String) { runOnUiThread { showChat(s) } }
-        override fun onMode(m: Int) {}
-        override fun onLevel(l: Float) {}
+        override fun onMode(m: Int) { runOnUiThread { orb.mode = m; orbStatus.text = orbLabel(m) } }
+        override fun onLevel(l: Float) { orb.level = l }
     }
 
     private fun showChat(raw: String) {
@@ -427,7 +428,10 @@ class MainActivity : Activity() {
             ins
         }
 
-        setContentView(root)
+        setContentView(FrameLayout(this).apply {
+            addView(root, FrameLayout.LayoutParams(-1, -1))
+            addView(buildOrbScreen(), FrameLayout.LayoutParams(-1, -1))
+        })
         root.requestApplyInsets()
 
         // zaroori permissions, phir assistant shuru
@@ -447,7 +451,7 @@ class MainActivity : Activity() {
     private fun sendInput() {
         val t = input.text.toString().trim()
         if (t.isEmpty()) {
-            talk()
+            openOrb()
             return
         }
         val e = AssistantService.engine
@@ -505,6 +509,59 @@ class MainActivity : Activity() {
         } else if (n > 0) {
             h.postDelayed({ attach(n - 1) }, 300)
         }
+    }
+
+    // ---------- voice orb screen ----------
+    private lateinit var orb: OrbView
+    private lateinit var orbStatus: TextView
+    private lateinit var orbScreen: FrameLayout
+
+    private fun orbLabel(m: Int) = when (m) {
+        1 -> "Sun raha hoon..."
+        2 -> "Soch raha hoon..."
+        3 -> "Bol raha hoon..."
+        else -> "Orb ko dabao aur bolo"
+    }
+
+    private fun buildOrbScreen(): FrameLayout {
+        orb = OrbView(this)
+        orbStatus = TextView(this).apply {
+            text = orbLabel(0)
+            setTextColor(Color.parseColor("#9AA3B5"))
+            textSize = 15f
+            gravity = Gravity.CENTER
+        }
+        val close = icon(1, 56) { closeOrb() }
+        close.rotation = 45f
+        close.tint = Color.BLACK
+        close.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) }
+        orb.setOnClickListener { talk() }
+        orbScreen = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
+            visibility = View.GONE
+            isClickable = true
+            addView(orb, FrameLayout.LayoutParams(-1, -1))
+            addView(orbStatus, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { bottomMargin = dp(170) })
+            addView(close, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(70) })
+        }
+        return orbScreen
+    }
+
+    private fun openOrb() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(input.windowToken, 0)
+        orbScreen.visibility = View.VISIBLE
+        orb.invalidate()
+        talk()
+    }
+
+    private fun closeOrb() {
+        orbScreen.visibility = View.GONE
+        AssistantService.engine?.let { if (it.isBusy()) it.replay("") }
+    }
+
+    override fun onBackPressed() {
+        if (orbScreen.visibility == View.VISIBLE) closeOrb() else super.onBackPressed()
     }
 
     private fun talk() {
