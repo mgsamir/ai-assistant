@@ -86,6 +86,8 @@ Never save passwords, OTPs, card numbers or bank details.
     private var awaiting = 0L
     private val history = mutableListOf<Pair<String, String>>()
     private val voiceFor = HashMap<String, String>()
+    // typed sawal ka jawab sirf likha aaye, bola na jaye
+    @Volatile private var silent = false
 
     init {
         // Hamesha sunne wala mode band hai. Mic sirf button dabane par sunta hai.
