@@ -1,1 +1,1 @@
-# my-assistant
+# ai-assistant
