@@ -31,6 +31,7 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -299,7 +300,9 @@ class MainActivity : Activity() {
                 View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
                 View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
         }
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        window.setSoftInputMode(
+            if (Build.VERSION.SDK_INT >= 30) WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+            else WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -371,7 +374,7 @@ class MainActivity : Activity() {
             background = null
             maxLines = 4
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            imeOptions = EditorInfo.IME_ACTION_SEND
+            imeOptions = EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             setPadding(dp(6), dp(12), dp(6), dp(12))
             setOnEditorActionListener { _, id, _ ->
                 if (id == EditorInfo.IME_ACTION_SEND) { sendInput(); true } else false
@@ -450,7 +453,14 @@ class MainActivity : Activity() {
             return
         }
         e.sendText(t)
-        input.setText("")
+        input.text?.clear()
+        input.requestFocus()
+        input.post {
+            input.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.restartInput(input)
+            imm.showSoftInput(input, 0)
+        }
     }
 
     private fun startSvc() {
