@@ -172,7 +172,7 @@ class MainActivity : Activity() {
     }
 
     private fun scrollDown() {
-        chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
+        chatScroll.post { chatScroll.scrollTo(0, chatList.height) }
     }
 
     // Meri baat: daayin taraf, gol bubble
@@ -223,6 +223,8 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#E8EAF0"))
             setLineSpacing(0f, 1.25f)
             setTextIsSelectable(true)
+            isFocusable = false
+            isFocusableInTouchMode = false
         }
         box.addView(tv)
 
@@ -348,6 +350,7 @@ class MainActivity : Activity() {
         // ---------- beech ka hissa: baat-cheet ----------
         chatList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         chatScroll = ScrollView(this).apply {
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             isVerticalScrollBarEnabled = false
             addView(chatList, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
@@ -458,7 +461,6 @@ class MainActivity : Activity() {
         input.post {
             input.requestFocus()
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            imm.restartInput(input)
             imm.showSoftInput(input, 0)
         }
     }
