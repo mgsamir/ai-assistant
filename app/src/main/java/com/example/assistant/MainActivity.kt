@@ -133,8 +133,8 @@ class IconView(ctx: Context) : View(ctx) {
                 t.lineTo(7f, 10f)
                 t.close()
                 c.drawPath(t, p)
-                c.drawArc(RectF(12f, 8.5f, 19f, 15.5f), -55f, 110f, false, p)
-                c.drawArc(RectF(11f, 5f, 25f, 19f), -40f, 80f, false, p)
+                c.drawArc(RectF(10f, 8.5f, 17f, 15.5f), -50f, 100f, false, p)
+                c.drawArc(RectF(6.5f, 5f, 20.5f, 19f), -45f, 90f, false, p)
             }
         }
         c.restore()
@@ -251,11 +251,11 @@ class MainActivity : Activity() {
         })
         acts.addView(icon(9, 44) { soon() })
         acts.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        acts.addView(icon(10, 44) { soon() })
+        acts.addView(icon(10, 44) { AssistantService.engine?.replay(text) })
         box.addView(acts, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dp(8)
             leftMargin = -dp(10)
-            rightMargin = -dp(10)
+            rightMargin = dp(4)
         })
         chatList.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dp(8)

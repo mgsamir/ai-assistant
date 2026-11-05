@@ -85,6 +85,7 @@ Never save passwords, OTPs, card numbers or bank details.
     private var errs = 0
     private var awaiting = 0L
     private val history = mutableListOf<Pair<String, String>>()
+    private val voiceFor = HashMap<String, String>()
 
     init {
         // Hamesha sunne wala mode band hai. Mic sirf button dabane par sunta hai.
@@ -164,6 +165,23 @@ Never save passwords, OTPs, card numbers or bank details.
             if (running && ambient && !listening && !busy) beginListen()
         }, delay)
     }
+    // Jawab ke neeche speaker dabane par wahi jawab dobara bolo (dobara dabane par ruk jao)
+    fun replay(screenText: String) {
+        if (busy) {
+            try { tts.stop() } catch (e: Exception) { }
+            busy = false
+            mode(0)
+            return
+        }
+        val v = voiceFor[screenText] ?: screenText
+        busy = true
+        val sr = tts.speak(v, TextToSpeech.QUEUE_FLUSH, null, "r")
+        if (sr != TextToSpeech.SUCCESS) {
+            busy = false
+            mode(0)
+        }
+    }
+
     // टाइप करके भेजा हुआ सवाल
     fun sendText(q: String) {
         if (q.isBlank() || busy) return
@@ -520,6 +538,7 @@ Never save passwords, OTPs, card numbers or bank details.
 
     private fun deliver(r: Reply, q: String, save: Boolean) {
         chat("\nAI: ${r.text}\n")
+        voiceFor[r.text] = r.voice
         
         if (save) {
             history.add(Pair(q, "S: ${r.text}\nV: ${r.voice}"))
