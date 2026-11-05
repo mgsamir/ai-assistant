@@ -186,10 +186,12 @@ Never save passwords, OTPs, card numbers or bank details.
     fun sendText(q: String) {
         if (q.isBlank() || busy) return
         awaiting = 0L
+        silent = true
         ask(q.trim())
     }
     // मिक/ऑर्ब बटन दबाने पर
     fun talk() {
+        silent = false
         awaiting = SystemClock.uptimeMillis() + 8000
         if (busy) {
             try { tts.stop() } catch (e: Exception) { }
@@ -543,6 +545,11 @@ Never save passwords, OTPs, card numbers or bank details.
         if (save) {
             history.add(Pair(q, "S: ${r.text}\nV: ${r.voice}"))
             while (history.size > 12) history.removeAt(0)
+        }
+        if (silent) {
+            busy = false
+            mode(0)
+            return
         }
         busy = true
         val sr = tts.speak(r.voice, TextToSpeech.QUEUE_FLUSH, null, "r")
