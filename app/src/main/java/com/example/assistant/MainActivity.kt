@@ -2,12 +2,16 @@ package com.example.assistant
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -29,10 +33,11 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
-// Chhote line-icons: 0 menu, 1 plus, 2 mic, 3 wave, 4 send
+// Chhote line-icons: 0 menu, 1 plus, 2 mic, 3 wave, 4 send, 5 like, 6 dislike, 7 share, 8 copy, 9 more, 10 speaker
 class IconView(ctx: Context) : View(ctx) {
     var kind = 0
         set(v) { field = v; invalidate() }
@@ -65,10 +70,71 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawLine(12f, 5f, 12f, 19f, p)
                 c.drawLine(16f, 9f, 16f, 15f, p)
             }
-            else -> {
+            4 -> {
                 c.drawLine(12f, 19f, 12f, 5f, p)
                 c.drawLine(6f, 11f, 12f, 5f, p)
                 c.drawLine(12f, 5f, 18f, 11f, p)
+            }
+            5, 6 -> {
+                if (kind == 6) c.rotate(180f, 12f, 12f)
+                c.drawRect(4f, 11f, 7f, 20f, p)
+                val t = Path()
+                t.moveTo(7f, 11f)
+                t.lineTo(10.5f, 4f)
+                t.cubicTo(12.1f, 4f, 13.2f, 5.2f, 12.9f, 6.8f)
+                t.lineTo(12.4f, 10f)
+                t.lineTo(18f, 10f)
+                t.quadTo(20.4f, 10f, 20.4f, 13f)
+                t.lineTo(19.3f, 18.2f)
+                t.quadTo(19f, 20f, 16.9f, 20f)
+                t.lineTo(7f, 20f)
+                c.drawPath(t, p)
+            }
+            7 -> {
+                c.drawLine(12f, 15f, 12f, 4f, p)
+                c.drawLine(8f, 8f, 12f, 4f, p)
+                c.drawLine(12f, 4f, 16f, 8f, p)
+                val t = Path()
+                t.moveTo(5f, 12f)
+                t.lineTo(5f, 18f)
+                t.quadTo(5f, 20f, 7f, 20f)
+                t.lineTo(17f, 20f)
+                t.quadTo(19f, 20f, 19f, 18f)
+                t.lineTo(19f, 12f)
+                c.drawPath(t, p)
+            }
+            8 -> {
+                c.drawRoundRect(RectF(9f, 9f, 20f, 20f), 2.5f, 2.5f, p)
+                val t = Path()
+                t.moveTo(15f, 9f)
+                t.lineTo(15f, 6.5f)
+                t.quadTo(15f, 4f, 12.5f, 4f)
+                t.lineTo(6.5f, 4f)
+                t.quadTo(4f, 4f, 4f, 6.5f)
+                t.lineTo(4f, 12.5f)
+                t.quadTo(4f, 15f, 6.5f, 15f)
+                t.lineTo(9f, 15f)
+                c.drawPath(t, p)
+            }
+            9 -> {
+                p.style = Paint.Style.FILL
+                c.drawCircle(5f, 12f, 1.7f, p)
+                c.drawCircle(12f, 12f, 1.7f, p)
+                c.drawCircle(19f, 12f, 1.7f, p)
+                p.style = Paint.Style.STROKE
+            }
+            else -> {
+                val t = Path()
+                t.moveTo(4f, 10f)
+                t.lineTo(4f, 14f)
+                t.lineTo(7f, 14f)
+                t.lineTo(12f, 18f)
+                t.lineTo(12f, 6f)
+                t.lineTo(7f, 10f)
+                t.close()
+                c.drawPath(t, p)
+                c.drawArc(RectF(12f, 8.5f, 19f, 15.5f), -55f, 110f, false, p)
+                c.drawArc(RectF(11f, 5f, 25f, 19f), -40f, 80f, false, p)
             }
         }
         c.restore()
@@ -79,15 +145,134 @@ class MainActivity : Activity() {
     private val h = Handler(Looper.getMainLooper())
     private lateinit var input: EditText
     private lateinit var voiceBtn: IconView
+    private lateinit var chatList: LinearLayout
+    private lateinit var chatScroll: ScrollView
+    private var pending: View? = null
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
-    // Abhi screen saaf rakhi hai, isliye engine ki khabrein dikhayi nahi jaatin
+    // Engine se aane wali baat-cheet screen par dikhao
     private val cb = object : UiCb {
         override fun onStatus(s: String) {}
-        override fun onChat(s: String) {}
+        override fun onChat(s: String) { runOnUiThread { showChat(s) } }
         override fun onMode(m: Int) {}
         override fun onLevel(l: Float) {}
+    }
+
+    private fun showChat(raw: String) {
+        val t = raw.trim()
+        if (t.startsWith("Tum:")) {
+            addUser(t.removePrefix("Tum:").trim())
+            addPending()
+        } else if (t.startsWith("AI:")) {
+            removePending()
+            addAi(t.removePrefix("AI:").trim())
+        }
+    }
+
+    private fun scrollDown() {
+        chatScroll.post { chatScroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    // Meri baat: daayin taraf, gol bubble
+    private fun addUser(text: String) {
+        val row = LinearLayout(this).apply { gravity = Gravity.END }
+        val tv = TextView(this).apply {
+            this.text = text
+            textSize = 16f
+            setTextColor(Color.parseColor("#E8EAF0"))
+            setPadding(dp(20), dp(14), dp(20), dp(14))
+            maxWidth = (resources.displayMetrics.widthPixels * 0.78f).toInt()
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(28).toFloat()
+                setColor(Color.parseColor("#171717"))
+            }
+        }
+        row.addView(tv)
+        chatList.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(18)
+            bottomMargin = dp(10)
+        })
+        scrollDown()
+    }
+
+    private fun addPending() {
+        val tv = TextView(this).apply {
+            text = "..."
+            textSize = 22f
+            setTextColor(Color.parseColor("#9AA3B5"))
+        }
+        pending = tv
+        chatList.addView(tv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        scrollDown()
+    }
+
+    private fun removePending() {
+        pending?.let { chatList.removeView(it) }
+        pending = null
+    }
+
+    // AI ka jawab: baayin taraf, bina bubble, neeche chhote buttons
+    private fun addAi(text: String) {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val tv = TextView(this).apply {
+            this.text = text
+            textSize = 16.5f
+            setTextColor(Color.parseColor("#E8EAF0"))
+            setLineSpacing(0f, 1.25f)
+            setTextIsSelectable(true)
+        }
+        box.addView(tv)
+
+        val acts = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        val like = icon(5, 44) { }
+        val dis = icon(6, 44) { }
+        like.setOnClickListener {
+            val on = like.tint != Color.parseColor("#4F8BFF")
+            like.tint = if (on) Color.parseColor("#4F8BFF") else Color.parseColor("#E8EAF0")
+            dis.tint = Color.parseColor("#E8EAF0")
+        }
+        dis.setOnClickListener {
+            val on = dis.tint != Color.parseColor("#4F8BFF")
+            dis.tint = if (on) Color.parseColor("#4F8BFF") else Color.parseColor("#E8EAF0")
+            like.tint = Color.parseColor("#E8EAF0")
+        }
+        acts.addView(like)
+        acts.addView(dis)
+        acts.addView(icon(7, 44) {
+            val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+            startActivity(Intent.createChooser(i, null))
+        })
+        acts.addView(icon(8, 44) {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("AI", text))
+            Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
+        })
+        acts.addView(icon(9, 44) { soon() })
+        acts.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        acts.addView(icon(10, 44) { soon() })
+        box.addView(acts, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(8)
+            leftMargin = -dp(10)
+            rightMargin = -dp(10)
+        })
+        chatList.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(8)
+            bottomMargin = dp(6)
+        })
+        scrollDown()
+    }
+
+    // Purani baat-cheet dobara dikhao (ऐप wapas kholne par)
+    private fun rebuildChat(log: String) {
+        chatList.removeAllViews()
+        pending = null
+        for (part in log.split(Regex("\n(?=(?:Tum|AI): )"))) {
+            val t = part.trim()
+            if (t.startsWith("Tum:")) addUser(t.removePrefix("Tum:").trim())
+            else if (t.startsWith("AI:")) addAi(t.removePrefix("AI:").trim())
+        }
     }
 
     private fun soon() {
@@ -157,8 +342,13 @@ class MainActivity : Activity() {
         header.addView(avatar, LinearLayout.LayoutParams(dp(36), dp(36)))
         root.addView(header, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(60)))
 
-        // ---------- beech ka khaali hissa ----------
-        root.addView(View(this), LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        // ---------- beech ka hissa: baat-cheet ----------
+        chatList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        chatScroll = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            addView(chatList, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        root.addView(chatScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
         // ---------- neeche ka message bar ----------
         val bar = LinearLayout(this).apply {
@@ -296,7 +486,10 @@ class MainActivity : Activity() {
     private fun attach(n: Int) {
         val e = AssistantService.engine
         if (e != null) {
-            if (!e.listeners.contains(cb)) e.listeners.add(cb)
+            if (!e.listeners.contains(cb)) {
+                rebuildChat(e.log.toString())
+                e.listeners.add(cb)
+            }
         } else if (n > 0) {
             h.postDelayed({ attach(n - 1) }, 300)
         }
