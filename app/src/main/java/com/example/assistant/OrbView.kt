@@ -18,8 +18,8 @@ import kotlin.random.Random
 // Rainbow particles ka 3D gola (pure black par). Awaaz ke hisaab se thoda phoolta aur chamakta hai.
 class OrbView(ctx: Context) : View(ctx) {
     // 0 chup, 1 sun raha, 2 soch raha, 3 bol raha
-    var mode = 0
-    var level = 0f          // mic ki awaaz 0..1
+    @Volatile var mode = 0
+    @Volatile var level = 0f          // mic ki awaaz 0..1
 
     private val cnt = 24000
     private val px = FloatArray(cnt)
@@ -44,7 +44,11 @@ class OrbView(ctx: Context) : View(ctx) {
     private var drawSize = 0f
     private var acc = FloatArray(0)
     private var pixels = IntArray(0)
-    private var bmp: Bitmap? = null
+    @Volatile private var front: Bitmap? = null
+    @Volatile private var back: Bitmap? = null
+    private val swapLock = Any()
+    @Volatile private var running = false
+    private var worker: Thread? = null
     private val dst = RectF()
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
 
@@ -102,15 +106,60 @@ class OrbView(ctx: Context) : View(ctx) {
         drawSize = sScreen
         cx = w / 2f
         cy = h * 0.51f
-        acc = FloatArray(side * side * 3)
-        pixels = IntArray(side * side)
-        bmp = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+        val sd = side
+        acc = FloatArray(sd * sd * 3)
+        pixels = IntArray(sd * sd)
+        synchronized(swapLock) {
+            front = Bitmap.createBitmap(sd, sd, Bitmap.Config.ARGB_8888)
+            back = Bitmap.createBitmap(sd, sd, Bitmap.Config.ARGB_8888)
+        }
         val density = cnt / (PI.toFloat() * rad * rad)
         gain = 3.2f * 0.218f / density
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        running = true
+        worker = Thread {
+            while (running) {
+                val t0 = System.nanoTime()
+                val b = back
+                if (b != null && !b.isRecycled) {
+                    try {
+                        render(b)
+                        synchronized(swapLock) {
+                            val f = front
+                            front = b
+                            back = f
+                        }
+                        postInvalidateOnAnimation()
+                    } catch (e: Exception) { }
+                }
+                val spent = (System.nanoTime() - t0) / 1_000_000L
+                if (spent < 14) try { Thread.sleep(14 - spent) } catch (e: InterruptedException) { }
+            }
+        }.also { it.priority = Thread.NORM_PRIORITY - 1; it.start() }
+    }
+
+    override fun onDetachedFromWindow() {
+        running = false
+        worker?.interrupt()
+        worker = null
+        super.onDetachedFromWindow()
+    }
+
     override fun onDraw(c: Canvas) {
-        val b = bmp ?: return
+        val b = front ?: return
+        val hs = drawSize / 2f
+        dst.set(cx - hs, cy - hs, cx + hs, cy + hs)
+        c.drawBitmap(b, null, dst, paint)
+    }
+
+    private fun render(b: Bitmap) {
+        val side = this.side
+        val acc = this.acc
+        val pixels = this.pixels
+        if (acc.size < side * side * 3 || pixels.size < side * side || b.width != side) return
         val now = System.nanoTime()
         val dt = if (last == 0L) 0.016f else ((now - last) / 1e9f).coerceAtMost(0.05f)
         last = now
@@ -207,10 +256,5 @@ class OrbView(ctx: Context) : View(ctx) {
             }
         }
         b.setPixels(pixels, 0, side, 0, 0, side, side)
-
-        val hs = drawSize / 2f
-        dst.set(cx - hs, cy - hs, cx + hs, cy + hs)
-        c.drawBitmap(b, null, dst, paint)
-        postInvalidateOnAnimation()
     }
 }

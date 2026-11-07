@@ -592,15 +592,28 @@ class MainActivity : Activity() {
         orb.pivotY = h * 0.51f
         val ty = centerY - h * 0.51f
         if (animate) {
-            orb.animate().scaleX(scale).scaleY(scale).translationY(ty).setDuration(260).start()
+            orb.animate().scaleX(scale).scaleY(scale).translationY(ty).setDuration(340)
+                .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)).start()
         } else {
+            orb.animate().cancel()
             orb.scaleX = scale; orb.scaleY = scale; orb.translationY = ty
         }
         val lp = orbScroll.layoutParams as FrameLayout.LayoutParams
         lp.topMargin = insTop + dp(76)
         lp.bottomMargin = (h - (centerY - smallR - dp(8))).toInt()
         orbScroll.layoutParams = lp
-        orbScroll.visibility = if (orbChat) View.VISIBLE else View.GONE
+        if (animate) {
+            if (orbChat) {
+                orbScroll.visibility = View.VISIBLE
+                orbScroll.animate().alpha(1f).setDuration(300).start()
+            } else {
+                orbScroll.animate().alpha(0f).setDuration(200).withEndAction { if (!orbChat) orbScroll.visibility = View.GONE }.start()
+            }
+        } else {
+            orbScroll.animate().cancel()
+            orbScroll.alpha = if (orbChat) 1f else 0f
+            orbScroll.visibility = if (orbChat) View.VISIBLE else View.GONE
+        }
     }
 
     private fun toggleOrbChat() {
@@ -629,7 +642,7 @@ class MainActivity : Activity() {
             visibility = View.GONE
             gravity = Gravity.CENTER
         }
-        micBtn = icon(2, 43) { toggleMute() }
+        micBtn = icon(12, 43) { toggleMute() }
         micBtn.tint = Color.WHITE
         micBtn.background = oval("#303030")
         val close = icon(1, 43) { closeOrb() }
@@ -661,6 +674,7 @@ class MainActivity : Activity() {
             })
         }
         sendBtn = icon(4, 36) { sendOrbText() }
+        sendBtn.layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
         sendBtn.tint = Color.WHITE
         sendBtn.background = oval("#2F6BFF")
         sendBtn.visibility = View.GONE
@@ -673,10 +687,10 @@ class MainActivity : Activity() {
                 setColor(Color.parseColor("#303030"))
                 setStroke(dp(1), Color.parseColor("#3C3C3C"))
             }
-            setPadding(dp(8), 0, dp(14), 0)
+            setPadding(dp(8), 0, dp(9), 0)
             addView(plus, LinearLayout.LayoutParams(dp(30), dp(30)))
             addView(orbInput, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(6) })
-            addView(sendBtn, LinearLayout.LayoutParams(dp(34), dp(34)).apply { leftMargin = dp(6); rightMargin = dp(-8) })
+            addView(sendBtn, LinearLayout.LayoutParams(dp(36), dp(36)).apply { leftMargin = dp(6) })
         }
         val bottomRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -780,11 +794,11 @@ class MainActivity : Activity() {
     }
 
     private fun styleMic() {
-        micBtn.kind = if (micMuted) 12 else 2
-        micBtn.tint = if (micMuted) Color.parseColor("#FF8A8A") else Color.WHITE
+        micBtn.kind = 12
+        micBtn.tint = Color.WHITE
         micBtn.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(Color.parseColor(if (micMuted) "#4A1D1D" else "#26272C"))
+            setColor(Color.parseColor(if (micMuted) "#D32F2F" else "#303030"))
         }
         micBtn.invalidate()
     }
