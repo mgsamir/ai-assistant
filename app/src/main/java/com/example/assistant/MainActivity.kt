@@ -66,10 +66,11 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawCircle(15f, 8f, 2.2f, p); c.drawCircle(9f, 16f, 2.2f, p)
             }
             1 -> { c.drawLine(12f, 5f, 12f, 19f, p); c.drawLine(5f, 12f, 19f, 12f, p) }
-            2 -> {
+            2, 12 -> {
                 c.drawRoundRect(RectF(9f, 3f, 15f, 14f), 3f, 3f, p)
                 c.drawArc(RectF(5f, 4f, 19f, 18f), 0f, 180f, false, p)
                 c.drawLine(12f, 18f, 12f, 21f, p)
+                if (kind == 12) c.drawLine(4f, 3f, 20f, 21f, p)
             }
             3 -> {
                 c.drawLine(8f, 9f, 8f, 15f, p)
@@ -170,10 +171,54 @@ class MainActivity : Activity() {
         if (t.startsWith("Tum:")) {
             addUser(t.removePrefix("Tum:").trim())
             addPending()
+            if (::orbList.isInitialized) orbAdd(true, t.removePrefix("Tum:").trim())
         } else if (t.startsWith("AI:")) {
             removePending()
             addAi(t.removePrefix("AI:").trim())
+            if (::orbList.isInitialized) orbAdd(false, t.removePrefix("AI:").trim())
         }
+    }
+
+    // ---- orb screen ki baat-cheet (ChatGPT jaisi) ----
+    private fun orbAdd(mine: Boolean, text: String) {
+        if (text.isEmpty()) return
+        if (mine) {
+            val row = LinearLayout(this).apply { gravity = Gravity.END }
+            row.addView(TextView(this).apply {
+                this.text = text
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                setPadding(dp(18), dp(12), dp(18), dp(12))
+                maxWidth = (resources.displayMetrics.widthPixels * 0.78f).toInt()
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(26).toFloat()
+                    setColor(Color.parseColor("#0A0A6B"))
+                }
+            })
+            orbList.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14); bottomMargin = dp(10) })
+        } else {
+            val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            box.addView(TextView(this).apply {
+                this.text = text
+                textSize = 16.5f
+                setTextColor(Color.parseColor("#F0F0F0"))
+                setLineSpacing(0f, 1.25f)
+            })
+            val acts = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            acts.addView(icon(8, 40) {
+                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("AI", text))
+                Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
+            })
+            acts.addView(icon(7, 40) {
+                val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+                startActivity(Intent.createChooser(i, null))
+            })
+            box.addView(acts, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6); leftMargin = -dp(10) })
+            orbList.addView(box, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(10) })
+        }
+        orbScroll.post { orbScroll.fullScroll(View.FOCUS_DOWN) }
     }
 
     private fun scrollDown() {
@@ -522,6 +567,46 @@ class MainActivity : Activity() {
     private lateinit var micBtn: IconView
     private lateinit var orbInput: EditText
     private var micMuted = false
+    private lateinit var orbList: LinearLayout
+    private lateinit var orbScroll: ScrollView
+    private lateinit var sendBtn: IconView
+    private lateinit var closeBtn: IconView
+    private lateinit var bottomRowV: LinearLayout
+    private lateinit var topRowV: FrameLayout
+    private var orbChat = false
+    private var insTop = 0
+    private var insBottom = 0
+
+    // orb ko sahi jagah par rakho: beech mein ya chhota hokar neeche (baat-cheet dikhne par)
+    private fun layoutOrb(animate: Boolean) {
+        if (!::orbScreen.isInitialized) return
+        val h = orbScreen.height.toFloat()
+        val w = orbScreen.width.toFloat()
+        if (h <= 0f) return
+        val rowTop = h - insBottom - dp(16) - dp(43)
+        val topBottom = insTop + dp(20) + dp(40)
+        val scale = if (orbChat) 0.44f else 1f
+        val smallR = minOf(w, h) * 0.253f * 0.44f
+        val centerY = if (orbChat) rowTop - dp(26) - smallR else (topBottom + rowTop) / 2f
+        orb.pivotX = w / 2f
+        orb.pivotY = h * 0.51f
+        val ty = centerY - h * 0.51f
+        if (animate) {
+            orb.animate().scaleX(scale).scaleY(scale).translationY(ty).setDuration(260).start()
+        } else {
+            orb.scaleX = scale; orb.scaleY = scale; orb.translationY = ty
+        }
+        val lp = orbScroll.layoutParams as FrameLayout.LayoutParams
+        lp.topMargin = insTop + dp(76)
+        lp.bottomMargin = (h - (centerY - smallR - dp(8))).toInt()
+        orbScroll.layoutParams = lp
+        orbScroll.visibility = if (orbChat) View.VISIBLE else View.GONE
+    }
+
+    private fun toggleOrbChat() {
+        orbChat = !orbChat
+        layoutOrb(true)
+    }
 
     private fun orbLabel(m: Int) = when (m) {
         1 -> "Sun raha hoon..."
@@ -548,6 +633,7 @@ class MainActivity : Activity() {
         micBtn.tint = Color.WHITE
         micBtn.background = oval("#303030")
         val close = icon(1, 43) { closeOrb() }
+        closeBtn = close
         close.rotation = 45f
         close.tint = Color.BLACK
         close.background = oval("#FFFFFF")
@@ -559,13 +645,25 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE)
             textSize = 16f
             background = null
-            setSingleLine(true)
-            imeOptions = EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_EXTRACT_UI
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            setOnEditorActionListener { _, a, _ ->
-                if (a == EditorInfo.IME_ACTION_SEND) { sendOrbText(); true } else false
-            }
+            // enter dabane par nayi line (ChatGPT jaisa); bhejne ke liye upar wala teer
+            maxLines = 4
+            imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(a: CharSequence?, b: Int, c: Int, d: Int) {}
+                override fun onTextChanged(a: CharSequence?, b: Int, c: Int, d: Int) {}
+                override fun afterTextChanged(e: android.text.Editable?) {
+                    val has = !e.isNullOrBlank()
+                    sendBtn.visibility = if (has) View.VISIBLE else View.GONE
+                    micBtn.visibility = if (has) View.GONE else View.VISIBLE
+                    closeBtn.visibility = if (has) View.GONE else View.VISIBLE
+                }
+            })
         }
+        sendBtn = icon(4, 36) { sendOrbText() }
+        sendBtn.tint = Color.WHITE
+        sendBtn.background = oval("#2F6BFF")
+        sendBtn.visibility = View.GONE
         val pill = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -573,10 +671,12 @@ class MainActivity : Activity() {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dp(22).toFloat()
                 setColor(Color.parseColor("#303030"))
+                setStroke(dp(1), Color.parseColor("#3C3C3C"))
             }
             setPadding(dp(8), 0, dp(14), 0)
             addView(plus, LinearLayout.LayoutParams(dp(30), dp(30)))
             addView(orbInput, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(6) })
+            addView(sendBtn, LinearLayout.LayoutParams(dp(34), dp(34)).apply { leftMargin = dp(6); rightMargin = dp(-8) })
         }
         val bottomRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -595,12 +695,21 @@ class MainActivity : Activity() {
             addView(setBtn, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.END))
         }
 
-        orb.setOnClickListener { talk() }
+        orb.setOnClickListener { toggleOrbChat() }
+        orbList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        orbScroll = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            visibility = View.GONE
+            setPadding(dp(16), 0, dp(16), 0)
+            clipToPadding = false
+            addView(orbList, ViewGroup.LayoutParams(-1, -2))
+        }
         orbScreen = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             visibility = View.GONE
             isClickable = true
             addView(orb, FrameLayout.LayoutParams(-1, -1))
+            addView(orbScroll, FrameLayout.LayoutParams(-1, -1))
             addView(orbStatus, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { bottomMargin = dp(100) })
             addView(bottomRow, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
                 leftMargin = dp(32); rightMargin = dp(32); bottomMargin = dp(16)
@@ -609,6 +718,7 @@ class MainActivity : Activity() {
                 leftMargin = dp(13); rightMargin = dp(13); topMargin = dp(20)
             })
             // status bar / navigation bar / keyboard ke hisaab se upar-neeche ki jagah
+            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> layoutOrb(false) }
             setOnApplyWindowInsetsListener { _, ins ->
                 val top: Int
                 val bottom: Int
@@ -624,6 +734,9 @@ class MainActivity : Activity() {
                 topRow.translationY = top.toFloat()
                 bottomRow.translationY = -bottom.toFloat()
                 orbStatus.translationY = -bottom.toFloat()
+                insTop = top
+                insBottom = bottom
+                layoutOrb(true)
                 ins
             }
         }
@@ -645,8 +758,12 @@ class MainActivity : Activity() {
     private fun openOrb() {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(input.windowToken, 0)
+        orbList.removeAllViews()
+        orbChat = false
+        orbInput.text?.clear()
         orbScreen.visibility = View.VISIBLE
         orbScreen.requestApplyInsets()
+        layoutOrb(false)
         orb.invalidate()
         micMuted = false
         styleMic()
@@ -663,7 +780,8 @@ class MainActivity : Activity() {
     }
 
     private fun styleMic() {
-        micBtn.tint = if (micMuted) Color.parseColor("#8A8F9A") else Color.WHITE
+        micBtn.kind = if (micMuted) 12 else 2
+        micBtn.tint = if (micMuted) Color.parseColor("#FF8A8A") else Color.WHITE
         micBtn.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.parseColor(if (micMuted) "#4A1D1D" else "#26272C"))
