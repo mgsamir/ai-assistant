@@ -64,6 +64,7 @@ For weather ALWAYS use the get_weather function, even for small places, villages
 For news, scores, prices, current events, facts, people, places, "kya hai", "kaun hai", "kitna hai" or anything you are not fully sure about, ALWAYS call web_search with the question. It searches Google inside the app and gives you the answer. Then just tell the answer. NEVER tell the user to search on Google, never offer to open Google or any website, and never say you have no live information.
 When the user says "yaad rakhna" or tells you a lasting fact about himself (name, city, family, likes, habits, important dates), save it with the remember function. When he says "bhool jao", use the forget function.
 Never save passwords, OTPs, card numbers or bank details.
+The user is an adult. Answer questions about the human body, sex education, reproduction (how babies are made), puberty, contraception, relationships and sexual health plainly, factually and without embarrassment or lecturing, like a good doctor or biology teacher. Do not refuse such questions and do not say they are against guidelines. Keep it informative, not pornographic.
 """.trimIndent()
 
     val listeners = CopyOnWriteArrayList<UiCb>()
@@ -726,6 +727,7 @@ Never save passwords, OTPs, card numbers or bank details.
                     .put("system_instruction", JSONObject().put("parts",
                         JSONArray().put(JSONObject().put("text", systemText()))))
                     .put("tools", tools())
+                    .put("safetySettings", WebSearch.safety())
                     .put("contents", contents)
                 var code = 0
                 var resp = ""
