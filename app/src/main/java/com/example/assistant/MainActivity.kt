@@ -576,6 +576,7 @@ class MainActivity : Activity() {
     private var orbChat = false
     private var orbMoved = false
     private var orbHomeTy = 0f
+    private var orbBase = 1f
     private var insTop = 0
     private var insBottom = 0
 
@@ -594,6 +595,7 @@ class MainActivity : Activity() {
         orb.pivotY = h * 0.51f
         val ty = centerY - h * 0.51f
         orbHomeTy = ty
+        orbBase = scale
         if (orbMoved) {
             // orb ko tumne kheencha hai: wahin rehne do, sirf list ki jagah theek karo
         } else if (animate) {
@@ -740,24 +742,33 @@ class MainActivity : Activity() {
                     if (!dragging && (mx * mx + my * my) > dp(10) * dp(10)) dragging = true
                     if (dragging) {
                         // rubber jaisa: ungli ke saath thoda hi khinchta hai, jitna zyada kheencho utna kadak
-                        val mxs = dp(70).toFloat()
-                        fun rub(d: Float) = (if (d < 0) -1f else 1f) * mxs * (1f - Math.exp((-Math.abs(d) / mxs).toDouble()).toFloat())
-                        orb.translationX = rub(mx)
-                        orb.translationY = orbHomeTy + rub(my)
+                        // orb apni jagah par fix rehta hai; bas ungli wali taraf se halka sa khinchta hai
+                        val mxs = dp(90).toFloat()
+                        fun rub(d: Float) = (if (d < 0) -1f else 1f) * (1f - Math.exp((-Math.abs(d) / mxs).toDouble()).toFloat())
+                        val nx = rub(mx)
+                        val ny = rub(my)
+                        val ax = Math.abs(nx)
+                        val ay = Math.abs(ny)
+                        val big = 0.13f
+                        val r0 = minOf(orbScreen.width, orbScreen.height) * 0.253f * orbBase
+                        orb.scaleX = orbBase * (1f + big * ax) * (1f - 0.05f * ay)
+                        orb.scaleY = orbBase * (1f + big * ay) * (1f - 0.05f * ax)
+                        orb.translationX = nx * big * r0 * ax.coerceAtLeast(0.01f) / ax.coerceAtLeast(0.01f) * ax
+                        orb.translationY = orbHomeTy + ny * big * r0 * ay / ay.coerceAtLeast(0.01f) * ay
                     }
                     true
                 }
                 android.view.MotionEvent.ACTION_UP -> {
                     if (inside && !dragging) toggleOrbChat()
                     else if (inside) {
-                        orb.animate().translationX(0f).translationY(orbHomeTy).setDuration(550)
-                            .setInterpolator(android.view.animation.OvershootInterpolator(2.6f)).start()
+                        orb.animate().scaleX(orbBase).scaleY(orbBase).translationX(0f).translationY(orbHomeTy).setDuration(600)
+                            .setInterpolator(android.view.animation.OvershootInterpolator(3.2f)).start()
                     }
                     inside = false
                     true
                 }
                 android.view.MotionEvent.ACTION_CANCEL -> {
-                    if (inside && dragging) orb.animate().translationX(0f).translationY(orbHomeTy).setDuration(400).start()
+                    if (inside && dragging) orb.animate().scaleX(orbBase).scaleY(orbBase).translationX(0f).translationY(orbHomeTy).setDuration(400).start()
                     inside = false; true
                 }
                 else -> false
