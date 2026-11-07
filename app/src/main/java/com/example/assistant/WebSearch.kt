@@ -9,12 +9,12 @@ import java.net.URL
 // Browser ya Google khulta nahi.
 object WebSearch {
     // Google ke default filter bahut sakht hote hain (padhai wale sawaal bhi rok dete hain).
-    // Sirf bahut khatarnak cheezein rokte hain, baaki sab jawab milega.
+    // App ki taraf se koi extra rok nahi; jo rok Google ke model mein andar hai, wahi rahegi.
     fun safety(): JSONArray {
         val a = JSONArray()
         for (c in listOf("HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH",
             "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT")) {
-            a.put(JSONObject().put("category", c).put("threshold", "BLOCK_ONLY_HIGH"))
+            a.put(JSONObject().put("category", c).put("threshold", "BLOCK_NONE"))
         }
         return a
     }
