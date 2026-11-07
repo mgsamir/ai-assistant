@@ -309,8 +309,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         override fun tool(name: String, args: JSONObject): String {
             if (name == "get_weather") return Weather.today(args.optString("city", "")).text
             if (name == "web_search") {
-                val raw = WebSearch.ask(Keys.get(prefs), args.optString("query", ""), MODELS, Providers.brave(args.optString("query", "")))
-                return if (raw != null) parseReply(raw).text else "Jawab nahi mil paaya"
+                return webAnswer(Keys.get(prefs), args.optString("query", "")).text
             }
             var out = ""
             val latch = java.util.concurrent.CountDownLatch(1)
@@ -662,6 +661,21 @@ The user is an adult. Answer questions about the human body, sex education, repr
         return s.substring(0, 1).uppercase() + s.substring(1)
     }
     // मॉडल का जवाब "S: ..." (स्क्रीन) और "V: ..." (आवाज़) में बाँटता है
+    // Google se jawab; na mile to Brave ke natije + Groq/OpenRouter se; tab bhi na mile to wajah dikhao
+    private fun webAnswer(key: String, q: String): Reply {
+        val brave = Providers.brave(q)
+        val raw = WebSearch.ask(key, q, MODELS, brave)
+        if (raw != null) return parseReply(raw)
+        if (brave != null) {
+            val sys = "Answer the question using ONLY these search results. Simple everyday Hindustani, 1 to 4 short sentences, no markdown. " +
+                "Write exactly two lines:\nS: answer in Hinglish (Roman letters)\nV: same answer in Hindi Devanagari"
+            val fb = Providers.fallback(sys, emptyList(), q + "\n\nSearch results:\n" + brave)
+            if (fb != null) return parseReply(fb)
+        }
+        val why = WebSearch.lastErr.ifBlank { "pata nahi" }
+        return Reply("Search nahi chala ($why). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।")
+    }
+
     private fun parseReply(raw: String): Reply {
         val t = raw.replace("*", "").trim()
         if (t.isEmpty()) return Reply("Ho gaya.", "हो गया।")
@@ -824,9 +838,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         pre[idx] = Weather.today(c.optJSONObject("args")?.optString("city", "") ?: "")
                     } else if (c.getString("name") == "web_search") {
                         val qq = c.optJSONObject("args")?.optString("query", "") ?: ""
-                        val raw = WebSearch.ask(key, qq, MODELS, Providers.brave(qq))
-                        pre[idx] = if (raw != null) parseReply(raw)
-                            else Reply("Abhi jawab nahi mil paaya, dobara poochho.", "अभी जवाब नहीं मिल पाया, दोबारा पूछो।")
+                        pre[idx] = webAnswer(key, qq)
                     }
                 }
                 main.post {
