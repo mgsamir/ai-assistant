@@ -10,12 +10,6 @@ import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.NoiseSuppressor
 import android.util.Base64
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import okio.ByteString
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.LinkedBlockingQueue
@@ -38,16 +32,15 @@ class LiveSession(private val ctx: Context, private val key: String, private val
     }
 
     private val MODELS = listOf("gemini-3.8-live", "gemini-3.1-flash-live-preview", "gemini-2.5-flash-native-audio-preview-12-2025")
-    private val URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key="
+    private val HOST = "generativelanguage.googleapis.com"
+    private val PATH = "/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key="
 
-    private val http = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS)
-        .pingInterval(20, TimeUnit.SECONDS).build()
     private val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     @Volatile var ready = false; private set
     @Volatile var muted = false
     @Volatile private var active = false
-    @Volatile private var ws: WebSocket? = null
+    @Volatile private var ws: TinyWs? = null
     @Volatile private var attempt = 0
     @Volatile private var everReady = false
     @Volatile private var resumeHandle: String? = null
@@ -111,7 +104,6 @@ class LiveSession(private val ctx: Context, private val key: String, private val
             if (savedVol >= 0) am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, savedVol, 0)
             am.mode = savedMode
         } catch (e: Exception) { }
-        try { http.dispatcher.executorService.shutdown() } catch (e: Exception) { }
     }
 
     fun sendText(t: String) {
@@ -156,24 +148,19 @@ class LiveSession(private val ctx: Context, private val key: String, private val
         val modelIdx = (attempt / 2).coerceAtMost(MODELS.size - 1)
         val full = attempt % 2 == 0
         ready = false
-        val req = Request.Builder().url(URL + key).build()
-        ws = http.newWebSocket(req, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
+        ws = TinyWs(HOST, PATH + key, object : TinyWs.Cb {
+            override fun onOpen() {
                 if (myGen != gen) return
-                webSocket.send(setupJson(modelIdx, full))
+                ws?.send(setupJson(modelIdx, full))
             }
-
-            override fun onMessage(webSocket: WebSocket, text: String) { if (myGen == gen) handle(text) }
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) { if (myGen == gen) handle(bytes.utf8()) }
-
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            override fun onMessage(text: String) { if (myGen == gen) handle(text) }
+            override fun onClosed(code: Int, reason: String) {
                 if (myGen == gen) lost("band ($code) $reason")
             }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                if (myGen == gen) lost((response?.code?.toString() ?: "") + " " + (t.message ?: ""))
+            override fun onFailure(msg: String) {
+                if (myGen == gen) lost(msg)
             }
-        })
+        }).also { it.connect() }
     }
 
     private val errs = StringBuilder()
