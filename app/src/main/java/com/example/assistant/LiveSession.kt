@@ -165,8 +165,11 @@ class LiveSession(private val ctx: Context, private val key: String, private val
         })
     }
 
+    private val errs = StringBuilder()
+
     private fun lost(why: String) {
         if (!active) return
+        errs.append(MODELS[(attempt / 2).coerceAtMost(MODELS.size - 1)].removePrefix("gemini-")).append(": ").append(why.trim().take(90)).append("\n")
         ready = false
         stopMic()
         if (everReady) {
@@ -181,7 +184,7 @@ class LiveSession(private val ctx: Context, private val key: String, private val
         attempt++
         if (attempt >= MODELS.size * 2) {
             active = false
-            cb.failed(why.trim())
+            cb.failed(errs.toString().trim())
             return
         }
         thread { Thread.sleep(300); connect() }

@@ -279,8 +279,11 @@ Never save passwords, OTPs, card numbers or bank details.
         override fun failed(reason: String) {
             main.post {
                 liveSess = null
-                status("Live nahi chala ($reason). Purana mic chal raha hai")
+                chat("\nAI: Live nahi chala:\n$reason\n")
                 if (convo && !muted && !listening && !busy) beginListen()
+                val msg = "Live nahi chala: " + reason.lines().firstOrNull().orEmpty().take(80)
+                main.postDelayed({ status(msg) }, 700)
+                main.postDelayed({ status(msg) }, 2500)
             }
         }
     }
