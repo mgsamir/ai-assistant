@@ -26,6 +26,8 @@ object WebSearch {
         lastErr = ""
         val sys = "Use Google Search to find the current, correct answer. " +
             "Today is " + java.text.SimpleDateFormat("EEEE, d MMMM yyyy", java.util.Locale.ENGLISH).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata") }.format(java.util.Date()) + " (India). " +
+            "The user lives in India (Little Andaman). For days, festivals, holidays, news, prices and events assume India and ignore foreign events unless he names a country. If he says kal, aaj or parson, use today's date. " +
+            "Speak like Gemini speaks to an ordinary Indian: clear, natural, easy daily words, no heavy shuddh Hindi, and no English office words (listed, countdown, top events, schedule), and no half translated English phrases. " +
             "Answer in simple everyday Hindustani (Hindi-Urdu mix, common English words kept). Give a complete, clear answer in one go like a good Gemini answer: the direct answer first, " +
             "then all key details (exact dates and day, timings, reasons, names, numbers, and anything that could confuse, such as two different dates). Say clearly whether it is yesterday, today or tomorrow compared with today's date. 4 to 8 sentences. " +
             "Never tell the user to search on Google or open a website. No markdown, no asterisks. " +
