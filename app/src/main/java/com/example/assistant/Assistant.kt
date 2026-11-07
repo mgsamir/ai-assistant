@@ -93,6 +93,28 @@ Never save passwords, OTPs, card numbers or bank details.
     private var muted = false
     private fun live() = ambient || (convo && !muted)
 
+    // Baat-cheet mode mein har baar mic chalu hone ki beep na aaye
+    private val am = app.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val beepStreams = intArrayOf(AudioManager.STREAM_NOTIFICATION, AudioManager.STREAM_SYSTEM, AudioManager.STREAM_MUSIC)
+    private val beepMutedByUs = BooleanArray(3)
+    private fun muteBeeps() {
+        for (i in beepStreams.indices) {
+            try {
+                if (!am.isStreamMute(beepStreams[i])) {
+                    am.adjustStreamVolume(beepStreams[i], AudioManager.ADJUST_MUTE, 0)
+                    beepMutedByUs[i] = true
+                }
+            } catch (e: Exception) { }
+        }
+    }
+    private fun unmuteBeeps() {
+        for (i in beepStreams.indices) {
+            if (!beepMutedByUs[i]) continue
+            try { am.adjustStreamVolume(beepStreams[i], AudioManager.ADJUST_UNMUTE, 0) } catch (e: Exception) { }
+            beepMutedByUs[i] = false
+        }
+    }
+
     init {
         // Hamesha sunne wala mode band hai. Mic sirf button dabane par sunta hai.
         ambient = false
@@ -136,6 +158,7 @@ Never save passwords, OTPs, card numbers or bank details.
     fun shutdown() {
         running = false
         main.removeCallbacksAndMessages(null)
+        unmuteBeeps()
         try { recognizer?.destroy() } catch (e: Exception) { }
         recognizer = null
         try { tts.stop(); tts.shutdown() } catch (e: Exception) { }
@@ -156,7 +179,7 @@ Never save passwords, OTPs, card numbers or bank details.
 
     private fun speakDone() {
         busy = false
-        mode(0)
+        if (convo && !muted) mode(1) else mode(0)
         if (ambient) {
             // जवाब के बाद 7 सेकंड तक wake word बोले बिना बात आगे बढ़ा सकते हो
             awaiting = SystemClock.uptimeMillis() + 7000
@@ -194,10 +217,14 @@ Never save passwords, OTPs, card numbers or bank details.
     }
 
     // टाइप करके भेजा हुआ सवाल
-    fun sendText(q: String) {
+    fun sendText(q: String, speak: Boolean = false) {
         if (q.isBlank() || busy) return
         awaiting = 0L
-        silent = true
+        silent = !speak
+        if (listening) {
+            try { recognizer?.cancel() } catch (e: Exception) { }
+            listening = false
+        }
         ask(q.trim())
     }
     // मिक/ऑर्ब बटन दबाने पर
@@ -244,6 +271,7 @@ Never save passwords, OTPs, card numbers or bank details.
         convo = false
         muted = false
         main.removeCallbacksAndMessages(null)
+        unmuteBeeps()
         try { tts.stop() } catch (e: Exception) { }
         busy = false
         if (listening) {
@@ -286,7 +314,7 @@ Never save passwords, OTPs, card numbers or bank details.
                 listening = false
                 val t = res?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 if (t.isNullOrBlank()) {
-                    mode(0)
+                    if (!convo) mode(0)
                     if (live()) scheduleListen(200) else status("Kuch sunai nahi diya")
                 } else {
                     handle(t)
@@ -319,6 +347,10 @@ Never save passwords, OTPs, card numbers or bank details.
         mode(1)
         if (!ambient || SystemClock.uptimeMillis() < awaiting) status("Sun raha hoon...")
         else status("Wake word ka intezaar: assistant")
+        if (convo) {
+            muteBeeps()
+            main.postDelayed({ unmuteBeeps() }, 500)
+        }
         try {
             recognizer?.startListening(i)
         } catch (e: Exception) {
@@ -601,7 +633,8 @@ Never save passwords, OTPs, card numbers or bank details.
         }
         if (silent) {
             busy = false
-            mode(0)
+            if (convo && !muted) mode(1) else mode(0)
+            if (live()) scheduleListen(300)
             return
         }
         busy = true

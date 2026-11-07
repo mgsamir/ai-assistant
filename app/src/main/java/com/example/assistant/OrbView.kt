@@ -94,14 +94,14 @@ class OrbView(ctx: Context) : View(ctx) {
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
         super.onSizeChanged(w, h, ow, oh)
         if (w <= 0 || h <= 0) return
-        val rScreen = minOf(w, h) * 0.285f
+        val rScreen = minOf(w, h) * 0.253f
         val sScreen = rScreen * 2f * 1.35f
         val rr = minOf(1f, 640f / sScreen)
         side = (sScreen * rr).toInt().coerceAtLeast(16)
         rad = rScreen * rr
         drawSize = sScreen
         cx = w / 2f
-        cy = h * 0.42f
+        cy = h * 0.51f
         acc = FloatArray(side * side * 3)
         pixels = IntArray(side * side)
         bmp = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
