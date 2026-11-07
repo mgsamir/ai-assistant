@@ -61,8 +61,7 @@ Never use markdown, asterisks, hashes or emojis.
 When the user asks for a phone action (call, alarm, timer, open app, close app, message, torch, settings), do not just talk: use the provided functions.
 When the user says to stop or quit the assistant (for example "band ho ja", "stop assistant", "bas ab chup"), call stop_assistant.
 For weather ALWAYS use the get_weather function, even for small places, villages and islands (like Little Andaman, Hut Bay, Diglipur). Never say weather information is unavailable. Write the place name in English. If the user's city is in the remembered facts use it, otherwise ask.
-Use web_search only when the user himself asks to search on Google.
-For live things you cannot know (news, scores, prices) say plainly that you have no live information and ask if you should open Google.
+For news, scores, prices, current events, facts, people, places, "kya hai", "kaun hai", "kitna hai" or anything you are not fully sure about, ALWAYS call web_search with the question. It searches Google inside the app and gives you the answer. Then just tell the answer. NEVER tell the user to search on Google, never offer to open Google or any website, and never say you have no live information.
 When the user says "yaad rakhna" or tells you a lasting fact about himself (name, city, family, likes, habits, important dates), save it with the remember function. When he says "bhool jao", use the forget function.
 Never save passwords, OTPs, card numbers or bank details.
 """.trimIndent()
@@ -267,6 +266,10 @@ Never save passwords, OTPs, card numbers or bank details.
         override fun tools(): JSONArray = this@Assistant.tools()
         override fun tool(name: String, args: JSONObject): String {
             if (name == "get_weather") return Weather.today(args.optString("city", "")).text
+            if (name == "web_search") {
+                val raw = WebSearch.ask(Keys.get(prefs), args.optString("query", ""), MODELS)
+                return if (raw != null) parseReply(raw).text else "Jawab nahi mil paaya"
+            }
             var out = ""
             val latch = java.util.concurrent.CountDownLatch(1)
             main.post {
@@ -575,7 +578,7 @@ Never save passwords, OTPs, card numbers or bank details.
         f.put(fn("get_weather", "Get today's weather for any place, even a small village or island",
             JSONObject().put("city", str("Place name in English, for example Little Andaman or Port Blair. If the user did not say, use the city from the remembered facts")),
             listOf("city")))
-        f.put(fn("web_search", "Open Google and search. Only when the user himself asks to search on Google",
+        f.put(fn("web_search", "Search Google inside the app and get the real answer. Use for any news, live info, facts or question you are not sure about",
             JSONObject().put("query", str("What to search")), listOf("query")))
         f.put(fn("youtube_search", "Search or play something on YouTube",
             JSONObject().put("query", str("What to search")), listOf("query")))
@@ -772,6 +775,11 @@ Never save passwords, OTPs, card numbers or bank details.
                 calls.forEachIndexed { idx, c ->
                     if (c.getString("name") == "get_weather") {
                         pre[idx] = Weather.today(c.optJSONObject("args")?.optString("city", "") ?: "")
+                    } else if (c.getString("name") == "web_search") {
+                        val qq = c.optJSONObject("args")?.optString("query", "") ?: ""
+                        val raw = WebSearch.ask(key, qq, MODELS)
+                        pre[idx] = if (raw != null) parseReply(raw)
+                            else Reply("Abhi jawab nahi mil paaya, dobara poochho.", "अभी जवाब नहीं मिल पाया, दोबारा पूछो।")
                     }
                 }
                 main.post {
