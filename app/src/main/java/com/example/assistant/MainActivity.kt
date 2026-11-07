@@ -575,6 +575,7 @@ class MainActivity : Activity() {
     private lateinit var topRowV: FrameLayout
     private var orbChat = false
     private var orbMoved = false
+    private var orbHomeTy = 0f
     private var insTop = 0
     private var insBottom = 0
 
@@ -592,6 +593,7 @@ class MainActivity : Activity() {
         orb.pivotX = w / 2f
         orb.pivotY = h * 0.51f
         val ty = centerY - h * 0.51f
+        orbHomeTy = ty
         if (orbMoved) {
             // orb ko tumne kheencha hai: wahin rehne do, sirf list ki jagah theek karo
         } else if (animate) {
@@ -737,20 +739,27 @@ class MainActivity : Activity() {
                     val my = e.rawY - dY
                     if (!dragging && (mx * mx + my * my) > dp(10) * dp(10)) dragging = true
                     if (dragging) {
-                        orbMoved = true
-                        val hh = orbScreen.height.toFloat(); val ww = orbScreen.width.toFloat()
-                        val limX = ww * 0.42f
-                        orb.translationX = (sTx + mx).coerceIn(-limX, limX)
-                        orb.translationY = (sTy + my).coerceIn(-hh * 0.51f + dp(60), hh * 0.49f - dp(60))
+                        // rubber jaisa: ungli ke saath thoda hi khinchta hai, jitna zyada kheencho utna kadak
+                        val mxs = dp(70).toFloat()
+                        fun rub(d: Float) = (if (d < 0) -1f else 1f) * mxs * (1f - Math.exp((-Math.abs(d) / mxs).toDouble()).toFloat())
+                        orb.translationX = rub(mx)
+                        orb.translationY = orbHomeTy + rub(my)
                     }
                     true
                 }
                 android.view.MotionEvent.ACTION_UP -> {
                     if (inside && !dragging) toggleOrbChat()
+                    else if (inside) {
+                        orb.animate().translationX(0f).translationY(orbHomeTy).setDuration(550)
+                            .setInterpolator(android.view.animation.OvershootInterpolator(2.6f)).start()
+                    }
                     inside = false
                     true
                 }
-                android.view.MotionEvent.ACTION_CANCEL -> { inside = false; true }
+                android.view.MotionEvent.ACTION_CANCEL -> {
+                    if (inside && dragging) orb.animate().translationX(0f).translationY(orbHomeTy).setDuration(400).start()
+                    inside = false; true
+                }
                 else -> false
             }
         }
