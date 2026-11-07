@@ -64,6 +64,8 @@ class LiveSession(private val ctx: Context, private val key: String, private val
     @Volatile private var outLevel = 0f
     private var savedMode = AudioManager.MODE_NORMAL
     private var savedSpeaker = false
+    private var savedVol = -1
+    @Volatile private var openedAt = 0L
 
     private val inText = StringBuilder()
     private val outText = StringBuilder()
@@ -76,7 +78,14 @@ class LiveSession(private val ctx: Context, private val key: String, private val
             savedMode = am.mode
             savedSpeaker = am.isSpeakerphoneOn
             am.mode = AudioManager.MODE_IN_COMMUNICATION
-            am.isSpeakerphoneOn = true
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                am.availableCommunicationDevices.firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                    ?.let { am.setCommunicationDevice(it) }
+            } else {
+                am.isSpeakerphoneOn = true
+            }
+            savedVol = am.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
+            am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL), 0)
         } catch (e: Exception) { }
         cb.status("Gemini Live se jud raha hoon...")
         initTrack()
@@ -97,8 +106,10 @@ class LiveSession(private val ctx: Context, private val key: String, private val
             track = null
         }
         try {
+            if (android.os.Build.VERSION.SDK_INT >= 31) am.clearCommunicationDevice()
+            else am.isSpeakerphoneOn = savedSpeaker
+            if (savedVol >= 0) am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, savedVol, 0)
             am.mode = savedMode
-            am.isSpeakerphoneOn = savedSpeaker
         } catch (e: Exception) { }
         try { http.dispatcher.executorService.shutdown() } catch (e: Exception) { }
     }
@@ -171,13 +182,12 @@ class LiveSession(private val ctx: Context, private val key: String, private val
         if (!active) return
         errs.append(MODELS[(attempt / 2).coerceAtMost(MODELS.size - 1)].removePrefix("gemini-")).append(": ").append(why.trim().take(90)).append("\n")
         ready = false
-        stopMic()
         if (everReady) {
-            // beech mein toot gaya: wahi model dobara try karo
+            // beech mein toot gaya: mic chalu rakho (beep na aaye), sirf jod dobara lagao
             everReady = false
-            if (attempt < 100) {
+            if (System.currentTimeMillis() - openedAt > 8000) {
                 cb.status("Dobara jud raha hoon...")
-                thread { Thread.sleep(600); connect() }
+                thread { Thread.sleep(500); connect() }
                 return
             }
         }
@@ -196,6 +206,7 @@ class LiveSession(private val ctx: Context, private val key: String, private val
         if (j.has("setupComplete")) {
             ready = true
             everReady = true
+            openedAt = System.currentTimeMillis()
             cb.status("Bolo, main sun raha hoon...")
             cb.mode(1)
             startMic()
