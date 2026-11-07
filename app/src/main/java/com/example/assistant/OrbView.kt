@@ -94,7 +94,7 @@ class OrbView(ctx: Context) : View(ctx) {
     override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) {
         super.onSizeChanged(w, h, ow, oh)
         if (w <= 0 || h <= 0) return
-        val rScreen = minOf(w, h) * 0.34f
+        val rScreen = minOf(w, h) * 0.285f
         val sScreen = rScreen * 2f * 1.35f
         val rr = minOf(1f, 640f / sScreen)
         side = (sScreen * rr).toInt().coerceAtLeast(16)

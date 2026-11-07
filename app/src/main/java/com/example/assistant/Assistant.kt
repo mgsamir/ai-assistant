@@ -88,6 +88,10 @@ Never save passwords, OTPs, card numbers or bank details.
     private val voiceFor = HashMap<String, String>()
     // typed sawal ka jawab sirf likha aaye, bola na jaye
     @Volatile private var silent = false
+    // Baat-cheet mode (orb screen): mic tab tak chalu jab tak band na karo
+    private var convo = false
+    private var muted = false
+    private fun live() = ambient || (convo && !muted)
 
     init {
         // Hamesha sunne wala mode band hai. Mic sirf button dabane par sunta hai.
@@ -158,13 +162,17 @@ Never save passwords, OTPs, card numbers or bank details.
             awaiting = SystemClock.uptimeMillis() + 7000
             status("Bolo, main sun raha hoon...")
             scheduleListen(350)
+        } else if (convo) {
+            // jawab ke baad mic apne aap dobara chalu
+            status("Bolo, main sun raha hoon...")
+            scheduleListen(350)
         }
     }
 
     // ---------- सुनना ----------
     private fun scheduleListen(delay: Long) {
         main.postDelayed({
-            if (running && ambient && !listening && !busy) beginListen()
+            if (running && live() && !listening && !busy) beginListen()
         }, delay)
     }
     // Jawab ke neeche speaker dabane par wahi jawab dobara bolo (dobara dabane par ruk jao)
@@ -219,6 +227,46 @@ Never save passwords, OTPs, card numbers or bank details.
         beginListen()
     }
 
+    fun startConvo() {
+        convo = true
+        muted = false
+        silent = false
+        if (busy) {
+            try { tts.stop() } catch (e: Exception) { }
+            busy = false
+        }
+        retried = false
+        errs = 0
+        if (!listening) beginListen()
+    }
+
+    fun stopConvo() {
+        convo = false
+        muted = false
+        main.removeCallbacksAndMessages(null)
+        try { tts.stop() } catch (e: Exception) { }
+        busy = false
+        if (listening) {
+            try { recognizer?.cancel() } catch (e: Exception) { }
+            listening = false
+        }
+        mode(0)
+    }
+
+    fun setMuted(m: Boolean) {
+        muted = m
+        if (m) {
+            if (listening) {
+                try { recognizer?.cancel() } catch (e: Exception) { }
+                listening = false
+            }
+            mode(0)
+            status("Mic band hai")
+        } else if (convo && !busy && !listening) {
+            beginListen()
+        }
+    }
+
     private fun makeRecognizer() {
         try { recognizer?.destroy() } catch (e: Exception) { }
         val r = SpeechRecognizer.createSpeechRecognizer(app)
@@ -239,7 +287,7 @@ Never save passwords, OTPs, card numbers or bank details.
                 val t = res?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 if (t.isNullOrBlank()) {
                     mode(0)
-                    if (ambient) scheduleListen(200) else status("Kuch sunai nahi diya")
+                    if (live()) scheduleListen(200) else status("Kuch sunai nahi diya")
                 } else {
                     handle(t)
                 }
@@ -276,19 +324,21 @@ Never save passwords, OTPs, card numbers or bank details.
         } catch (e: Exception) {
             listening = false
             status("Mic shuru nahi hua")
-            if (ambient) scheduleListen(2000)
+            if (live()) scheduleListen(2000)
         }
     }
 
     private fun handleError(e: Int) {
         listening = false
+        if (convo && muted) { mode(0); return }
         if (e == 9) {
             // मिक की permission नहीं
+            convo = false
             setAmbient(false)
             status("Mic ki permission nahi hai")
             return
         }
-        if (ambient) {
+        if (live()) {
             // चुप्पी (6) और "समझ नहीं आया" (7) ambient में आम बात है, चुपचाप दोबारा सुनो
             if (e == 6 || e == 7) {
                 errs = 0
@@ -559,7 +609,7 @@ Never save passwords, OTPs, card numbers or bank details.
         if (sr != TextToSpeech.SUCCESS) {
             busy = false
             mode(0)
-            if (ambient) scheduleListen(500)
+            if (live()) scheduleListen(500)
         }
     }
 
@@ -568,7 +618,7 @@ Never save passwords, OTPs, card numbers or bank details.
         if (key.isEmpty()) {
             mode(0)
             status("Pehle app kholkar gear dabao aur API key save karo")
-            if (ambient) scheduleListen(3000)
+            if (live()) scheduleListen(3000)
             return
         }
         busy = true
@@ -658,7 +708,7 @@ Never save passwords, OTPs, card numbers or bank details.
                     mode(0)
                     beep(2)
                     status("Error: ${e.message}")
-                    if (ambient) scheduleListen(2000)
+                    if (live()) scheduleListen(2000)
                 }
             }
         }

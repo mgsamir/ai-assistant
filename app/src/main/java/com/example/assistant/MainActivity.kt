@@ -515,12 +515,14 @@ class MainActivity : Activity() {
     private lateinit var orb: OrbView
     private lateinit var orbStatus: TextView
     private lateinit var orbScreen: FrameLayout
+    private lateinit var micBtn: IconView
+    private var micMuted = false
 
     private fun orbLabel(m: Int) = when (m) {
         1 -> "Sun raha hoon..."
         2 -> "Soch raha hoon..."
         3 -> "Bol raha hoon..."
-        else -> "Orb ko dabao aur bolo"
+        else -> if (micMuted) "Mic band hai" else "Bolo, main sun raha hoon..."
     }
 
     private fun buildOrbScreen(): FrameLayout {
@@ -531,6 +533,9 @@ class MainActivity : Activity() {
             textSize = 15f
             gravity = Gravity.CENTER
         }
+        micBtn = icon(2, 56) { toggleMute() }
+        micBtn.tint = Color.WHITE
+        micBtn.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#26272C")) }
         val close = icon(1, 56) { closeOrb() }
         close.rotation = 45f
         close.tint = Color.BLACK
@@ -542,7 +547,12 @@ class MainActivity : Activity() {
             isClickable = true
             addView(orb, FrameLayout.LayoutParams(-1, -1))
             addView(orbStatus, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { bottomMargin = dp(170) })
-            addView(close, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(70) })
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                addView(micBtn, LinearLayout.LayoutParams(dp(56), dp(56)).apply { rightMargin = dp(24) })
+                addView(close, LinearLayout.LayoutParams(dp(56), dp(56)))
+            }, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(70) })
         }
         return orbScreen
     }
@@ -552,12 +562,37 @@ class MainActivity : Activity() {
         imm.hideSoftInputFromWindow(input.windowToken, 0)
         orbScreen.visibility = View.VISIBLE
         orb.invalidate()
-        talk()
+        micMuted = false
+        styleMic()
+        orbStatus.text = orbLabel(0)
+        AssistantService.engine?.startConvo()
     }
 
     private fun closeOrb() {
         orbScreen.visibility = View.GONE
-        AssistantService.engine?.let { if (it.isBusy()) it.replay("") }
+        AssistantService.engine?.stopConvo()
+    }
+
+    private fun styleMic() {
+        micBtn.tint = if (micMuted) Color.parseColor("#8A8F9A") else Color.WHITE
+        micBtn.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.parseColor(if (micMuted) "#4A1D1D" else "#26272C"))
+        }
+        micBtn.invalidate()
+    }
+
+    private fun toggleMute() {
+        micMuted = !micMuted
+        styleMic()
+        orbStatus.text = orbLabel(0)
+        AssistantService.engine?.setMuted(micMuted)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // app peeche jaye to mic band (background mein nahi chalta)
+        if (::orbScreen.isInitialized && orbScreen.visibility == View.VISIBLE) closeOrb()
     }
 
     override fun onBackPressed() {
