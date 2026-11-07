@@ -177,6 +177,48 @@ The user is an adult. Answer questions about the human body, sex education, repr
         }
     }
 
+    // ---- bolna: ElevenLabs ki natural awaaz, na chale to phone ki apni awaaz ----
+    private var mp: android.media.MediaPlayer? = null
+    @Volatile private var speakGen = 0
+
+    private fun stopSpeech() {
+        speakGen++
+        try { tts.stop() } catch (e: Exception) { }
+        try { mp?.stop() } catch (e: Exception) { }
+        try { mp?.release() } catch (e: Exception) { }
+        mp = null
+    }
+
+    private fun speak(v: String): Boolean {
+        if (Extra.eleven.isEmpty()) return tts.speak(v, TextToSpeech.QUEUE_FLUSH, null, "r") == TextToSpeech.SUCCESS
+        val gen = ++speakGen
+        thread {
+            val bytes = Providers.eleven(v)
+            main.post {
+                if (gen != speakGen) return@post
+                if (bytes == null) {
+                    if (tts.speak(v, TextToSpeech.QUEUE_FLUSH, null, "r") != TextToSpeech.SUCCESS) speakDone()
+                    return@post
+                }
+                try {
+                    val f = java.io.File(app.cacheDir, "say.mp3")
+                    f.writeBytes(bytes)
+                    try { mp?.release() } catch (e: Exception) { }
+                    val m = android.media.MediaPlayer()
+                    mp = m
+                    m.setDataSource(f.absolutePath)
+                    m.setOnPreparedListener { it.start(); mode(3) }
+                    m.setOnCompletionListener { main.post { if (mp === it) speakDone() } }
+                    m.setOnErrorListener { _, _, _ -> main.post { speakDone() }; true }
+                    m.prepareAsync()
+                } catch (e: Exception) {
+                    speakDone()
+                }
+            }
+        }
+        return true
+    }
+
     private fun speakDone() {
         busy = false
         if (convo && !muted) mode(1) else mode(0)
@@ -202,15 +244,14 @@ The user is an adult. Answer questions about the human body, sex education, repr
     fun isBusy(): Boolean = busy
     fun replay(screenText: String) {
         if (busy) {
-            try { tts.stop() } catch (e: Exception) { }
+            stopSpeech()
             busy = false
             mode(0)
             return
         }
         val v = voiceFor[screenText] ?: screenText
         busy = true
-        val sr = tts.speak(v, TextToSpeech.QUEUE_FLUSH, null, "r")
-        if (sr != TextToSpeech.SUCCESS) {
+        if (!speak(v)) {
             busy = false
             mode(0)
         }
@@ -234,7 +275,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         silent = false
         awaiting = SystemClock.uptimeMillis() + 8000
         if (busy) {
-            try { tts.stop() } catch (e: Exception) { }
+            stopSpeech()
             busy = false
         }
         if (listening) {
@@ -268,7 +309,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         override fun tool(name: String, args: JSONObject): String {
             if (name == "get_weather") return Weather.today(args.optString("city", "")).text
             if (name == "web_search") {
-                val raw = WebSearch.ask(Keys.get(prefs), args.optString("query", ""), MODELS)
+                val raw = WebSearch.ask(Keys.get(prefs), args.optString("query", ""), MODELS, Providers.brave(args.optString("query", "")))
                 return if (raw != null) parseReply(raw).text else "Jawab nahi mil paaya"
             }
             var out = ""
@@ -298,14 +339,14 @@ The user is an adult. Answer questions about the human body, sex education, repr
         silent = false
         val key = Keys.get(prefs)
         if (key.isNotEmpty() && app.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            try { tts.stop() } catch (e: Exception) { }
+            stopSpeech()
             busy = false
             liveSess?.stop()
             liveSess = LiveSession(app, key, liveCb).also { it.start() }
             return
         }
         if (busy) {
-            try { tts.stop() } catch (e: Exception) { }
+            stopSpeech()
             busy = false
         }
         retried = false
@@ -320,7 +361,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         liveSess = null
         main.removeCallbacksAndMessages(null)
         unmuteBeeps()
-        try { tts.stop() } catch (e: Exception) { }
+        stopSpeech()
         busy = false
         if (listening) {
             try { recognizer?.cancel() } catch (e: Exception) { }
@@ -692,8 +733,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             return
         }
         busy = true
-        val sr = tts.speak(r.voice, TextToSpeech.QUEUE_FLUSH, null, "r")
-        if (sr != TextToSpeech.SUCCESS) {
+        if (!speak(r.voice)) {
             busy = false
             mode(0)
             if (live()) scheduleListen(500)
@@ -753,6 +793,11 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     }
                 }
                 if (code != 200) {
+                    val fb = Providers.fallback(systemText(), history.takeLast(6), q)
+                    if (fb != null) {
+                        main.post { deliver(parseReply(fb), q, true) }
+                        return@thread
+                    }
                     val er = apiError(code, resp)
                     main.post {
                         mode(0)
@@ -779,7 +824,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         pre[idx] = Weather.today(c.optJSONObject("args")?.optString("city", "") ?: "")
                     } else if (c.getString("name") == "web_search") {
                         val qq = c.optJSONObject("args")?.optString("query", "") ?: ""
-                        val raw = WebSearch.ask(key, qq, MODELS)
+                        val raw = WebSearch.ask(key, qq, MODELS, Providers.brave(qq))
                         pre[idx] = if (raw != null) parseReply(raw)
                             else Reply("Abhi jawab nahi mil paaya, dobara poochho.", "अभी जवाब नहीं मिल पाया, दोबारा पूछो।")
                     }

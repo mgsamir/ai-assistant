@@ -19,7 +19,7 @@ object WebSearch {
         return a
     }
 
-    fun ask(key: String, query: String, models: List<String>): String? {
+    fun ask(key: String, query: String, models: List<String>, extra: String? = null): String? {
         val sys = "Use Google Search to find the current, correct answer. " +
             "Answer in simple everyday Hindustani (Hindi-Urdu mix, common English words kept), 1 to 4 short sentences, with the actual facts and numbers. " +
             "Never tell the user to search on Google or open a website. No markdown, no asterisks. " +
@@ -29,7 +29,9 @@ object WebSearch {
             .put("safetySettings", safety())
             .put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
             .put("contents", JSONArray().put(JSONObject().put("role", "user")
-                .put("parts", JSONArray().put(JSONObject().put("text", query)))))
+                .put("parts", JSONArray().put(JSONObject().put("text",
+                    if (extra.isNullOrBlank()) query
+                    else query + "\n\nExtra results from the Brave search engine (use them together with Google Search):\n" + extra)))))
         for (m in models) {
             try {
                 val c = URL("https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent")

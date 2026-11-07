@@ -11,3 +11,11 @@ object Keys {
         return prefs.getString("key", "") ?: ""
     }
 }
+
+// Baaki services ki keys (build ke time GitHub secrets se)
+object Extra {
+    val brave: String get() = BuildConfig.BRAVE_KEY
+    val groq: String get() = BuildConfig.GROQ_KEY
+    val openrouter: String get() = BuildConfig.OPENROUTER_KEY
+    val eleven: String get() = BuildConfig.ELEVEN_KEY
+}
