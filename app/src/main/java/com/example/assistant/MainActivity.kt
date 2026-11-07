@@ -599,9 +599,13 @@ class MainActivity : Activity() {
             orb.scaleX = scale; orb.scaleY = scale; orb.translationY = ty
         }
         val lp = orbScroll.layoutParams as FrameLayout.LayoutParams
-        lp.topMargin = insTop + dp(76)
-        lp.bottomMargin = (h - (centerY - smallR - dp(8))).toInt()
-        orbScroll.layoutParams = lp
+        val nt = insTop + dp(76)
+        val nb = (h - (centerY - smallR - dp(8))).toInt()
+        if (lp.topMargin != nt || lp.bottomMargin != nb) {
+            lp.topMargin = nt
+            lp.bottomMargin = nb
+            orbScroll.layoutParams = lp
+        }
         if (animate) {
             if (orbChat) {
                 orbScroll.visibility = View.VISIBLE
@@ -732,7 +736,9 @@ class MainActivity : Activity() {
                 leftMargin = dp(13); rightMargin = dp(13); topMargin = dp(20)
             })
             // status bar / navigation bar / keyboard ke hisaab se upar-neeche ki jagah
-            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> layoutOrb(false) }
+            addOnLayoutChangeListener { v, l, t, r, b, ol, ot, orr, ob ->
+                if (r - l != orr - ol || b - t != ob - ot) layoutOrb(false)
+            }
             setOnApplyWindowInsetsListener { _, ins ->
                 val top: Int
                 val bottom: Int

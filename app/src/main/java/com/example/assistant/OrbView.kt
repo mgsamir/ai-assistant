@@ -45,7 +45,8 @@ class OrbView(ctx: Context) : View(ctx) {
     private var acc = FloatArray(0)
     private var pixels = IntArray(0)
     @Volatile private var front: Bitmap? = null
-    @Volatile private var back: Bitmap? = null
+    private var bufs: Array<Bitmap>? = null
+    private var bi = 0
     private val swapLock = Any()
     @Volatile private var running = false
     private var worker: Thread? = null
@@ -110,8 +111,9 @@ class OrbView(ctx: Context) : View(ctx) {
         acc = FloatArray(sd * sd * 3)
         pixels = IntArray(sd * sd)
         synchronized(swapLock) {
-            front = Bitmap.createBitmap(sd, sd, Bitmap.Config.ARGB_8888)
-            back = Bitmap.createBitmap(sd, sd, Bitmap.Config.ARGB_8888)
+            bufs = Array(3) { Bitmap.createBitmap(sd, sd, Bitmap.Config.ARGB_8888) }
+            bi = 0
+            front = null
         }
         val density = cnt / (PI.toFloat() * rad * rad)
         gain = 3.2f * 0.218f / density
@@ -123,14 +125,14 @@ class OrbView(ctx: Context) : View(ctx) {
         worker = Thread {
             while (running) {
                 val t0 = System.nanoTime()
-                val b = back
+                val arr = bufs
+                val nxt = (bi + 1) % 3
+                val b = arr?.get(nxt)
                 if (b != null && !b.isRecycled) {
                     try {
                         render(b)
                         synchronized(swapLock) {
-                            val f = front
-                            front = b
-                            back = f
+                            if (bufs === arr) { bi = nxt; front = b }
                         }
                         postInvalidateOnAnimation()
                     } catch (e: Exception) { }
