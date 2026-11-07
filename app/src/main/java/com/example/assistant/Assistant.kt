@@ -259,12 +259,12 @@ Never save passwords, OTPs, card numbers or bank details.
     // ---------- Gemini Live (seedhi awaaz) ----------
     private var liveSess: LiveSession? = null
     private val liveCb = object : LiveSession.Cb {
-        override fun status(s: String) { main.post { status(s) } }
-        override fun mode(m: Int) { main.post { mode(m) } }
-        override fun level(v: Float) { level(v) }
-        override fun chat(s: String) { main.post { chat(s) } }
+        override fun status(s: String) { main.post { this@Assistant.status(s) } }
+        override fun mode(m: Int) { main.post { this@Assistant.mode(m) } }
+        override fun level(v: Float) { this@Assistant.level(v) }
+        override fun chat(s: String) { main.post { this@Assistant.chat(s) } }
         override fun system(): String = systemText() + "\n\nVOICE CONVERSATION MODE: You are talking live by voice. Ignore the two line S:/V: format. Just speak naturally in simple everyday Hindustani (Hindi-Urdu mix, Roman words like phone, alarm kept in English). Keep answers short. Never read out markdown or symbols."
-        override fun tools(): JSONArray = tools()
+        override fun tools(): JSONArray = this@Assistant.tools()
         override fun tool(name: String, args: JSONObject): String {
             if (name == "get_weather") return Weather.today(args.optString("city", "")).text
             var out = ""
@@ -279,11 +279,11 @@ Never save passwords, OTPs, card numbers or bank details.
         override fun failed(reason: String) {
             main.post {
                 liveSess = null
-                chat("\nAI: Live nahi chala:\n$reason\n")
+                this@Assistant.chat("\nAI: Live nahi chala:\n$reason\n")
                 if (convo && !muted && !listening && !busy) beginListen()
                 val msg = "Live nahi chala: " + reason.lines().firstOrNull().orEmpty().take(80)
-                main.postDelayed({ status(msg) }, 700)
-                main.postDelayed({ status(msg) }, 2500)
+                main.postDelayed({ this@Assistant.status(msg) }, 700)
+                main.postDelayed({ this@Assistant.status(msg) }, 2500)
             }
         }
     }
