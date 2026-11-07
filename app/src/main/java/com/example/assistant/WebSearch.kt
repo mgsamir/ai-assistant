@@ -25,9 +25,11 @@ object WebSearch {
     fun ask(key: String, query: String, models: List<String>, extra: String? = null): String? {
         lastErr = ""
         val sys = "Use Google Search to find the current, correct answer. " +
-            "Answer in simple everyday Hindustani (Hindi-Urdu mix, common English words kept), 1 to 4 short sentences, with the actual facts and numbers. " +
+            "Today is " + java.text.SimpleDateFormat("EEEE, d MMMM yyyy", java.util.Locale.ENGLISH).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata") }.format(java.util.Date()) + " (India). " +
+            "Answer in simple everyday Hindustani (Hindi-Urdu mix, common English words kept). Give a complete, clear answer in one go like a good Gemini answer: the direct answer first, " +
+            "then all key details (exact dates and day, timings, reasons, names, numbers, and anything that could confuse, such as two different dates). Say clearly whether it is yesterday, today or tomorrow compared with today's date. 4 to 8 sentences. " +
             "Never tell the user to search on Google or open a website. No markdown, no asterisks. " +
-            "Write exactly two lines:\nS: the answer in Hinglish (Hindi in English letters)\nV: the same answer in Hindi Devanagari script"
+            "Write exactly two lines, each line one paragraph:\nS: the full answer in Hinglish (Hindi in English letters)\nV: the same full answer in Hindi Devanagari script"
         val text = if (extra.isNullOrBlank()) query
             else query + "\n\nExtra results from the Brave search engine (use them together with Google Search):\n" + extra
         for (pass in 0..1) {

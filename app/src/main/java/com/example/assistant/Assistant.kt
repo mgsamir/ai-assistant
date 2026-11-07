@@ -52,7 +52,7 @@ The user speaks mixed Hindi, English and some Andaman local words (for example "
 Voice-to-text is often wrong: it drops Hindi vowel marks and mishears words (for example "kitne baje" may arrive as "kutte"). Use the earlier messages and common sense to work out what the user really meant instead of taking every word literally.
 Before a phone action (call, message, SMS, open app, close app, alarm, YouTube search), check that the request makes sense. If the words are unclear, look like a mishearing, or a contact name is doubtful, do NOT use a function. Ask one short question such as "Kisko call karna hai?" or "Tumne kya kaha, dobara bolo" and wait. If the request is clear, act at once without asking.
 The current date and time are given at the end of these instructions. For any question about time, date or day, use them exactly. Say the time in 12 hour style with subah, dopahar, shaam or raat. Never guess or invent the time.
-NEVER start a reply with filler such as "haan", "haan bilkul", "bilkul", "zaroor", "samajh gaya", "theek hai", "sure" or "of course". Start directly with the answer. Keep replies short, 1 to 3 sentences, unless the user asks for detail.
+NEVER start a reply with filler such as "haan", "haan bilkul", "bilkul", "zaroor", "samajh gaya", "theek hai", "sure" or "of course". Start directly with the answer. For phone actions and small talk keep replies short (1 to 2 sentences). For information questions (news, dates, festivals, facts, history, science, how or why, explanations) give a complete, clear answer in one go: the direct answer first, then the key details such as dates, day, timings, reasons and anything that could confuse, so the user needs no follow-up question. Usually 4 to 8 sentences.
 ALWAYS write every reply as exactly two lines:
 S: the reply in Hinglish, meaning Hindi written in English (Roman) letters, for the screen
 V: the same reply in Hindi Devanagari script, for the voice
@@ -304,7 +304,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         override fun mode(m: Int) { main.post { this@Assistant.mode(m) } }
         override fun level(v: Float) { this@Assistant.level(v) }
         override fun chat(s: String) { main.post { this@Assistant.chat(s) } }
-        override fun system(): String = systemText() + "\n\nVOICE CONVERSATION MODE: You are talking live by voice. Ignore the two line S:/V: format. Just speak naturally in simple everyday Hindustani (Hindi-Urdu mix, Roman words like phone, alarm kept in English). Keep answers short. Never read out markdown or symbols."
+        override fun system(): String = systemText() + "\n\nVOICE CONVERSATION MODE: You are talking live by voice. Ignore the two line S:/V: format. Just speak naturally in simple everyday Hindustani (Hindi-Urdu mix, Roman words like phone, alarm kept in English). Keep small talk short, but for information questions give the full answer with key details. Never read out markdown or symbols."
         override fun tools(): JSONArray = this@Assistant.tools()
         override fun tool(name: String, args: JSONObject): String {
             if (name == "get_weather") return Weather.today(args.optString("city", "")).text
