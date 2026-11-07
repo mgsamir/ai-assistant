@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.media.AudioManager
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
@@ -838,6 +839,7 @@ class MainActivity : Activity() {
     private fun openOrb() {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(input.windowToken, 0)
+        volumeControlStream = AudioManager.STREAM_VOICE_CALL
         orbList.removeAllViews()
         orbChat = false
         orbMoved = false
@@ -856,6 +858,7 @@ class MainActivity : Activity() {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(orbInput.windowToken, 0)
         orbInput.clearFocus()
+        volumeControlStream = AudioManager.USE_DEFAULT_STREAM_TYPE
         orbScreen.visibility = View.GONE
         AssistantService.engine?.stopConvo()
     }

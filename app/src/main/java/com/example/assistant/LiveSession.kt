@@ -84,8 +84,15 @@ class LiveSession(private val ctx: Context, private val key: String, private val
             } else {
                 am.isSpeakerphoneOn = true
             }
-            savedVol = am.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
-            am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL), 0)
+            // Awaaz zabardasti full nahi karte. Phone khud yaad rakhta hai ki pichhli baar kitni thi.
+            // Sirf pehli baar: jitni media (gaane) ki awaaz hai, utni hi rakho.
+            val sp = ctx.getSharedPreferences("live", Context.MODE_PRIVATE)
+            if (!sp.getBoolean("vol_init", false)) {
+                val mv = am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                val vmax = am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+                am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, Math.round(mv * vmax).coerceAtLeast(1), 0)
+                sp.edit().putBoolean("vol_init", true).apply()
+            }
         } catch (e: Exception) { }
         cb.status("Gemini Live se jud raha hoon...")
         initTrack()
@@ -108,7 +115,6 @@ class LiveSession(private val ctx: Context, private val key: String, private val
         try {
             if (android.os.Build.VERSION.SDK_INT >= 31) am.clearCommunicationDevice()
             else am.isSpeakerphoneOn = savedSpeaker
-            if (savedVol >= 0) am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, savedVol, 0)
             am.mode = savedMode
         } catch (e: Exception) { }
         try { http.dispatcher.executorService.shutdown() } catch (e: Exception) { }
