@@ -150,6 +150,14 @@ class OrbView(ctx: Context) : View(ctx) {
         super.onDetachedFromWindow()
     }
 
+    // touch gole ke andar hai ya nahi (bahar ka touch peeche ki list ko milega)
+    fun hit(x: Float, y: Float): Boolean {
+        val dx = x - cx
+        val dy = y - cy
+        val r = rad * 1.3f
+        return dx * dx + dy * dy <= r * r
+    }
+
     override fun onDraw(c: Canvas) {
         val b = front ?: return
         val hs = drawSize / 2f
@@ -248,13 +256,18 @@ class OrbView(ctx: Context) : View(ctx) {
             a += 3
             val m = if (rr > gg) (if (rr > bb) rr else bb) else (if (gg > bb) gg else bb)
             if (m < 0.0015f) {
-                pixels[j] = 0xFF000000.toInt()
+                pixels[j] = 0
             } else {
                 val k = 255f * gTone / (1f + gTone * m)
                 var ri = (rr * k).toInt(); if (ri > 255) ri = 255
                 var gi = (gg * k).toInt(); if (gi > 255) gi = 255
                 var bi = (bb * k).toInt(); if (bi > 255) bi = 255
-                pixels[j] = (0xFF shl 24) or (ri shl 16) or (gi shl 8) or bi
+                val mx = maxOf(ri, maxOf(gi, bi)).coerceAtLeast(1)
+                // alpha = chamak; rang poori tarah chamakdar. Kaale par pehle jaisa hi dikhega
+                val rf = ri * 255 / mx
+                val gf = gi * 255 / mx
+                val bf = bi * 255 / mx
+                pixels[j] = (mx shl 24) or (rf shl 16) or (gf shl 8) or bf
             }
         }
         b.setPixels(pixels, 0, side, 0, 0, side, side)

@@ -574,6 +574,7 @@ class MainActivity : Activity() {
     private lateinit var bottomRowV: LinearLayout
     private lateinit var topRowV: FrameLayout
     private var orbChat = false
+    private var orbMoved = false
     private var insTop = 0
     private var insBottom = 0
 
@@ -591,16 +592,18 @@ class MainActivity : Activity() {
         orb.pivotX = w / 2f
         orb.pivotY = h * 0.51f
         val ty = centerY - h * 0.51f
-        if (animate) {
-            orb.animate().scaleX(scale).scaleY(scale).translationY(ty).setDuration(340)
+        if (orbMoved) {
+            // orb ko tumne kheencha hai: wahin rehne do, sirf list ki jagah theek karo
+        } else if (animate) {
+            orb.animate().scaleX(scale).scaleY(scale).translationX(0f).translationY(ty).setDuration(340)
                 .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)).start()
         } else {
             orb.animate().cancel()
-            orb.scaleX = scale; orb.scaleY = scale; orb.translationY = ty
+            orb.scaleX = scale; orb.scaleY = scale; orb.translationX = 0f; orb.translationY = ty
         }
         val lp = orbScroll.layoutParams as FrameLayout.LayoutParams
         val nt = insTop + dp(76)
-        val nb = (h - (centerY - smallR - dp(8))).toInt()
+        val nb = (h - rowTop + dp(8)).toInt()
         if (lp.topMargin != nt || lp.bottomMargin != nb) {
             lp.topMargin = nt
             lp.bottomMargin = nb
@@ -622,6 +625,7 @@ class MainActivity : Activity() {
 
     private fun toggleOrbChat() {
         orbChat = !orbChat
+        orbMoved = false
         layoutOrb(true)
     }
 
@@ -713,7 +717,43 @@ class MainActivity : Activity() {
             addView(setBtn, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.END))
         }
 
-        orb.setOnClickListener { toggleOrbChat() }
+        var dragging = false
+        var dX = 0f; var dY = 0f; var sTx = 0f; var sTy = 0f; var inside = false
+        orb.setOnTouchListener { v, e ->
+            when (e.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    inside = orb.hit(e.x, e.y)
+                    if (inside) {
+                        orb.animate().cancel()
+                        dragging = false
+                        dX = e.rawX; dY = e.rawY
+                        sTx = orb.translationX; sTy = orb.translationY
+                    }
+                    inside
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    if (!inside) return@setOnTouchListener false
+                    val mx = e.rawX - dX
+                    val my = e.rawY - dY
+                    if (!dragging && (mx * mx + my * my) > dp(10) * dp(10)) dragging = true
+                    if (dragging) {
+                        orbMoved = true
+                        val hh = orbScreen.height.toFloat(); val ww = orbScreen.width.toFloat()
+                        val limX = ww * 0.42f
+                        orb.translationX = (sTx + mx).coerceIn(-limX, limX)
+                        orb.translationY = (sTy + my).coerceIn(-hh * 0.51f + dp(60), hh * 0.49f - dp(60))
+                    }
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP -> {
+                    if (inside && !dragging) toggleOrbChat()
+                    inside = false
+                    true
+                }
+                android.view.MotionEvent.ACTION_CANCEL -> { inside = false; true }
+                else -> false
+            }
+        }
         orbList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         orbScroll = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
@@ -726,8 +766,8 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.BLACK)
             visibility = View.GONE
             isClickable = true
-            addView(orb, FrameLayout.LayoutParams(-1, -1))
             addView(orbScroll, FrameLayout.LayoutParams(-1, -1))
+            addView(orb, FrameLayout.LayoutParams(-1, -1))
             addView(orbStatus, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { bottomMargin = dp(100) })
             addView(bottomRow, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
                 leftMargin = dp(32); rightMargin = dp(32); bottomMargin = dp(16)
@@ -780,6 +820,7 @@ class MainActivity : Activity() {
         imm.hideSoftInputFromWindow(input.windowToken, 0)
         orbList.removeAllViews()
         orbChat = false
+        orbMoved = false
         orbInput.text?.clear()
         orbScreen.visibility = View.VISIBLE
         orbScreen.requestApplyInsets()
