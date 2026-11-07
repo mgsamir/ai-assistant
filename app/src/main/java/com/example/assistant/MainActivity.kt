@@ -541,22 +541,23 @@ class MainActivity : Activity() {
             text = orbLabel(0)
             setTextColor(Color.parseColor("#9AA3B5"))
             textSize = 14f
+            visibility = View.GONE
             gravity = Gravity.CENTER
         }
-        micBtn = icon(2, 54) { toggleMute() }
+        micBtn = icon(2, 43) { toggleMute() }
         micBtn.tint = Color.WHITE
-        micBtn.background = oval("#2B2B2F")
-        val close = icon(1, 54) { closeOrb() }
+        micBtn.background = oval("#303030")
+        val close = icon(1, 43) { closeOrb() }
         close.rotation = 45f
         close.tint = Color.BLACK
         close.background = oval("#FFFFFF")
-        val plus = icon(1, 40) { Toast.makeText(this, "Jaldi aayega", Toast.LENGTH_SHORT).show() }
+        val plus = icon(1, 30) { Toast.makeText(this, "Jaldi aayega", Toast.LENGTH_SHORT).show() }
 
         orbInput = EditText(this).apply {
             hint = "Ask AI"
             setHintTextColor(Color.parseColor("#8D8D95"))
             setTextColor(Color.WHITE)
-            textSize = 17f
+            textSize = 16f
             background = null
             setSingleLine(true)
             imeOptions = EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_EXTRACT_UI
@@ -570,28 +571,28 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(27).toFloat()
-                setColor(Color.parseColor("#2B2B2F"))
+                cornerRadius = dp(22).toFloat()
+                setColor(Color.parseColor("#303030"))
             }
-            setPadding(dp(8), 0, dp(16), 0)
-            addView(plus, LinearLayout.LayoutParams(dp(40), dp(40)))
+            setPadding(dp(8), 0, dp(14), 0)
+            addView(plus, LinearLayout.LayoutParams(dp(30), dp(30)))
             addView(orbInput, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(6) })
         }
         val bottomRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(pill, LinearLayout.LayoutParams(0, dp(54), 1f))
-            addView(micBtn, LinearLayout.LayoutParams(dp(54), dp(54)).apply { leftMargin = dp(10) })
-            addView(close, LinearLayout.LayoutParams(dp(54), dp(54)).apply { leftMargin = dp(10) })
+            addView(pill, LinearLayout.LayoutParams(0, dp(43), 1f))
+            addView(micBtn, LinearLayout.LayoutParams(dp(43), dp(43)).apply { leftMargin = dp(8) })
+            addView(close, LinearLayout.LayoutParams(dp(43), dp(43)).apply { leftMargin = dp(8) })
         }
 
-        val menuBtn = icon(0, 50) { Toast.makeText(this, "Jaldi aayega", Toast.LENGTH_SHORT).show() }
-        menuBtn.background = oval("#2B2B2F")
-        val setBtn = icon(11, 50) { Toast.makeText(this, "Jaldi aayega", Toast.LENGTH_SHORT).show() }
-        setBtn.background = oval("#2B2B2F")
+        val menuBtn = icon(0, 40) { Toast.makeText(this, "Jaldi aayega", Toast.LENGTH_SHORT).show() }
+        menuBtn.background = oval("#303030")
+        val setBtn = icon(11, 40) { Toast.makeText(this, "Jaldi aayega", Toast.LENGTH_SHORT).show() }
+        setBtn.background = oval("#303030")
         val topRow = FrameLayout(this).apply {
-            addView(menuBtn, FrameLayout.LayoutParams(dp(50), dp(50), Gravity.START))
-            addView(setBtn, FrameLayout.LayoutParams(dp(50), dp(50), Gravity.END))
+            addView(menuBtn, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START))
+            addView(setBtn, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.END))
         }
 
         orb.setOnClickListener { talk() }
@@ -602,10 +603,10 @@ class MainActivity : Activity() {
             addView(orb, FrameLayout.LayoutParams(-1, -1))
             addView(orbStatus, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { bottomMargin = dp(100) })
             addView(bottomRow, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
-                leftMargin = dp(20); rightMargin = dp(20); bottomMargin = dp(24)
+                leftMargin = dp(32); rightMargin = dp(32); bottomMargin = dp(16)
             })
             addView(topRow, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply {
-                leftMargin = dp(20); rightMargin = dp(20); topMargin = dp(12)
+                leftMargin = dp(13); rightMargin = dp(13); topMargin = dp(20)
             })
             // status bar / navigation bar / keyboard ke hisaab se upar-neeche ki jagah
             setOnApplyWindowInsetsListener { _, ins ->
