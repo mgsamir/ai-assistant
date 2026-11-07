@@ -218,6 +218,8 @@ Never save passwords, OTPs, card numbers or bank details.
 
     // टाइप करके भेजा हुआ सवाल
     fun sendText(q: String, speak: Boolean = false) {
+        val ls = liveSess
+        if (speak && ls != null && ls.ready) { ls.sendText(q.trim()); return }
         if (q.isBlank() || busy) return
         awaiting = 0L
         silent = !speak
@@ -254,10 +256,47 @@ Never save passwords, OTPs, card numbers or bank details.
         beginListen()
     }
 
+    // ---------- Gemini Live (seedhi awaaz) ----------
+    private var liveSess: LiveSession? = null
+    private val liveCb = object : LiveSession.Cb {
+        override fun status(s: String) { main.post { status(s) } }
+        override fun mode(m: Int) { main.post { mode(m) } }
+        override fun level(v: Float) { level(v) }
+        override fun chat(s: String) { main.post { chat(s) } }
+        override fun system(): String = systemText() + "\n\nVOICE CONVERSATION MODE: You are talking live by voice. Ignore the two line S:/V: format. Just speak naturally in simple everyday Hindustani (Hindi-Urdu mix, Roman words like phone, alarm kept in English). Keep answers short. Never read out markdown or symbols."
+        override fun tools(): JSONArray = tools()
+        override fun tool(name: String, args: JSONObject): String {
+            if (name == "get_weather") return Weather.today(args.optString("city", "")).text
+            var out = ""
+            val latch = java.util.concurrent.CountDownLatch(1)
+            main.post {
+                try { out = runAction(name, args).text } catch (e: Exception) { out = "Nahi ho paaya" }
+                latch.countDown()
+            }
+            latch.await(10, java.util.concurrent.TimeUnit.SECONDS)
+            return out
+        }
+        override fun failed(reason: String) {
+            main.post {
+                liveSess = null
+                status("Live nahi chala ($reason). Purana mic chal raha hai")
+                if (convo && !muted && !listening && !busy) beginListen()
+            }
+        }
+    }
+
     fun startConvo() {
         convo = true
         muted = false
         silent = false
+        val key = Keys.get(prefs)
+        if (key.isNotEmpty() && app.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            try { tts.stop() } catch (e: Exception) { }
+            busy = false
+            liveSess?.stop()
+            liveSess = LiveSession(app, key, liveCb).also { it.start() }
+            return
+        }
         if (busy) {
             try { tts.stop() } catch (e: Exception) { }
             busy = false
@@ -270,6 +309,8 @@ Never save passwords, OTPs, card numbers or bank details.
     fun stopConvo() {
         convo = false
         muted = false
+        liveSess?.stop()
+        liveSess = null
         main.removeCallbacksAndMessages(null)
         unmuteBeeps()
         try { tts.stop() } catch (e: Exception) { }
@@ -283,6 +324,12 @@ Never save passwords, OTPs, card numbers or bank details.
 
     fun setMuted(m: Boolean) {
         muted = m
+        val ls = liveSess
+        if (ls != null) {
+            ls.muted = m
+            if (m) { mode(0); status("Mic band hai") } else { mode(1); status("Bolo, main sun raha hoon...") }
+            return
+        }
         if (m) {
             if (listening) {
                 try { recognizer?.cancel() } catch (e: Exception) { }
