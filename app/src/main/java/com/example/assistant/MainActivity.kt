@@ -167,6 +167,22 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawLine(9f, 17f, 9f, 5f, p); c.drawLine(9f, 5f, 19f, 3f, p); c.drawLine(19f, 3f, 19f, 15f, p)
                 c.drawCircle(7f, 17f, 2.2f, p); c.drawCircle(17f, 15f, 2.2f, p)
             }
+            20 -> {
+                c.drawCircle(12f, 12f, 1.8f, p)
+                for (ang in listOf(0f, 60f, 120f)) { c.save(); c.rotate(ang, 12f, 12f); c.drawOval(RectF(3f, 8f, 21f, 16f), p); c.restore() }
+            }
+            21 -> {
+                val l = Path()
+                l.moveTo(12f, 6f); l.quadTo(8f, 4f, 3f, 5f); l.lineTo(3f, 18f); l.quadTo(8f, 17f, 12f, 19.5f)
+                val r = Path()
+                r.moveTo(12f, 6f); r.quadTo(16f, 4f, 21f, 5f); r.lineTo(21f, 18f); r.quadTo(16f, 17f, 12f, 19.5f)
+                c.drawPath(l, p); c.drawPath(r, p); c.drawLine(12f, 6f, 12f, 19.5f, p)
+            }
+            22 -> {
+                c.drawCircle(10f, 8f, 3.2f, p)
+                c.drawArc(RectF(3f, 14f, 17f, 28f), 180f, 180f, false, p)
+                c.drawLine(19f, 4f, 19f, 9f, p); c.drawLine(16.5f, 6.5f, 21.5f, 6.5f, p)
+            }
             else -> {
                 val t = Path()
                 t.moveTo(4f, 10f)
@@ -379,6 +395,7 @@ class MainActivity : Activity() {
             pendMode == "video" -> "Kaisa video banana hai?"
             pendMode == "music" -> "Kaisa gaana banana hai?"
             pendMode == "map" -> "Kaunsi jagah ya raasta?"
+            pendMode == "research" -> "Kis baare mein report chahiye?"
             pendAtt != null -> "\uD83D\uDCCE " + pendName + " - sawal likho"
             else -> "Ask AI"
         }
@@ -424,7 +441,7 @@ class MainActivity : Activity() {
         for (c in chips) row.addView(c, LinearLayout.LayoutParams(0, dp(92), 1f).apply { rightMargin = dp(8) })
         col.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
 
-        fun item(kind: Int, title: String, sub: String, go: () -> Unit): View {
+        fun item(kind: Int, title: String, sub: String, state: String? = null, go: () -> Unit): View {
             val r = LinearLayout(this)
             r.gravity = Gravity.CENTER_VERTICAL
             r.setPadding(dp(6), dp(12), dp(6), dp(12))
@@ -434,12 +451,35 @@ class MainActivity : Activity() {
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
             tx.addView(TextView(this).apply { text = sub; textSize = 14f; setTextColor(Color.parseColor("#9AA3B5")) })
             r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+            if (state != null) r.addView(TextView(this).apply {
+                text = state
+                textSize = 13f
+                setTextColor(if (state == "ON") Color.WHITE else Color.parseColor("#9AA3B5"))
+                setPadding(dp(14), dp(6), dp(14), dp(6))
+                background = GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(Color.parseColor(if (state == "ON") "#2F6BFF" else "#2A2A2A")) }
+            })
             r.setOnClickListener { dlg.dismiss(); go() }
             return r
         }
         col.addView(item(17, "Create images", "Image banao ya photo badlo") { setMode("image") })
         col.addView(item(18, "Video", "Video banao") { setMode("video") })
         col.addView(item(19, "Create music", "Gaana banao") { setMode("music") })
+        val eng = AssistantService.engine
+        col.addView(item(20, "Deep Research", "Poori jaanch ke saath lamba report") { setMode("research") })
+        col.addView(item(21, "Guided Learning", "Kadam-kadam par sikho", if (eng?.learn == true) "ON" else "OFF") {
+            val e = AssistantService.engine
+            if (e != null) {
+                e.learn = !e.learn
+                Toast.makeText(this, if (e.learn) "Guided Learning chalu" else "Guided Learning band", Toast.LENGTH_SHORT).show()
+            }
+        })
+        col.addView(item(22, "Personal Intelligence", "Tumhari yaad ki hui baatein use kare", if (eng?.personal != false) "ON" else "OFF") {
+            val e = AssistantService.engine
+            if (e != null) {
+                e.personal = !e.personal
+                Toast.makeText(this, if (e.personal) "Personal Intelligence chalu" else "Personal Intelligence band", Toast.LENGTH_SHORT).show()
+            }
+        })
         if (pendAtt != null || pendMode.isNotEmpty()) {
             col.addView(item(1, "Hatao", "Jo jodha hai use hata do") { pendAtt = null; pendMode = ""; refreshHints() })
         }
@@ -582,6 +622,23 @@ class MainActivity : Activity() {
                 startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(t))))
             } catch (e: Exception) {
                 Toast.makeText(this, "Maps app nahi mila", Toast.LENGTH_SHORT).show()
+            }
+            return true
+        }
+        if (mode == "research") {
+            pendMode = ""
+            refreshHints()
+            if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
+            showChat("Tum: $t")
+            Toast.makeText(this, "Report banne mein 1-2 minute lagte hain", Toast.LENGTH_LONG).show()
+            val e = AssistantService.engine
+            if (e == null) { removePending(); return true }
+            e.research(t) { rep ->
+                runOnUiThread {
+                    removePending()
+                    addAi(rep)
+                    if (::orbList.isInitialized) orbAdd(false, rep)
+                }
             }
             return true
         }

@@ -571,10 +571,22 @@ The user is an adult. Answer questions about the human body, sex education, repr
         else Reply("Aisi koi baat yaad nahi thi", "ऐसी कोई बात याद नहीं थी")
     }
 
-        private fun systemText(): String {
-        val mem = loadMem()
+        @Volatile var learn = false
+    var personal: Boolean
+        get() = prefs.getBoolean("pi", true)
+        set(v) { prefs.edit().putBoolean("pi", v).apply() }
+
+    fun research(q: String, cb: (String) -> Unit) {
+        val key = Keys.get(prefs)
+        val p = if (personal) { val m = loadMem(); if (m.isEmpty()) "" else "Facts about the user you may use: " + m.joinToString("; ") } else ""
+        thread { cb(Research.run(key, q, p)) }
+    }
+
+    private fun systemText(): String {
+        val mem = if (personal) loadMem() else emptyList()
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", Locale.ENGLISH).format(java.util.Date())
-        val base = PERSONA + "\n\nCurrent date and time on the user's phone: " + now
+        var base = PERSONA + "\n\nCurrent date and time on the user's phone: " + now
+        if (learn) base += "\n\nGUIDED LEARNING MODE is ON. Act like a patient teacher: teach step by step in small easy steps, use simple examples from daily life in India, give only one step at a time (3 to 5 sentences), then ask the user one short question to check understanding or ask if he wants the next step. Do not dump the whole answer at once. This overrides the rule to give complete long answers."
         if (mem.isEmpty()) return base
         return base + "\n\nFacts remembered about the user:\n" + mem.joinToString("\n") { "- $it" }
         }
