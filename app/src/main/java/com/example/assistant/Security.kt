@@ -52,8 +52,16 @@ object Security {
         (d.activeAdmins ?: emptyList<ComponentName>()).map { it.packageName }.toSet()
     } catch (e: Exception) { emptySet() }
 
-    private fun isSystem(i: ApplicationInfo) =
-        (i.flags and ApplicationInfo.FLAG_SYSTEM) != 0 && (i.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0
+    // phone ke saath aaye / system ke app (update hue ho tab bhi) shak ki list mein nahi aate
+    private fun isSystem(i: ApplicationInfo): Boolean {
+        if ((i.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0) return true
+        val d = i.sourceDir ?: return false
+        return listOf("/system", "/product", "/vendor", "/system_ext", "/apex", "/odm", "/my_").any { d.startsWith(it) }
+    }
+
+    // company ke apne naam wale app (phone ke saath aaye, par /data mein hote hain)
+    private val OWN = listOf("com.miui.", "com.xiaomi.", "com.mi.", "com.google.android.", "com.android.",
+        "com.qualcomm.", "com.microsoft.appmanager", "com.preff.", "android.")
 
     private fun hasLauncher(pm: PackageManager, pkg: String): Boolean =
         pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(pkg), 0).isNotEmpty()
@@ -63,22 +71,29 @@ object Security {
         val ai = pi.applicationInfo ?: return null
         val pkg = pi.packageName
         if (pkg == c.packageName || isSystem(ai)) return null
+        if (try { pm.checkSignatures("android", pkg) == PackageManager.SIGNATURE_MATCH } catch (e: Exception) { false }) return null
+        if (try { pm.checkSignatures(pkg, "android") == PackageManager.SIGNATURE_MATCH } catch (e: Exception) { false }) return null
         val label = ai.loadLabel(pm).toString()
         val low = label.lowercase()
         var s = 0
         val why = ArrayList<String>()
         val src = installer(pm, pkg)
         val trusted = src != null && src in STORES
-        if (!trusted) { s += 1; why.add("Play Store ke bahar se aaya (file se install)") }
-        if (!hasLauncher(pm, pkg)) { s += 3; why.add("Icon chhupa hua hai, app list mein nahi dikhta") }
+        // phone ke saath aaye company ke app: halke nishaan (icon, install ka raasta) ginte hi nahi
+        val soft = !(src == null && OWN.any { pkg.startsWith(it) }) && !trusted
+        val perms = (pi.requestedPermissions ?: emptyArray()).map { it.substringAfterLast('.') }
+        val sms = "READ_SMS" in perms || "RECEIVE_SMS" in perms
+        val sens = SENS.count { it in perms }
+        val risky = sms || sens >= 2 || pkg in acc || pkg in ad || pkg in nl
+        if (soft) {
+            s += 1; why.add("Play Store ke bahar se aaya (file se install)")
+            if (!hasLauncher(pm, pkg) && risky) { s += 3; why.add("Icon chhupa hua hai, app list mein nahi dikhta") }
+            if (sms) { s += 2; why.add("SMS padhne ki ijazat (OTP chura sakta hai)") }
+            if (sens >= 4) { s += 2; why.add("Bahut saari nijee ijazatein maangta hai ($sens)") }
+        } else if (trusted && sms) { s += 1; why.add("SMS padhne ki ijazat (OTP chura sakta hai)") }
         if (pkg in acc) { s += 4; why.add("Accessibility chalu hai, ye screen padh sakta hai aur khud tap kar sakta hai") }
         if (pkg in ad) { s += 4; why.add("Device admin bana hua hai, hatana mushkil kar sakta hai") }
         if (pkg in nl) { s += 2; why.add("Tumhare saare notification (OTP bhi) padh sakta hai") }
-        val perms = (pi.requestedPermissions ?: emptyArray()).map { it.substringAfterLast('.') }
-        val sms = "READ_SMS" in perms || "RECEIVE_SMS" in perms
-        if (sms) { s += if (trusted) 1 else 2; why.add("SMS padhne ki ijazat (OTP chura sakta hai)") }
-        val sens = SENS.count { it in perms }
-        if (!trusted && sens >= 4) { s += 2; why.add("Bahut saari nijee ijazatein maangta hai ($sens)") }
         for ((nm, real) in REAL) {
             if ((low == nm || low.replace(" ", "") == nm.replace(" ", "")) && pkg != real) {
                 s += 5; why.add("Naam '$label' jaisa hai par asli app ka package nahi hai (fake ho sakta hai)")
@@ -168,6 +183,13 @@ object Security {
     // App khulte hi apne aap jaanch: sirf tab bolta hai jab kuch shak wala mile
     // (zyada shak wale har baar, thode shak wale sirf pehli baar jab dikhe, ya naye aaye app)
     fun autoCheck(c: Context, p: android.content.SharedPreferences): String? {
+        if (!p.getBoolean("sec_v2", false)) {
+            p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putBoolean("sec_v2", true).apply()
+        }
+        if (p.getInt("sec_ver", 0) < 2) {
+            // purani galat chetavniyan saaf
+            p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putInt("sec_ver", 2).apply()
+        }
         val f = scan(c)
         val pm = c.packageManager
         val known = p.getStringSet("sec_known", null)
