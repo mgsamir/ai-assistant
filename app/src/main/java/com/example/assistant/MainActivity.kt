@@ -464,8 +464,6 @@ class MainActivity : Activity() {
             return r
         }
         col.addView(item(17, "Create images", "Image banao ya photo badlo") { setMode("image") })
-        col.addView(item(18, "Video", "Video banao") { setMode("video") })
-        col.addView(item(19, "Create music", "Gaana banao") { setMode("music") })
         val eng = AssistantService.engine
         col.addView(item(20, "Deep Research", "Poori jaanch ke saath lamba report") { setMode("research") })
         col.addView(item(20, "Agent", "Google ka agent kai kadam mein kaam karta hai") { setMode("agent") })
