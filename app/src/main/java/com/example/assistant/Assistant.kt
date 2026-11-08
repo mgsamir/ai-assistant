@@ -258,9 +258,9 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
 
     // टाइप करके भेजा हुआ सवाल
-    fun sendText(q: String, speak: Boolean = false) {
+    fun sendText(q: String, speak: Boolean = false, att: Pair<String, String>? = null) {
         val ls = liveSess
-        if (speak && ls != null && ls.ready) { ls.sendText(q.trim()); return }
+        if (att == null && speak && ls != null && ls.ready) { ls.sendText(q.trim()); return }
         if (q.isBlank() || busy) return
         awaiting = 0L
         silent = !speak
@@ -268,7 +268,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             try { recognizer?.cancel() } catch (e: Exception) { }
             listening = false
         }
-        ask(q.trim())
+        ask(q.trim(), att)
     }
     // मिक/ऑर्ब बटन दबाने पर
     fun talk() {
@@ -755,7 +755,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         }
     }
 
-    private fun ask(q: String) {
+    private fun ask(q: String, att: Pair<String, String>? = null) {
         val key = Keys.get(prefs)
         if (key.isEmpty()) {
             mode(0)
@@ -776,8 +776,10 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     contents.put(JSONObject().put("role", "model")
                         .put("parts", JSONArray().put(JSONObject().put("text", a))))
                 }
-                contents.put(JSONObject().put("role", "user")
-                    .put("parts", JSONArray().put(JSONObject().put("text", q))))
+                val lastParts = JSONArray().put(JSONObject().put("text", q))
+                if (att != null) lastParts.put(JSONObject().put("inlineData",
+                    JSONObject().put("mimeType", att.first).put("data", att.second)))
+                contents.put(JSONObject().put("role", "user").put("parts", lastParts))
                 val body = JSONObject()
                     .put("system_instruction", JSONObject().put("parts",
                         JSONArray().put(JSONObject().put("text", systemText()))))

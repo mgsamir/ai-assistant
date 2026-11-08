@@ -131,6 +131,42 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawCircle(19f, 12f, 1.7f, p)
                 p.style = Paint.Style.STROKE
             }
+            13, 17 -> {
+                c.drawRoundRect(RectF(3f, 4f, 21f, 20f), 3f, 3f, p)
+                c.drawCircle(9f, 10f, 2f, p)
+                val t = Path()
+                t.moveTo(3f, 17f); t.lineTo(9f, 12.5f); t.lineTo(14f, 17f); t.lineTo(17f, 14.5f); t.lineTo(21f, 18f)
+                c.drawPath(t, p)
+                if (kind == 17) { c.drawLine(17f, 6.5f, 17f, 10.5f, p); c.drawLine(15f, 8.5f, 19f, 8.5f, p) }
+            }
+            14 -> {
+                c.drawRoundRect(RectF(3f, 7f, 21f, 20f), 3f, 3f, p)
+                c.drawCircle(12f, 13.5f, 3.6f, p)
+                c.drawLine(8f, 7f, 9.5f, 4f, p); c.drawLine(9.5f, 4f, 14.5f, 4f, p); c.drawLine(14.5f, 4f, 16f, 7f, p)
+            }
+            15 -> {
+                val t = Path()
+                t.moveTo(6f, 3f); t.lineTo(14f, 3f); t.lineTo(19f, 8f); t.lineTo(19f, 21f); t.lineTo(6f, 21f); t.close()
+                c.drawPath(t, p)
+                c.drawLine(14f, 3f, 14f, 8f, p); c.drawLine(14f, 8f, 19f, 8f, p)
+            }
+            16 -> {
+                val t = Path()
+                t.moveTo(3f, 6f); t.lineTo(9f, 4f); t.lineTo(15f, 6f); t.lineTo(21f, 4f)
+                t.lineTo(21f, 18f); t.lineTo(15f, 20f); t.lineTo(9f, 18f); t.lineTo(3f, 20f); t.close()
+                c.drawPath(t, p)
+                c.drawLine(9f, 4f, 9f, 18f, p); c.drawLine(15f, 6f, 15f, 20f, p)
+            }
+            18 -> {
+                c.drawRoundRect(RectF(3f, 5f, 21f, 19f), 3f, 3f, p)
+                val t = Path()
+                t.moveTo(10f, 9f); t.lineTo(10f, 15f); t.lineTo(15f, 12f); t.close()
+                c.drawPath(t, p)
+            }
+            19 -> {
+                c.drawLine(9f, 17f, 9f, 5f, p); c.drawLine(9f, 5f, 19f, 3f, p); c.drawLine(19f, 3f, 19f, 15f, p)
+                c.drawCircle(7f, 17f, 2.2f, p); c.drawCircle(17f, 15f, 2.2f, p)
+            }
             else -> {
                 val t = Path()
                 t.moveTo(4f, 10f)
@@ -329,6 +365,358 @@ class MainActivity : Activity() {
         }
     }
 
+
+    // ---------- "+" menu: photo, camera, file, map, image/video/music banana ----------
+    private var pendAtt: Pair<String, String>? = null
+    private var pendName = ""
+    private var pendMode = ""
+    private var camUri: android.net.Uri? = null
+    private var player: android.media.MediaPlayer? = null
+
+    private fun refreshHints() {
+        val t = when {
+            pendMode == "image" -> "Kaisi image banani hai?"
+            pendMode == "video" -> "Kaisa video banana hai?"
+            pendMode == "music" -> "Kaisa gaana banana hai?"
+            pendMode == "map" -> "Kaunsi jagah ya raasta?"
+            pendAtt != null -> "\uD83D\uDCCE " + pendName + " - sawal likho"
+            else -> "Ask AI"
+        }
+        input.hint = t
+        if (::orbInput.isInitialized) orbInput.hint = t
+    }
+
+    private fun showPlus() {
+        val dlg = android.app.Dialog(this)
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(26))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                val r = dp(28).toFloat()
+                cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
+                setColor(Color.parseColor("#1E1E1E"))
+            }
+        }
+        col.addView(View(this).apply {
+            background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(Color.parseColor("#555555")) }
+        }, LinearLayout.LayoutParams(dp(40), dp(5)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(14) })
+
+        fun chip(kind: Int, label: String, go: () -> Unit): View {
+            val b = LinearLayout(this)
+            b.orientation = LinearLayout.VERTICAL
+            b.gravity = Gravity.CENTER
+            b.background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+            val ic = IconView(this).apply { this.kind = kind }
+            b.addView(ic, LinearLayout.LayoutParams(dp(56), dp(44)))
+            b.addView(TextView(this).apply { text = label; textSize = 14f; setTextColor(Color.parseColor("#E8EAF0")); gravity = Gravity.CENTER })
+            b.setOnClickListener { dlg.dismiss(); go() }
+            return b
+        }
+        val row = LinearLayout(this)
+        val chips = listOf(
+            chip(13, "Photos") { pick(101) },
+            chip(14, "Camera") { camera() },
+            chip(15, "Files") { pick(103) },
+            chip(16, "Map") { setMode("map") }
+        )
+        for (c in chips) row.addView(c, LinearLayout.LayoutParams(0, dp(92), 1f).apply { rightMargin = dp(8) })
+        col.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+
+        fun item(kind: Int, title: String, sub: String, go: () -> Unit): View {
+            val r = LinearLayout(this)
+            r.gravity = Gravity.CENTER_VERTICAL
+            r.setPadding(dp(6), dp(12), dp(6), dp(12))
+            r.addView(IconView(this).apply { this.kind = kind }, LinearLayout.LayoutParams(dp(48), dp(40)))
+            val tx = LinearLayout(this)
+            tx.orientation = LinearLayout.VERTICAL
+            tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
+            tx.addView(TextView(this).apply { text = sub; textSize = 14f; setTextColor(Color.parseColor("#9AA3B5")) })
+            r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+            r.setOnClickListener { dlg.dismiss(); go() }
+            return r
+        }
+        col.addView(item(17, "Create images", "Image banao ya photo badlo") { setMode("image") })
+        col.addView(item(18, "Video", "Video banao") { setMode("video") })
+        col.addView(item(19, "Create music", "Gaana banao") { setMode("music") })
+        if (pendAtt != null || pendMode.isNotEmpty()) {
+            col.addView(item(1, "Hatao", "Jo jodha hai use hata do") { pendAtt = null; pendMode = ""; refreshHints() })
+        }
+        dlg.setContentView(col)
+        dlg.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setGravity(Gravity.BOTTOM)
+        }
+        dlg.show()
+    }
+
+    private fun setMode(m: String) {
+        pendMode = m
+        refreshHints()
+        val v = if (orbScreen.visibility == View.VISIBLE) orbInput else input
+        v.requestFocus()
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(v, 0)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun pick(code: Int) {
+        try {
+            val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE)
+                .setType(if (code == 101) "image/*" else "*/*")
+            startActivityForResult(i, code)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Ye khul nahi paaya", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun camera() {
+        try {
+            val i = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+            if (Build.VERSION.SDK_INT >= 29) {
+                val cv = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "photo_" + System.currentTimeMillis() + ".jpg")
+                    put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/AI Assistant")
+                }
+                camUri = contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)
+                i.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, camUri)
+            } else camUri = null
+            startActivityForResult(i, 102)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Camera khul nahi paaya", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(rq: Int, rs: Int, d: Intent?) {
+        super.onActivityResult(rq, rs, d)
+        if (rs != RESULT_OK) {
+            if (rq == 102) camUri?.let { try { contentResolver.delete(it, null, null) } catch (e: Exception) { } }
+            return
+        }
+        kotlin.concurrent.thread {
+            try {
+                when (rq) {
+                    101, 103 -> d?.data?.let { readPicked(it) }
+                    102 -> {
+                        val u = camUri
+                        if (u != null) readPicked(u, "image/jpeg")
+                        else (d?.extras?.get("data") as? android.graphics.Bitmap)?.let { setAtt(it, "photo") }
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "Ye file nahi khul paayi", Toast.LENGTH_SHORT).show() }
+            }
+        }
+    }
+
+    private fun setAtt(bm: android.graphics.Bitmap, name: String) {
+        var b = bm
+        val mx = 1280
+        if (maxOf(b.width, b.height) > mx) {
+            val s = mx.toFloat() / maxOf(b.width, b.height)
+            b = android.graphics.Bitmap.createScaledBitmap(b, (b.width * s).toInt(), (b.height * s).toInt(), true)
+        }
+        val bo = java.io.ByteArrayOutputStream()
+        b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, bo)
+        pendAtt = Pair("image/jpeg", android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP))
+        pendName = name
+        runOnUiThread {
+            refreshHints()
+            if (orbScreen.visibility == View.VISIBLE) closeOrb()
+            Toast.makeText(this, "Photo jud gayi, ab sawal likho", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun readPicked(u: android.net.Uri, forceMime: String? = null) {
+        var name = "file"
+        try {
+            contentResolver.query(u, null, null, null, null)?.use {
+                if (it.moveToFirst()) {
+                    val ix = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (ix >= 0) name = it.getString(ix) ?: name
+                }
+            }
+        } catch (e: Exception) { }
+        val mime = forceMime ?: contentResolver.getType(u) ?: "application/octet-stream"
+        if (mime.startsWith("image/")) {
+            val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, o) }
+            var s = 1
+            while (maxOf(o.outWidth, o.outHeight) / s > 2400) s *= 2
+            val o2 = android.graphics.BitmapFactory.Options().apply { inSampleSize = s }
+            val bm = contentResolver.openInputStream(u)?.use { android.graphics.BitmapFactory.decodeStream(it, null, o2) }
+            if (bm != null) { setAtt(bm, name); return }
+        }
+        val bytes = contentResolver.openInputStream(u)?.use { it.readBytes() } ?: return
+        if (bytes.size > 8_000_000) {
+            runOnUiThread { Toast.makeText(this, "File bahut badi hai (8 MB se chhoti chahiye)", Toast.LENGTH_LONG).show() }
+            return
+        }
+        val ok = mime == "application/pdf" || mime.startsWith("audio/") || mime.startsWith("video/") || mime.startsWith("text/")
+        pendAtt = Pair(if (ok) mime else "text/plain", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+        pendName = name
+        runOnUiThread {
+            refreshHints()
+            if (orbScreen.visibility == View.VISIBLE) closeOrb()
+            Toast.makeText(this, "File jud gayi, ab sawal likho", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Map / image / video / music wale mode mein bheja gaya text
+    private fun runSpecial(t: String): Boolean {
+        val mode = pendMode
+        if (mode.isEmpty()) return false
+        if (mode == "map") {
+            pendMode = ""
+            refreshHints()
+            showChat("Tum: $t")
+            removePending()
+            val msg = "Maps mein khol raha hoon."
+            addAi(msg)
+            if (::orbList.isInitialized) orbAdd(false, msg)
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(t))))
+            } catch (e: Exception) {
+                Toast.makeText(this, "Maps app nahi mila", Toast.LENGTH_SHORT).show()
+            }
+            return true
+        }
+        val key = Keys.get(getSharedPreferences("p", Context.MODE_PRIVATE))
+        val att = pendAtt
+        pendAtt = null
+        pendMode = ""
+        refreshHints()
+        if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
+        showChat("Tum: $t")
+        if (key.isEmpty()) { finishMedia(null, mode, "API key nahi mili"); return true }
+        Toast.makeText(this, if (mode == "image") "Ban rahi hai..." else "Ban raha hai, 1-2 minute lag sakte hain", Toast.LENGTH_LONG).show()
+        kotlin.concurrent.thread {
+            val out = when (mode) {
+                "image" -> Media.image(key, t, att)
+                "video" -> Media.video(key, t)
+                else -> Media.music(key, t)
+            }
+            val err = Media.lastErr
+            runOnUiThread { finishMedia(out, mode, err) }
+        }
+        return true
+    }
+
+    private fun finishMedia(out: Media.Out?, kind: String, err: String) {
+        removePending()
+        if (out == null) {
+            val t = "Nahi ban paaya. " + err.ifBlank { "Dobara try karo." }
+            addAi(t)
+            if (::orbList.isInitialized) orbAdd(false, t)
+            return
+        }
+        val uri = saveMedia(out, kind)
+        chatList.addView(mediaView(out, kind, uri), LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8); bottomMargin = dp(8) })
+        scrollDown()
+        if (::orbList.isInitialized) {
+            orbList.addView(mediaView(out, kind, uri), LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8); bottomMargin = dp(8) })
+            orbScroll.post { orbScroll.fullScroll(View.FOCUS_DOWN) }
+        }
+    }
+
+    private fun saveMedia(out: Media.Out, kind: String): android.net.Uri? {
+        if (Build.VERSION.SDK_INT < 29) return null
+        return try {
+            val ext = when {
+                out.mime.contains("png") -> "png"
+                out.mime.contains("jpeg") || out.mime.contains("jpg") -> "jpg"
+                out.mime.contains("webp") -> "webp"
+                out.mime.contains("wav") -> "wav"
+                kind == "video" -> "mp4"
+                kind == "music" -> "mp3"
+                else -> "jpg"
+            }
+            val (col, dir) = when (kind) {
+                "video" -> Pair(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, android.os.Environment.DIRECTORY_MOVIES)
+                "music" -> Pair(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, android.os.Environment.DIRECTORY_MUSIC)
+                else -> Pair(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, android.os.Environment.DIRECTORY_PICTURES)
+            }
+            val cv = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, kind + "_" + System.currentTimeMillis() + "." + ext)
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, out.mime)
+                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, dir + "/AI Assistant")
+            }
+            val u = contentResolver.insert(col, cv)
+            if (u != null) contentResolver.openOutputStream(u)?.use { it.write(out.bytes) }
+            u
+        } catch (e: Exception) { null }
+    }
+
+    private fun mediaView(out: Media.Out, kind: String, uri: android.net.Uri?): View {
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        fun btn(label: String): TextView = TextView(this).apply {
+            text = label
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setPadding(dp(20), dp(14), dp(20), dp(14))
+            background = GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+        }
+        when (kind) {
+            "image" -> {
+                val o = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
+                val bm = android.graphics.BitmapFactory.decodeByteArray(out.bytes, 0, out.bytes.size, o)
+                val iv = android.widget.ImageView(this)
+                iv.setImageBitmap(bm)
+                iv.adjustViewBounds = true
+                iv.maxWidth = (resources.displayMetrics.widthPixels * 0.8f).toInt()
+                iv.clipToOutline = true
+                iv.outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(v: View, ol: android.graphics.Outline) { ol.setRoundRect(0, 0, v.width, v.height, dp(18).toFloat()) }
+                }
+                iv.setOnClickListener {
+                    if (uri != null) try { startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, out.mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) } catch (e: Exception) { }
+                }
+                box.addView(iv, LinearLayout.LayoutParams(-2, -2))
+                if (uri != null) box.addView(icon(7, 44) {
+                    startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType(out.mime)
+                        .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), null))
+                })
+            }
+            "video" -> {
+                val b = btn("\u25B6  Video chalao")
+                b.setOnClickListener {
+                    if (uri == null) { Toast.makeText(this, "Video save nahi hua", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                    try { startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, out.mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) }
+                    catch (e: Exception) { Toast.makeText(this, "Video player nahi mila", Toast.LENGTH_SHORT).show() }
+                }
+                box.addView(b)
+            }
+            else -> {
+                val b = btn("\u25B6  Gaana chalao")
+                b.setOnClickListener {
+                    try {
+                        if (player?.isPlaying == true) {
+                            player?.stop(); player?.release(); player = null
+                            b.text = "\u25B6  Gaana chalao"
+                        } else {
+                            val f = java.io.File(cacheDir, "song")
+                            f.writeBytes(out.bytes)
+                            player = android.media.MediaPlayer().apply {
+                                setDataSource(f.path)
+                                setOnCompletionListener { b.text = "\u25B6  Gaana chalao" }
+                                prepare()
+                                start()
+                            }
+                            b.text = "\u23F8  Rok do"
+                        }
+                    } catch (e: Exception) { Toast.makeText(this, "Gaana nahi chala", Toast.LENGTH_SHORT).show() }
+                }
+                box.addView(b)
+            }
+        }
+        return box
+    }
+
     private fun soon() {
         Toast.makeText(this, "Ye jald aayega", Toast.LENGTH_SHORT).show()
     }
@@ -419,7 +807,7 @@ class MainActivity : Activity() {
                 setStroke(dp(1), Color.parseColor("#1F2633"))
             }
         }
-        bar.addView(icon(1, 44) { soon() })
+        bar.addView(icon(1, 44) { showPlus() })
         input = EditText(this).apply {
             hint = "Ask AI"
             setHintTextColor(Color.parseColor("#7D8597"))
@@ -499,17 +887,22 @@ class MainActivity : Activity() {
 
     // ---------- bataon ke kaam ----------
     private fun sendInput() {
-        val t = input.text.toString().trim()
-        if (t.isEmpty()) {
+        var t = input.text.toString().trim()
+        if (t.isEmpty() && pendAtt == null && pendMode.isEmpty()) {
             openOrb()
             return
         }
+        if (t.isEmpty()) t = "Isme kya hai? Aasaan shabdon mein batao."
+        if (runSpecial(t)) { input.text?.clear(); return }
         val e = AssistantService.engine
         if (e == null) {
             Toast.makeText(this, "Thoda ruko, assistant shuru ho raha hai", Toast.LENGTH_SHORT).show()
             return
         }
-        e.sendText(t)
+        val att = pendAtt
+        pendAtt = null
+        refreshHints()
+        e.sendText(t, false, att)
         input.text?.clear()
         input.requestFocus()
         input.post {
@@ -663,7 +1056,7 @@ class MainActivity : Activity() {
         close.rotation = 45f
         close.tint = Color.BLACK
         close.background = oval("#FFFFFF")
-        val plus = icon(1, 30) { Toast.makeText(this, "Jaldi aayega", Toast.LENGTH_SHORT).show() }
+        val plus = icon(1, 30) { showPlus() }
 
         orbInput = EditText(this).apply {
             hint = "Ask AI"
@@ -825,14 +1218,18 @@ class MainActivity : Activity() {
     }
 
     private fun sendOrbText() {
-        val t = orbInput.text.toString().trim()
+        var t = orbInput.text.toString().trim()
         if (t.isEmpty()) return
+        if (runSpecial(t)) { orbInput.text?.clear(); return }
         val e = AssistantService.engine
         if (e == null) {
             Toast.makeText(this, "Assistant shuru nahi hua", Toast.LENGTH_SHORT).show()
             return
         }
-        e.sendText(t, true)
+        val att = pendAtt
+        pendAtt = null
+        refreshHints()
+        e.sendText(t, true, att)
         orbInput.text?.clear()
     }
 
