@@ -52,6 +52,7 @@ object Media {
                     val b = cs.getJSONObject(j)
                     if (b.optString("type") == kind && b.optString("data").isNotEmpty()) {
                         val mime = b.optString("mime_type").ifBlank { if (kind == "video") "video/mp4" else "audio/mpeg" }
+                        Usage.hit("gemini", model, 0)
                         return Out(Base64.decode(b.getString("data"), Base64.DEFAULT), mime)
                     }
                 }
@@ -122,6 +123,7 @@ object Media {
                     val d = ps.getJSONObject(i).let { it.optJSONObject("inlineData") ?: it.optJSONObject("inline_data") } ?: continue
                     val data = d.optString("data")
                     if (data.isNotEmpty()) {
+                        Usage.hit("gemini", m, 0)
                         return Out(Base64.decode(data, Base64.DEFAULT), d.optString("mimeType").ifBlank { d.optString("mime_type").ifBlank { "image/png" } })
                     }
                 }
@@ -165,7 +167,7 @@ object Media {
                 val text = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText() ?: ""
                 if (code in 200..299) {
                     val b64 = JSONObject(text).optJSONArray("data")?.optJSONObject(0)?.optString("b64_json") ?: ""
-                    if (b64.isNotEmpty()) return Out(Base64.decode(b64, Base64.DEFAULT), "image/png")
+                    if (b64.isNotEmpty()) { Usage.hit("openai", model, 0); return Out(Base64.decode(b64, Base64.DEFAULT), "image/png") }
                 } else lastErr = "OpenAI $model: " + why(code, text)
             } catch (e: Exception) { }
         }

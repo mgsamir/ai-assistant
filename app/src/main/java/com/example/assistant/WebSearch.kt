@@ -35,7 +35,7 @@ object WebSearch {
         val text = if (extra.isNullOrBlank()) query
             else query + "\n\nExtra results from the Brave search engine (use them together with Google Search):\n" + extra
         for (pass in 0..1) {
-            for (m in SEARCH_MODELS) {
+            for (m in (models + SEARCH_MODELS).distinct()) {
                 val body = JSONObject()
                     .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", sys))))
                     .put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
@@ -60,7 +60,10 @@ object WebSearch {
                         if (parts == null) { lastErr = "$m: khaali jawab"; continue }
                         val sb = StringBuilder()
                         for (i in 0 until parts.length()) sb.append(parts.getJSONObject(i).optString("text", ""))
-                        if (sb.isNotBlank()) return sb.toString()
+                        if (sb.isNotBlank()) {
+                            Usage.hit("gemini", m, JSONObject(resp).optJSONObject("usageMetadata")?.optInt("totalTokenCount") ?: 0)
+                            return sb.toString()
+                        }
                         lastErr = "$m: khaali text"
                     } else {
                         val msg = try { JSONObject(resp).optJSONObject("error")?.optString("message", "") ?: "" } catch (e: Exception) { "" }

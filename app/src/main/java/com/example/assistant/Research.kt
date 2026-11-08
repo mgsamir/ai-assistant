@@ -31,7 +31,7 @@ object Research {
                     ?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts") ?: continue
                 val sb = StringBuilder()
                 for (i in 0 until parts.length()) sb.append(parts.getJSONObject(i).optString("text"))
-                if (sb.isNotBlank()) return sb.toString().trim()
+                if (sb.isNotBlank()) { Usage.hit("gemini", m, 0); return sb.toString().trim() }
             } catch (e: Exception) { }
         }
         return null
@@ -52,7 +52,7 @@ object Research {
         val found = arrayOfNulls<String>(qs.size)
         val ts = qs.mapIndexed { i, s ->
             Thread {
-                found[i] = sLine(WebSearch.ask(key, s, MODELS, Providers.brave(s)))
+                found[i] = sLine(WebSearch.ask(key, s, emptyList(), Providers.brave(s)))
             }.also { it.start() }
         }
         ts.forEach { it.join(70000) }

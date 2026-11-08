@@ -55,8 +55,11 @@ object Providers {
             c.doOutput = true
             c.outputStream.use { it.write(body.toString().toByteArray()) }
             if (c.responseCode != 200) return null
-            JSONObject(c.inputStream.bufferedReader().readText())
-                .optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
+            val prov = if (url.contains("groq")) "groq" else if (url.contains("openai")) "openai" else "openrouter"
+            if (prov == "groq") Usage.groqHeaders(model, c)
+            val jo = JSONObject(c.inputStream.bufferedReader().readText())
+            Usage.hit(prov, model, jo.optJSONObject("usage")?.optInt("total_tokens") ?: 0)
+            jo.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
         } catch (e: Exception) { null }
     }
 

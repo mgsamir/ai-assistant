@@ -1039,6 +1039,20 @@ class MainActivity : Activity() {
     // ---------- model chunna (Auto / Chat / Coding / Web search / Photo / Video / Music) ----------
     private lateinit var titleV: TextView
 
+    private fun askLimit(m: Models.M, done: () -> Unit) {
+        val et = EditText(this)
+        et.inputType = InputType.TYPE_CLASS_NUMBER
+        et.hint = "Roz ki requests, jaise 250"
+        val cur = Usage.limitOf(m)
+        if (cur > 0) et.setText(cur.toString())
+        android.app.AlertDialog.Builder(this)
+            .setTitle(m.name + " ki roz ki limit")
+            .setView(et)
+            .setPositiveButton("Save") { _, _ -> Usage.setLimit(m, et.text.toString().toIntOrNull() ?: 0); done() }
+            .setNegativeButton("Hatao") { _, _ -> Usage.setLimit(m, 0); done() }
+            .show()
+    }
+
     private fun refreshTitle() {
         val p = getSharedPreferences("p", Context.MODE_PRIVATE)
         val c = Models.sel(p, "chat")
@@ -1063,7 +1077,7 @@ class MainActivity : Activity() {
         var showFree = true
 
         lateinit var render: () -> Unit
-        fun row(title: String, sub: String?, tag: String?, checked: Boolean, go: () -> Unit): View {
+        fun row(title: String, sub: String?, tag: String?, checked: Boolean, usage: Usage.Info? = null, hold: (() -> Unit)? = null, go: () -> Unit): View {
             val r = LinearLayout(this)
             r.gravity = Gravity.CENTER_VERTICAL
             r.setPadding(dp(14), dp(11), dp(16), dp(11))
@@ -1077,9 +1091,26 @@ class MainActivity : Activity() {
             tx.orientation = LinearLayout.VERTICAL
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
             if (sub != null) tx.addView(TextView(this).apply { text = sub; textSize = 13.5f; setTextColor(Color.parseColor("#9AA3B5")) })
+            if (usage != null) {
+                if (usage.frac != null) {
+                    val bar = LinearLayout(this)
+                    bar.background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(Color.parseColor("#333333")) }
+                    val left = (1f - usage.frac).coerceIn(0f, 1f)
+                    val fill = View(this)
+                    fill.background = GradientDrawable().apply {
+                        cornerRadius = dp(3).toFloat()
+                        setColor(Color.parseColor(if (left > 0.4f) "#3DDC84" else if (left > 0.15f) "#FFB300" else "#FF5252"))
+                    }
+                    bar.addView(fill, LinearLayout.LayoutParams(0, dp(5), left))
+                    bar.addView(View(this), LinearLayout.LayoutParams(0, dp(5), 1f - left))
+                    tx.addView(bar, LinearLayout.LayoutParams(-1, dp(5)).apply { topMargin = dp(5) })
+                }
+                tx.addView(TextView(this).apply { text = usage.text; textSize = 12f; setTextColor(Color.parseColor("#7C8499")); setPadding(0, dp(3), 0, 0) })
+            }
             r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(6) })
             if (tag != null) r.addView(TextView(this).apply { text = tag; textSize = 12f; setTextColor(Color.parseColor("#9AA3B5")) })
             r.setOnClickListener { go() }
+            if (hold != null) r.setOnLongClickListener { hold(); true }
             return r
         }
         fun head(t: String): View = TextView(this).apply {
@@ -1132,7 +1163,7 @@ class MainActivity : Activity() {
                 val cur = Models.sel(p, cat)
                 for (mm in items) {
                     val on = cur != null && cur.key == mm.key
-                    col.addView(row(mm.name, null, mm.tag, on) {
+                    col.addView(row(mm.name, null, mm.tag, on, Usage.info(mm), if (mm.prov == "gemini" || mm.prov == "openai") ({ askLimit(mm) { render() } }) else null) {
                         Models.setSel(p, cat, if (on) null else mm)
                         refreshTitle(); render()
                     })
@@ -1161,6 +1192,10 @@ class MainActivity : Activity() {
                 runOnUiThread { if (dlg.isShowing) render() }
             }
         }
+        kotlin.concurrent.thread {
+            Usage.refreshOpenRouter()
+            runOnUiThread { if (dlg.isShowing) render() }
+        }
     }
 
     private fun soon() {
@@ -1176,6 +1211,7 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
+        Usage.p = getSharedPreferences("p", Context.MODE_PRIVATE)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT

@@ -116,6 +116,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
 
     init {
+        Usage.p = prefs
         // Hamesha sunne wala mode band hai. Mic sirf button dabane par sunta hai.
         ambient = false
         prefs.edit().putBoolean("ambient", false).apply()
@@ -684,7 +685,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 emptyList(), q)
             if (t != null) return parseReply(t)
         }
-        val raw = WebSearch.ask(key, q, if (ws != null && ws.prov == "gemini") listOf(ws.id) + MODELS else MODELS, brave)
+        val raw = WebSearch.ask(key, q, if (ws != null && ws.prov == "gemini") listOf(ws.id) else emptyList(), brave)
         if (raw != null) return parseReply(raw)
         if (brave != null) {
             val sys = "Answer the question using ONLY these search results. Simple everyday Hindustani, 1 to 4 short sentences, no markdown. " +
@@ -836,6 +837,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         c.outputStream.use { it.write(rb.toString().toByteArray()) }
                         code = c.responseCode
                         resp = (if (code == 200) c.inputStream else c.errorStream).bufferedReader().readText()
+                        if (code == 200) Usage.hit("gemini", m, try { JSONObject(resp).optJSONObject("usageMetadata")?.optInt("totalTokenCount") ?: 0 } catch (e: Exception) { 0 })
                         if (code == 200 || code == 401 || code == 403 || (code == 400 && resp.contains("API key", ignoreCase = true))) break
                     } catch (e: Exception) {
                         code = 0
