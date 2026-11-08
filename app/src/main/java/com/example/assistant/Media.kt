@@ -80,7 +80,7 @@ object Media {
     fun image(key: String, prompt: String, attach: Pair<String, String>?, sel: Models.M? = null): Out? {
         lastErr = ""
         val ps = sel
-        val gem = listOf("gemini-2.5-flash-image", "gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview")
+        val gem = listOf("gemini-2.5-flash-image", "gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview", "gemini-3.1-flash-lite-image")
         if (ps != null && ps.prov == "openrouter") {
             try {
                 val body = JSONObject().put("model", ps.id)

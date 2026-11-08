@@ -20,12 +20,28 @@ object Usage {
     }
 
     // Google ki free limit (roz ki requests). Google ab khud nahi batata, ye naapi hui kam-se-kam limit hai
+    // Google ki Rate Limit page se (free tier, roz ki requests)
     private fun geminiDefault(id: String): Int? = when {
-        id.contains("pro") || id.contains("image") || id.startsWith("imagen") || id.contains("veo") ||
-            id.contains("omni") || id.contains("lyria") || id.contains("argon") -> 0
+        id.contains("pro") || id.contains("image") || id.contains("banana") || id.startsWith("imagen") ||
+            id.contains("veo") || id.contains("omni") || id.contains("lyria") || id.contains("argon") ||
+            id.contains("deep-research") -> 0
+        id.contains("antigravity") -> 100
         id.contains("gemma") -> 14400
+        id.contains("tts") -> 10
+        id.contains("transcribe") -> 25
+        id.contains("robotics") -> 20
         id.contains("lite") -> if (id.contains("3.5") || id.contains("3.1")) 500 else 20
         id.contains("flash") -> 20
+        else -> null
+    }
+
+    // minute mein kitni requests (free tier)
+    private fun geminiRpm(id: String): Int? = when {
+        id.contains("antigravity") -> 60
+        id.contains("gemma") -> 30
+        id.contains("tts") || id.contains("transcribe") -> 3
+        id.contains("lite") -> if (id.contains("3.5") || id.contains("3.1")) 15 else 10
+        id.contains("flash") -> 5
         else -> null
     }
 
@@ -125,7 +141,7 @@ object Usage {
             if (d == 0) return Info(null, "Free plan mein nahi, paid chahiye")
             if (d != null) lim = d
         }
-        if (lim > 0) return Info((req.toFloat() / lim).coerceIn(0f, 1f), "Aaj $req / $lim use (app ki ginti), baaki ${maxOf(0, lim - req)}")
+        if (lim > 0) return Info((req.toFloat() / lim).coerceIn(0f, 1f), "Aaj $req / $lim use (app ki ginti), baaki ${maxOf(0, lim - req)}" + (if (m.prov == "gemini") geminiRpm(m.id)?.let { " · minute mein max $it" } ?: "" else ""))
         if (req > 0) return Info(null, "Aaj $req requests, ${if (tok >= 1000) (tok / 1000).toString() + "k" else tok.toString()} tokens")
         if (m.prov == "openai") return Info(null, "OpenAI paid hai, balance unke page par dikhta hai")
         return null

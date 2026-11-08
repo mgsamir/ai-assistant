@@ -80,6 +80,13 @@ object Providers {
             "llama-3.3-70b-versatile", system, hist, q)?.let { if (it.isNotBlank()) return it }
         chat("https://api.openai.com/v1/chat/completions", Extra.openai,
             "gpt-4o-mini", system, hist, q)?.let { if (it.isNotBlank()) return it }
+        // OpenRouter: pehle free models (paisa kharch nahi), tabhi auto jab free na chalein
+        val sp = Usage.p
+        val frees = if (sp != null) Models.list(sp).filter { it.prov == "openrouter" && it.free && it.cat == "chat" }.take(3) else emptyList()
+        for (m in frees) {
+            chat("https://openrouter.ai/api/v1/chat/completions", Extra.openrouter,
+                m.id, system, hist, q)?.let { if (it.isNotBlank()) return it }
+        }
         chat("https://openrouter.ai/api/v1/chat/completions", Extra.openrouter,
             "openrouter/auto", system, hist, q)?.let { if (it.isNotBlank()) return it }
         return null
