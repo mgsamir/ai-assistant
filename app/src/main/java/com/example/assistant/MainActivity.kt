@@ -448,6 +448,7 @@ class MainActivity : Activity() {
             r.gravity = Gravity.CENTER_VERTICAL
             r.setPadding(dp(6), dp(12), dp(6), dp(12))
             r.addView(IconView(this).apply { this.kind = kind }, LinearLayout.LayoutParams(dp(48), dp(40)))
+            if (prov != null) r.addView(badge(prov, 30), LinearLayout.LayoutParams(dp(30), dp(30)).apply { leftMargin = dp(4) })
             val tx = LinearLayout(this)
             tx.orientation = LinearLayout.VERTICAL
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
@@ -1175,10 +1176,24 @@ class MainActivity : Activity() {
         sv.addView(col)
         sv.background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#1E1E1E")) }
         var thinkOpen = true
-        var showFree = true
+        val openProv = mutableSetOf<String>()
+        Models.CATS.mapNotNull { Models.sel(p, it.first) }.forEach { openProv.add(it.prov) }
+        if (openProv.isEmpty()) openProv.add("gemini")
+        fun provName(x: String) = when (x) { "gemini" -> "Gemini"; "openai" -> "ChatGPT (OpenAI)"; "groq" -> "Groq"; "openrouter" -> "OpenRouter"; else -> x }
+        fun provColor(x: String) = when (x) { "gemini" -> "#4F8BFF"; "openai" -> "#10A37F"; "groq" -> "#F55036"; "openrouter" -> "#7C5CFF"; else -> "#6B7280" }
+        fun provLetter(x: String) = when (x) { "gemini" -> "G"; "openai" -> "O"; "groq" -> "Gq"; "openrouter" -> "OR"; else -> x.take(1).uppercase() }
+        fun badge(x: String, size: Int): View = TextView(this).apply {
+            text = provLetter(x)
+            textSize = if (size >= 30) 13f else 11f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor(provColor(x))) }
+            layoutParams = LinearLayout.LayoutParams(dp(size), dp(size))
+        }
 
         lateinit var render: () -> Unit
-        fun row(title: String, sub: String?, tag: String?, checked: Boolean, usage: Usage.Info? = null, hold: (() -> Unit)? = null, go: () -> Unit): View {
+        fun row(title: String, sub: String?, prov: String?, checked: Boolean, usage: Usage.Info? = null, hold: (() -> Unit)? = null, go: () -> Unit): View {
             val r = LinearLayout(this)
             r.gravity = Gravity.CENTER_VERTICAL
             r.setPadding(dp(14), dp(11), dp(16), dp(11))
@@ -1209,7 +1224,6 @@ class MainActivity : Activity() {
                 tx.addView(TextView(this).apply { text = usage.text; textSize = 12f; setTextColor(Color.parseColor("#7C8499")); setPadding(0, dp(3), 0, 0) })
             }
             r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(6) })
-            if (tag != null) r.addView(TextView(this).apply { text = tag; textSize = 12f; setTextColor(Color.parseColor("#9AA3B5")) })
             r.setOnClickListener { go() }
             if (hold != null) r.setOnLongClickListener { hold(); true }
             return r
@@ -1226,7 +1240,7 @@ class MainActivity : Activity() {
         render = {
             col.removeAllViews()
             val none = Models.CATS.all { Models.sel(p, it.first) == null }
-            col.addView(row("Auto", "Kaam ke hisaab se apne aap chunega", null, none) {
+            col.addView(row("Auto", null, null, none) {
                 for ((k, _) in Models.CATS) Models.setSel(p, k, null)
                 refreshTitle(); render()
             })
@@ -1243,34 +1257,37 @@ class MainActivity : Activity() {
                 col.addView(row("Medium", "Balanced depth", null, lv == "medium") { p.edit().putString("think", "medium").apply(); render() })
                 col.addView(row("High", "Extra thorough", null, lv == "high") { p.edit().putString("think", "high").apply(); render() })
             }
-            col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(14), dp(6), dp(14), dp(2)) })
-            val sides = LinearLayout(this)
-            fun side(isFree: Boolean, name: String): TextView = TextView(this).apply {
-                text = name
-                textSize = 16f
-                gravity = Gravity.CENTER
-                setTextColor(if (showFree == isFree) Color.WHITE else Color.parseColor("#9AA3B5"))
-                background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(if (showFree == isFree) Color.parseColor("#2F6BFF") else Color.parseColor("#2A2A2A")) }
-                setOnClickListener { showFree = isFree; render() }
-            }
-            sides.addView(side(true, "Free"), LinearLayout.LayoutParams(0, dp(40), 1f).apply { rightMargin = dp(4) })
-            sides.addView(side(false, "Paid"), LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(4) })
-            col.addView(sides, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(14), dp(8), dp(14), dp(4)) })
-            val all = Models.list(p).filter { it.free == showFree }
-            for ((cat, label) in Models.CATS) {
-                val items = all.filter { it.cat == cat }
-                if (items.isEmpty()) continue
-                col.addView(head(label))
-                val cur = Models.sel(p, cat)
-                for (mm in items) {
-                    val on = cur != null && cur.key == mm.key
-                    col.addView(row(mm.name, null, mm.tag, on, Usage.info(mm), if (mm.prov == "gemini" || mm.prov == "openai") ({ askLimit(mm) { render() } }) else null) {
-                        Models.setSel(p, cat, if (on) null else mm)
-                        refreshTitle(); render()
-                    })
+            val all = Models.list(p)
+            for (prov in listOf("gemini", "openai", "groq", "openrouter")) {
+                val mine = all.filter { it.prov == prov }
+                if (mine.isEmpty()) continue
+                col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(14), dp(6), dp(14), dp(2)) })
+                val open = prov in openProv
+                val ph = LinearLayout(this)
+                ph.gravity = Gravity.CENTER_VERTICAL
+                ph.setPadding(dp(18), dp(10), dp(20), dp(10))
+                ph.addView(badge(prov, 30), LinearLayout.LayoutParams(dp(30), dp(30)))
+                ph.addView(TextView(this).apply { text = provName(prov); textSize = 17f; setTextColor(Color.WHITE) },
+                    LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
+                ph.addView(TextView(this).apply { text = if (open) "\u2303" else "\u2304"; textSize = 20f; setTextColor(Color.WHITE) })
+                ph.setOnClickListener { if (open) openProv.remove(prov) else openProv.add(prov); render() }
+                col.addView(ph)
+                if (!open) continue
+                for ((cat, label) in Models.CATS) {
+                    val items = mine.filter { it.cat == cat }.sortedByDescending { it.free }
+                    if (items.isEmpty()) continue
+                    col.addView(head(label))
+                    val cur = Models.sel(p, cat)
+                    for (mm in items) {
+                        val on = cur != null && cur.key == mm.key
+                        col.addView(row(mm.name, null, mm.prov, on, Usage.info(mm), if (mm.prov == "gemini" || mm.prov == "openai") ({ askLimit(mm) { render() } }) else null) {
+                            Models.setSel(p, cat, if (on) null else mm)
+                            refreshTitle(); render()
+                        })
+                    }
                 }
-                if (cat == "chat") col.addView(TextView(this).apply {
-                    text = "Groq, OpenAI aur OpenRouter se sirf jawab milta hai, phone ke kaam nahi."
+                if (prov != "gemini") col.addView(TextView(this).apply {
+                    text = "Only gives answers, no phone actions."
                     textSize = 12.5f
                     setTextColor(Color.parseColor("#7C8499"))
                     setPadding(dp(20), dp(2), dp(16), dp(6))

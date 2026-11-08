@@ -113,7 +113,7 @@ object Usage {
         val tok = if (today) o!!.optInt("t") else 0
         if (m.prov == "groq" && o != null && o.has("gl")) {
             val l = o.optDouble("gl"); val r = o.optDouble("gr")
-            if (l > 0) return Info(((l - r) / l).toFloat().coerceIn(0f, 1f), "Aaj baaki ${r.toInt()} / ${l.toInt()} requests")
+            if (l > 0) return Info(((l - r) / l).toFloat().coerceIn(0f, 1f), "${r.toInt()} / ${l.toInt()} left today")
         }
         if (m.prov == "openrouter") {
             if (m.id.contains(":free")) {
@@ -126,24 +126,24 @@ object Usage {
                     if (k.startsWith("openrouter|") && k.contains(":free") && oo.optString("d") == day("openrouter")) n += oo.optInt("r")
                 }
                 val lim = limitOf(m).let { if (it > 0) it else 50 }
-                return Info((n.toFloat() / lim).coerceIn(0f, 1f), "Free models mil kar roz $lim requests, aaj $n use, baaki ${maxOf(0, lim - n)}")
+                return Info((n.toFloat() / lim).coerceIn(0f, 1f), "$n / $lim used today (shared by all free models) \u00b7 ${maxOf(0, lim - n)} left")
             }
             val used = sp.getFloat("or_used", -1f)
             if (sp.contains("or_limit")) {
                 val l = sp.getFloat("or_limit", 0f)
-                if (l > 0f) return Info((used / l).coerceIn(0f, 1f), "Credit baaki \$" + String.format(Locale.US, "%.2f", l - used) + " / \$" + String.format(Locale.US, "%.2f", l))
+                if (l > 0f) return Info((used / l).coerceIn(0f, 1f), "\$" + String.format(Locale.US, "%.2f", l - used) + " left of \$" + String.format(Locale.US, "%.2f", l))
             }
-            if (used >= 0f) return Info(null, "Ab tak kharch \$" + String.format(Locale.US, "%.3f", used) + " (koi limit nahi)")
+            if (used >= 0f) return Info(null, "\$" + String.format(Locale.US, "%.3f", used) + " spent, no limit")
         }
         var lim = limitOf(m)
         if (lim == 0 && m.prov == "gemini") {
             val d = geminiDefault(m.id)
-            if (d == 0) return Info(null, "Free plan mein nahi, paid chahiye")
+            if (d == 0) return Info(null, "Paid plan only")
             if (d != null) lim = d
         }
-        if (lim > 0) return Info((req.toFloat() / lim).coerceIn(0f, 1f), "Aaj $req / $lim use (app ki ginti), baaki ${maxOf(0, lim - req)}" + (if (m.prov == "gemini") geminiRpm(m.id)?.let { " · minute mein max $it" } ?: "" else ""))
-        if (req > 0) return Info(null, "Aaj $req requests, ${if (tok >= 1000) (tok / 1000).toString() + "k" else tok.toString()} tokens")
-        if (m.prov == "openai") return Info(null, "OpenAI paid hai, balance unke page par dikhta hai")
+        if (lim > 0) return Info((req.toFloat() / lim).coerceIn(0f, 1f), "$req / $lim used today \u00b7 ${maxOf(0, lim - req)} left" + (if (m.prov == "gemini") geminiRpm(m.id)?.let { " \u00b7 $it per min" } ?: "" else ""))
+        if (req > 0) return Info(null, "$req requests today, ${if (tok >= 1000) (tok / 1000).toString() + "k" else tok.toString()} tokens")
+        if (m.prov == "openai") return Info(null, "Paid \u00b7 check balance on the OpenAI website")
         return null
     }
 }
