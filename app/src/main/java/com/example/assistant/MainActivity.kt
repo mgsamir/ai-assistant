@@ -1156,7 +1156,8 @@ class MainActivity : Activity() {
 
     private fun refreshTitle() {
         val p = getSharedPreferences("p", Context.MODE_PRIVATE)
-        val c = Models.sel(p, "chat")
+        var c = Models.sel(p, "chat")
+        if (c != null && Usage.paidOnly(c)) { Models.setSel(p, "chat", null); c = null }
         val base = if (c == null) "AI Auto" else "AI " + c.name
         val s = SpannableString(base)
         s.setSpan(ForegroundColorSpan(Color.parseColor("#9AA3B5")), 3, base.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -1281,8 +1282,12 @@ class MainActivity : Activity() {
                     for (mm in items) {
                         val on = cur != null && cur.key == mm.key
                         col.addView(row(mm.name, null, mm.prov, on, Usage.info(mm), if (mm.prov == "gemini" || mm.prov == "openai") ({ askLimit(mm) { render() } }) else null) {
-                            Models.setSel(p, cat, if (on) null else mm)
-                            refreshTitle(); render()
+                            if (Usage.paidOnly(mm)) {
+                                Toast.makeText(this, "Ye model free plan mein nahi chalta. Paid key ho to isko lamba dabakar apni limit daalo.", Toast.LENGTH_LONG).show()
+                            } else {
+                                Models.setSel(p, cat, if (on) null else mm)
+                                refreshTitle(); render()
+                            }
                         })
                     }
                 }

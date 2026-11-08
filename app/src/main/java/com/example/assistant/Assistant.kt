@@ -806,7 +806,14 @@ The user is an adult. Answer questions about the human body, sex education, repr
         thread {
             try {
                 val codeQ = Regex("(?i)\\b(code|coding|program|script|function|bug|error|kotlin|java|python|html|css|javascript|sql|api|app banao|website banao)\\b|कोड|प्रोग्राम").containsMatchIn(q)
-                val pick = (if (codeQ) Models.sel(prefs, "coding") else null) ?: Models.sel(prefs, "chat")
+                val pick0 = (if (codeQ) Models.sel(prefs, "coding") else null) ?: Models.sel(prefs, "chat")
+                val pick = if (pick0 != null && Usage.paidOnly(pick0)) null else pick0
+                var okModel = ""
+                fun note(who: String) {
+                    if (pick == null) return
+                    val nm = Models.list(prefs).firstOrNull { it.id == who }?.name ?: who
+                    main.post { android.widget.Toast.makeText(app, "${pick.name} nahi chala, $nm se jawab aaya", android.widget.Toast.LENGTH_LONG).show() }
+                }
                 if (pick != null && pick.prov != "gemini" && att == null) {
                     val txt = Providers.chatWith(pick.prov, pick.id, systemText(), history.takeLast(6), q)
                     if (txt != null) {
@@ -852,6 +859,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         c.doOutput = true
                         c.outputStream.use { it.write(rb.toString().toByteArray()) }
                         code = c.responseCode
+                        if (code == 200) okModel = m
                         resp = (if (code == 200) c.inputStream else c.errorStream).bufferedReader().readText()
                         if (code == 200) Usage.hit("gemini", m, try { JSONObject(resp).optJSONObject("usageMetadata")?.optInt("totalTokenCount") ?: 0 } catch (e: Exception) { 0 })
                         if (code == 200 || code == 401 || code == 403 || (code == 400 && resp.contains("API key", ignoreCase = true))) break
@@ -860,9 +868,11 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         resp = ""
                     }
                 }
+                if (code == 200 && pick != null && okModel != pick.id) note(okModel)
                 if (code != 200) {
                     val fb = Providers.fallback(systemText(), history.takeLast(6), q)
                     if (fb != null) {
+                        note("dusre model")
                         main.post { deliver(parseReply(fb), q, true) }
                         return@thread
                     }

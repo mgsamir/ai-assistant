@@ -105,6 +105,9 @@ object Usage {
     fun setLimit(m: Models.M, n: Int) { p?.edit()?.apply { if (n <= 0) remove("lim_" + m.key) else putInt("lim_" + m.key, n) }?.apply() }
 
     // frac = kitna kharch ho chuka (0..1), text = dikhane wali line
+    // Free plan mein bilkul nahi chalne wala Gemini model (aur user ne apni limit nahi daali)
+    fun paidOnly(m: Models.M): Boolean = m.prov == "gemini" && limitOf(m) == 0 && geminiDefault(m.id) == 0
+
     fun info(m: Models.M): Info? {
         val sp = p ?: return null
         val o = all().optJSONObject(m.key)
