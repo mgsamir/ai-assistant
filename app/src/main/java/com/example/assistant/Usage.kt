@@ -12,7 +12,22 @@ import java.util.Locale
 object Usage {
     @Volatile var p: SharedPreferences? = null
 
-    private fun day() = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+    // Gemini ka din Pacific time ke raat 12 baje badalta hai, baaki ka phone ke hisaab se
+    private fun day(prov: String = ""): String {
+        val f = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        if (prov == "gemini") f.timeZone = java.util.TimeZone.getTimeZone("America/Los_Angeles")
+        return f.format(Date())
+    }
+
+    // Google ki free limit (roz ki requests). Google ab khud nahi batata, ye naapi hui kam-se-kam limit hai
+    private fun geminiDefault(id: String): Int? = when {
+        id.contains("pro") || id.contains("image") || id.startsWith("imagen") || id.contains("veo") ||
+            id.contains("omni") || id.contains("lyria") || id.contains("argon") -> 0
+        id.contains("gemma") -> 14400
+        id.contains("lite") -> if (id.contains("3.5") || id.contains("3.1")) 500 else 20
+        id.contains("flash") -> 20
+        else -> null
+    }
 
     private fun all(): JSONObject = try { JSONObject(p?.getString("usage", "{}") ?: "{}") } catch (e: Exception) { JSONObject() }
 
@@ -24,7 +39,7 @@ object Usage {
                 val a = all()
                 val k = "$prov|$model"
                 val o = a.optJSONObject(k) ?: JSONObject()
-                if (o.optString("d") != day()) { o.put("d", day()); o.put("r", 0); o.put("t", 0) }
+                if (o.optString("d") != day(prov)) { o.put("d", day(prov)); o.put("r", 0); o.put("t", 0) }
                 o.put("r", o.optInt("r") + 1)
                 o.put("t", o.optInt("t") + tokens)
                 a.put(k, o)
@@ -77,7 +92,7 @@ object Usage {
     fun info(m: Models.M): Info? {
         val sp = p ?: return null
         val o = all().optJSONObject(m.key)
-        val today = o != null && o.optString("d") == day()
+        val today = o != null && o.optString("d") == day(m.prov)
         val req = if (today) o!!.optInt("r") else 0
         val tok = if (today) o!!.optInt("t") else 0
         if (m.prov == "groq" && o != null && o.has("gl")) {
@@ -85,6 +100,18 @@ object Usage {
             if (l > 0) return Info(((l - r) / l).toFloat().coerceIn(0f, 1f), "Aaj baaki ${r.toInt()} / ${l.toInt()} requests")
         }
         if (m.prov == "openrouter") {
+            if (m.id.contains(":free")) {
+                val a = all()
+                var n = 0
+                val it = a.keys()
+                while (it.hasNext()) {
+                    val k = it.next()
+                    val oo = a.optJSONObject(k) ?: continue
+                    if (k.startsWith("openrouter|") && k.contains(":free") && oo.optString("d") == day("openrouter")) n += oo.optInt("r")
+                }
+                val lim = limitOf(m).let { if (it > 0) it else 50 }
+                return Info((n.toFloat() / lim).coerceIn(0f, 1f), "Free models mil kar roz $lim requests, aaj $n use, baaki ${maxOf(0, lim - n)}")
+            }
             val used = sp.getFloat("or_used", -1f)
             if (sp.contains("or_limit")) {
                 val l = sp.getFloat("or_limit", 0f)
@@ -92,9 +119,15 @@ object Usage {
             }
             if (used >= 0f) return Info(null, "Ab tak kharch \$" + String.format(Locale.US, "%.3f", used) + " (koi limit nahi)")
         }
-        val lim = limitOf(m)
-        if (lim > 0) return Info((req.toFloat() / lim).coerceIn(0f, 1f), "Aaj $req / $lim requests use, baaki ${maxOf(0, lim - req)}")
+        var lim = limitOf(m)
+        if (lim == 0 && m.prov == "gemini") {
+            val d = geminiDefault(m.id)
+            if (d == 0) return Info(null, "Free plan mein nahi, paid chahiye")
+            if (d != null) lim = d
+        }
+        if (lim > 0) return Info((req.toFloat() / lim).coerceIn(0f, 1f), "Aaj $req / $lim use (app ki ginti), baaki ${maxOf(0, lim - req)}")
         if (req > 0) return Info(null, "Aaj $req requests, ${if (tok >= 1000) (tok / 1000).toString() + "k" else tok.toString()} tokens")
+        if (m.prov == "openai") return Info(null, "OpenAI paid hai, balance unke page par dikhta hai")
         return null
     }
 }
