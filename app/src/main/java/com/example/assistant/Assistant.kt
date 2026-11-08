@@ -70,6 +70,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
     val listeners = CopyOnWriteArrayList<UiCb>()
     val log = StringBuilder()
     var onQuit: (() -> Unit)? = null
+    var onEarth: ((String) -> Unit)? = null
     var ambient = false
 
     private val main = Handler(Looper.getMainLooper())
@@ -1146,6 +1147,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
     // Google Earth ka app ho to usme, nahi to Earth ki website
     @Suppress("DEPRECATION")
     fun openEarth(place: String) {
+        val inApp = onEarth
+        if (inApp != null) { main.post { inApp(place) }; return }
         thread {
             val earthUrl = "https://earth.google.com/web/search/" + Uri.encode(place)
             val hasEarth = app.packageManager.getLaunchIntentForPackage("com.google.earth") != null

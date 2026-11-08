@@ -494,16 +494,58 @@ class MainActivity : Activity() {
         dlg.show()
     }
 
-    // Google Earth: app ho to usme, nahi to Earth ki website (Hut Bay ke upar se shuru)
-    private fun openEarthDirect() {
-        try {
-            val i = packageManager.getLaunchIntentForPackage("com.google.earth")
-            if (i != null) { startActivity(i); return }
-            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://earth.google.com/web/@10.59,92.55,0a,60000d,35y,0h,0t,0r")))
-        } catch (e: Exception) {
-            Toast.makeText(this, "Map nahi khul paya", Toast.LENGTH_SHORT).show()
+    // Google Earth assistant ke andar hi, poori screen par
+    @Suppress("SetJavaScriptEnabled")
+    private fun showEarth(place: String? = null) {
+        val url = if (place.isNullOrBlank()) "https://earth.google.com/web/@10.59,92.55,0a,60000d,35y,0h,0t,0r"
+            else "https://earth.google.com/web/search/" + android.net.Uri.encode(place)
+        val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val root = FrameLayout(this)
+        root.setBackgroundColor(Color.BLACK)
+        val wv = android.webkit.WebView(this)
+        val bar = android.widget.ProgressBar(this)
+        wv.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            loadWithOverviewMode = true
+            useWideViewPort = true
+            mediaPlaybackRequiresUserGesture = false
+            userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
         }
+        android.webkit.CookieManager.getInstance().apply { setAcceptCookie(true); setAcceptThirdPartyCookies(wv, true) }
+        var failed = false
+        wv.webChromeClient = object : android.webkit.WebChromeClient() {
+            override fun onProgressChanged(v: android.webkit.WebView?, p: Int) { bar.visibility = if (p >= 100) View.GONE else View.VISIBLE }
+        }
+        wv.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onReceivedError(v: android.webkit.WebView?, r: android.webkit.WebResourceRequest?, e: android.webkit.WebResourceError?) {
+                if (r?.isForMainFrame == true && !failed) {
+                    failed = true
+                    Toast.makeText(this@MainActivity, "Earth yahan nahi khula, browser mein khol raha hoon", Toast.LENGTH_LONG).show()
+                    dlg.dismiss()
+                    try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) } catch (x: Exception) { }
+                }
+            }
+        }
+        root.addView(wv, FrameLayout.LayoutParams(-1, -1))
+        root.addView(bar, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER))
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#99000000")
+        root.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.TOP).apply { leftMargin = dp(14); topMargin = dp(44) })
+        dlg.setContentView(root)
+        dlg.setOnKeyListener { _, k, ev ->
+            if (k == android.view.KeyEvent.KEYCODE_BACK && ev.action == android.view.KeyEvent.ACTION_UP) {
+                if (wv.canGoBack()) wv.goBack() else dlg.dismiss()
+                true
+            } else false
+        }
+        dlg.setOnDismissListener { try { wv.stopLoading(); wv.destroy() } catch (e: Exception) { } }
+        dlg.show()
+        wv.loadUrl(url)
     }
+
+    private fun openEarthDirect() = showEarth(null)
 
     private fun setMode(m: String) {
         pendMode = m
@@ -1586,6 +1628,7 @@ class MainActivity : Activity() {
     }
 
     override fun onStop() {
+        AssistantService.engine?.onEarth = null
         AssistantService.engine?.listeners?.remove(cb)
         super.onStop()
     }
@@ -1599,6 +1642,7 @@ class MainActivity : Activity() {
     private fun attach(n: Int) {
         val e = AssistantService.engine
         if (e != null) {
+            e.onEarth = { place -> showEarth(place) }
             if (!e.listeners.contains(cb)) {
                 rebuildChat(e.log.toString())
                 e.listeners.add(cb)
