@@ -78,8 +78,6 @@ object Providers {
     fun fallback(system: String, hist: List<Pair<String, String>>, q: String): String? {
         chat("https://api.groq.com/openai/v1/chat/completions", Extra.groq,
             "llama-3.3-70b-versatile", system, hist, q)?.let { if (it.isNotBlank()) return it }
-        chat("https://api.openai.com/v1/chat/completions", Extra.openai,
-            "gpt-4o-mini", system, hist, q)?.let { if (it.isNotBlank()) return it }
         // OpenRouter: pehle free models (paisa kharch nahi), tabhi auto jab free na chalein
         val sp = Usage.p
         val frees = if (sp != null) Models.list(sp).filter { it.prov == "openrouter" && it.free && it.cat == "chat" }.take(3) else emptyList()

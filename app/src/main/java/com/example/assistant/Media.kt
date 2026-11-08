@@ -133,8 +133,7 @@ object Media {
             }
         }
         // Google se na bane to OpenAI se
-        if (attach == null && Extra.openai.isNotEmpty() && !openaiFirst) openaiImage(prompt, listOf("gpt-image-1", "dall-e-3"))?.let { return it }
-        // Google se na bane to free Pollinations se (photo badalna isme nahi hota)
+                // Google se na bane to free Pollinations se (photo badalna isme nahi hota)
         if (attach == null) {
             try {
                 val u = "https://image.pollinations.ai/prompt/" + URLEncoder.encode(prompt, "UTF-8") + "?width=1024&height=1024&nologo=true"
