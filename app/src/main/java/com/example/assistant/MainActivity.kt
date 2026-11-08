@@ -464,7 +464,7 @@ class MainActivity : Activity() {
             r.setOnClickListener { dlg.dismiss(); go() }
             return r
         }
-        col.addView(item(16, "Google Earth", "Jagah ko satellite / 3D mein dekho") { setMode("earth") })
+        col.addView(item(16, "Google Earth", "Jagah ko satellite view mein dekho") { setMode("earth") })
         col.addView(item(17, "Create images", "Image banao ya photo badlo") { setMode("image") })
         val eng = AssistantService.engine
         col.addView(item(20, "Deep Research", "Poori jaanch ke saath lamba report") { setMode("research") })
@@ -633,17 +633,10 @@ class MainActivity : Activity() {
             refreshHints()
             showChat("Tum: $t")
             removePending()
-            val msg = "Google Earth mein khol raha hoon."
+            val msg = "Satellite view mein khol raha hoon."
             addAi(msg)
             if (::orbList.isInitialized) orbAdd(false, msg)
-            val u = android.net.Uri.parse("https://earth.google.com/web/search/" + android.net.Uri.encode(t))
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, u).setPackage("com.google.earth"))
-            } catch (e: Exception) {
-                try { startActivity(Intent(Intent.ACTION_VIEW, u)) } catch (e2: Exception) {
-                    Toast.makeText(this, "Browser nahi mila", Toast.LENGTH_SHORT).show()
-                }
-            }
+            AssistantService.engine?.openEarth(t)
             return true
         }
         if (mode == "agent") {

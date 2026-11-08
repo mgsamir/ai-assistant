@@ -953,8 +953,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     Reply("Google par khoj raha hoon", "गूगल पर खोज रहा हूँ"))
                 "youtube_search" -> openUrl("https://www.youtube.com/results?search_query=" + Uri.encode(a.getString("query")),
                     Reply("YouTube par khoj raha hoon", "यूट्यूब पर खोज रहा हूँ"))
-                "show_on_earth" -> openUrl("https://earth.google.com/web/search/" + Uri.encode(a.getString("place")),
-                    Reply("Google Earth mein khol raha hoon", "गूगल अर्थ में खोल रहा हूँ"))
+                "show_on_earth" -> { openEarth(a.getString("place")); Reply("Satellite view mein khol raha hoon", "सैटेलाइट व्यू में खोल रहा हूँ") }
                 "open_settings" -> openSettings(a.optString("page", "general"))
                 "wake_screen" -> wakeScreen(a.optInt("seconds", 20))
                 "remember" -> remember(a.getString("fact"))
@@ -1142,6 +1141,24 @@ The user is an adult. Answer questions about the human body, sex education, repr
         cm.setTorchMode(id, on)
         return if (on) Reply("Torch chalu kar di", "टॉर्च चालू कर दी")
         else Reply("Torch band kar di", "टॉर्च बंद कर दी")
+    }
+
+    // Google Earth ka app ho to usme, nahi to Google Maps ke satellite view mein, warna Earth ki website
+    @Suppress("DEPRECATION")
+    fun openEarth(place: String) {
+        thread {
+            val earthUrl = "https://earth.google.com/web/search/" + Uri.encode(place)
+            val hasEarth = app.packageManager.getLaunchIntentForPackage("com.google.earth") != null
+            if (hasEarth) {
+                main.post { go(Intent(Intent.ACTION_VIEW, Uri.parse(earthUrl)).setPackage("com.google.earth")) }
+                return@thread
+            }
+            val ll = try {
+                android.location.Geocoder(app, java.util.Locale.ENGLISH).getFromLocationName(place, 1)?.firstOrNull()
+            } catch (e: Exception) { null }
+            val url = if (ll != null) "https://www.google.com/maps/@${ll.latitude},${ll.longitude},16z/data=!3m1!1e3" else earthUrl
+            main.post { go(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        }
     }
 
     private fun openUrl(url: String, msg: Reply): Reply {
