@@ -593,6 +593,10 @@ The user is an adult. Answer questions about the human body, sex education, repr
         val mem = if (personal) loadMem() else emptyList()
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", Locale.ENGLISH).format(java.util.Date())
         var base = PERSONA + "\n\nCurrent date and time on the user's phone: " + now
+        val apps = installedApps()
+        if (apps.isNotEmpty()) base += "\n\nApps installed on the user's phone right now (${apps.size}): " +
+            apps.take(250).joinToString(", ") { it.first } +
+            ". To open one use open_app with its exact name from this list (the user may say it in Hindi or with a spelling difference; pick the closest). If the app is not in this list it is not installed (or was deleted): say so and do not call open_app."
         if (learn) base += "\n\nGUIDED LEARNING MODE is ON. Act like a patient teacher: teach step by step in small easy steps, use simple examples from daily life in India, give only one step at a time (3 to 5 sentences), then ask the user one short question to check understanding or ask if he wants the next step. Do not dump the whole answer at once. This overrides the rule to give complete long answers."
         if (mem.isEmpty()) return base
         return base + "\n\nFacts remembered about the user:\n" + mem.joinToString("\n") { "- $it" }
@@ -612,6 +616,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
         f.put(fn("open_app", "Open an app on the phone",
             JSONObject().put("app_name", str("App name in English, for example WhatsApp, YouTube, Camera")),
             listOf("app_name")))
+        f.put(fn("list_apps", "List every app installed on the phone right now (use when the user asks which apps he has)",
+            JSONObject().put("filter", str("Optional word to filter app names, usually empty")), emptyList()))
         f.put(fn("close_app", "Close an app that runs in the background",
             JSONObject().put("app_name", str("App name in English")),
             listOf("app_name")))
@@ -918,6 +924,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         return try {
             when (name) {
                 "open_app" -> openApp(a.getString("app_name"))
+                "list_apps" -> listApps()
                 "close_app" -> closeApp(a.getString("app_name"))
                 "set_alarm" -> setAlarm(a.getInt("hour"), a.optInt("minute", 0), a.optString("label", "Alarm"))
                 "set_timer" -> setTimer(a.getInt("seconds"))
@@ -944,13 +951,58 @@ The user is an adult. Answer questions about the human body, sex education, repr
         }
     }
 
+    // Phone mein abhi jitne app hain (naam, package). Install/delete par apne aap naya ho jaata hai
+    @Volatile private var appsCache: List<Pair<String, String>>? = null
+    private var appsReceiver: android.content.BroadcastReceiver? = null
+
+    private fun watchApps() {
+        if (appsReceiver != null) return
+        val r = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) { appsCache = null }
+        }
+        val f = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED); addDataScheme("package")
+        }
+        try { app.registerReceiver(r, f); appsReceiver = r } catch (e: Exception) { }
+    }
+
+    fun installedApps(): List<Pair<String, String>> {
+        watchApps()
+        appsCache?.let { return it }
+        val pm = app.packageManager
+        val l = try {
+            pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+                .map { Pair(it.loadLabel(pm).toString(), it.activityInfo.packageName) }
+                .filter { it.second != app.packageName && it.first.isNotBlank() }
+                .distinctBy { it.second }
+                .sortedBy { it.first.lowercase() }
+        } catch (e: Exception) { emptyList() }
+        appsCache = l
+        return l
+    }
+
+    private fun norm(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+
     private fun findApp(name: String): android.content.pm.ResolveInfo? {
         val pm = app.packageManager
-        val q = name.lowercase().trim()
-        val apps = pm.queryIntentActivities(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-        return apps.firstOrNull { it.loadLabel(pm).toString().lowercase() == q }
-            ?: apps.firstOrNull { it.loadLabel(pm).toString().lowercase().contains(q) }
+        val q = norm(name)
+        if (q.isEmpty()) return null
+        val l = installedApps()
+        val hit = l.firstOrNull { norm(it.first) == q }
+            ?: l.firstOrNull { it.second.lowercase() == name.lowercase().trim() }
+            ?: l.firstOrNull { norm(it.first).contains(q) }
+            ?: l.firstOrNull { q.contains(norm(it.first)) && norm(it.first).length >= 3 }
+            ?: return null
+        return pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(hit.second), 0)
+            .firstOrNull()
+    }
+
+    private fun listApps(): Reply {
+        val l = installedApps()
+        if (l.isEmpty()) return Reply("Koi app nahi mila", "कोई ऐप नहीं मिला")
+        val names = l.joinToString(", ") { it.first }
+        return Reply("Phone mein ${l.size} app hain: $names", "फ़ोन में ${l.size} ऐप हैं: $names")
     }
 
     private fun openApp(name: String): Reply {
