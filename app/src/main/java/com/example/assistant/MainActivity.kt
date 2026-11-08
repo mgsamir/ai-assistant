@@ -499,10 +499,27 @@ class MainActivity : Activity() {
     private fun showEarth(place: String? = null) {
         val url = if (place.isNullOrBlank()) "https://earth.google.com/web/@10.59,92.55,0a,60000d,35y,0h,0t,0r"
             else "https://earth.google.com/web/search/" + android.net.Uri.encode(place)
+        // Earth ka app phone mein ho to seedha wahi
+        packageManager.getLaunchIntentForPackage("com.google.earth")?.let {
+            try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).setPackage("com.google.earth")); return }
+            catch (e: Exception) { try { startActivity(it); return } catch (e2: Exception) { } }
+        }
         val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
         val wv = android.webkit.WebView(this)
+        fun needApp() {
+            dlg.dismiss()
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Google Earth ka app chahiye")
+                .setMessage("Phone ke browser mein Google Earth nahi chalta, Google ise sirf app mein deta hai. App free hai (kareeb 29 MB).")
+                .setPositiveButton("Install karo") { _, _ ->
+                    try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=com.google.earth"))) }
+                    catch (e: Exception) { try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=com.google.earth"))) } catch (e2: Exception) { } }
+                }
+                .setNegativeButton("Abhi nahi", null)
+                .show()
+        }
         val bar = android.widget.ProgressBar(this)
         wv.settings.apply {
             javaScriptEnabled = true
@@ -511,7 +528,8 @@ class MainActivity : Activity() {
             loadWithOverviewMode = true
             useWideViewPort = true
             mediaPlaybackRequiresUserGesture = false
-            userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+            // computer jaisa browser bankar jaata hai, taaki Earth website khul sake
+            userAgentString = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         }
         android.webkit.CookieManager.getInstance().apply { setAcceptCookie(true); setAcceptThirdPartyCookies(wv, true) }
         var failed = false
@@ -519,12 +537,21 @@ class MainActivity : Activity() {
             override fun onProgressChanged(v: android.webkit.WebView?, p: Int) { bar.visibility = if (p >= 100) View.GONE else View.VISIBLE }
         }
         wv.webViewClient = object : android.webkit.WebViewClient() {
+            override fun shouldOverrideUrlLoading(v: android.webkit.WebView?, r: android.webkit.WebResourceRequest?): Boolean {
+                val u = r?.url ?: return false
+                val s = u.scheme ?: ""
+                val h = u.host ?: ""
+                if (s == "market" || s == "intent" || h.contains("play.google.com") || h.contains("apps.apple.com")) {
+                    if (!failed) { failed = true; needApp() }
+                    return true
+                }
+                return false
+            }
             override fun onReceivedError(v: android.webkit.WebView?, r: android.webkit.WebResourceRequest?, e: android.webkit.WebResourceError?) {
                 if (r?.isForMainFrame == true && !failed) {
                     failed = true
-                    Toast.makeText(this@MainActivity, "Earth yahan nahi khula, browser mein khol raha hoon", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "Earth load nahi hua, net check karo", Toast.LENGTH_LONG).show()
                     dlg.dismiss()
-                    try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) } catch (x: Exception) { }
                 }
             }
         }
