@@ -583,6 +583,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
         thread { cb(Research.run(key, q, p)) }
     }
 
+    fun securityScan(cb: (String) -> Unit) { thread { cb(Security.report(app)) } }
+
     fun agent(q: String, cb: (String) -> Unit) {
         val key = Keys.get(prefs)
         val id = Models.sel(prefs, "agent")?.id ?: "antigravity-preview-05-2026"
@@ -618,6 +620,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
             listOf("app_name")))
         f.put(fn("list_apps", "List every app installed on the phone right now (use when the user asks which apps he has)",
             JSONObject().put("filter", str("Optional word to filter app names, usually empty")), emptyList()))
+        f.put(fn("security_scan", "Scan the phone for suspicious, fake, hidden or spying apps (virus check). Use when the user asks for virus check, security check, phone scan, hacker or fraud check",
+            JSONObject().put("note", str("Optional, usually empty")), emptyList()))
         f.put(fn("close_app", "Close an app that runs in the background",
             JSONObject().put("app_name", str("App name in English")),
             listOf("app_name")))
@@ -925,6 +929,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             when (name) {
                 "open_app" -> openApp(a.getString("app_name"))
                 "list_apps" -> listApps()
+                "security_scan" -> { val t = Security.report(app); Reply(t, t) }
                 "close_app" -> closeApp(a.getString("app_name"))
                 "set_alarm" -> setAlarm(a.getInt("hour"), a.optInt("minute", 0), a.optString("label", "Alarm"))
                 "set_timer" -> setTimer(a.getInt("seconds"))
@@ -958,7 +963,13 @@ The user is an adult. Answer questions about the human body, sex education, repr
     private fun watchApps() {
         if (appsReceiver != null) return
         val r = object : android.content.BroadcastReceiver() {
-            override fun onReceive(c: Context?, i: Intent?) { appsCache = null }
+            override fun onReceive(c: Context?, i: Intent?) {
+                appsCache = null
+                if (i?.action == Intent.ACTION_PACKAGE_ADDED && !i.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
+                    val pkg = i.data?.schemeSpecificPart ?: return
+                    thread { Security.checkNew(app, pkg)?.let { Security.notify(app, it) } }
+                }
+            }
         }
         val f = android.content.IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED); addAction(Intent.ACTION_PACKAGE_REMOVED)

@@ -822,6 +822,28 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r.setOnClickListener { dlg.dismiss(); showImages() }
         col.addView(r)
+        val r2 = LinearLayout(this)
+        r2.gravity = Gravity.CENTER_VERTICAL
+        r2.setPadding(0, dp(14), 0, dp(14))
+        r2.addView(IconView(this).apply { kind = 20 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        r2.addView(TextView(this).apply { text = "Security check"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        r2.setOnClickListener {
+            dlg.dismiss()
+            if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
+            showChat("Tum: Phone ki security check")
+            Toast.makeText(this, "Jaanch ho rahi hai...", Toast.LENGTH_SHORT).show()
+            val e = AssistantService.engine
+            if (e == null) { removePending(); return@setOnClickListener }
+            e.securityScan { rep ->
+                runOnUiThread {
+                    removePending()
+                    addAi(rep)
+                    if (::orbList.isInitialized) orbAdd(false, rep)
+                }
+            }
+        }
+        col.addView(r2)
         dlg.setContentView(col)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -1379,7 +1401,8 @@ class MainActivity : Activity() {
         val need = listOf(
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.READ_CONTACTS,
-            Manifest.permission.CALL_PHONE)
+            Manifest.permission.CALL_PHONE) +
+            (if (Build.VERSION.SDK_INT >= 33) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList())
         val missing = need.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) {
             requestPermissions(missing.toTypedArray(), 1)
