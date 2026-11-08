@@ -967,7 +967,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 appsCache = null
                 if (i?.action == Intent.ACTION_PACKAGE_ADDED && !i.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
                     val pkg = i.data?.schemeSpecificPart ?: return
-                    thread { Security.checkNew(app, pkg)?.let { Security.notify(app, it) } }
+                    thread { Security.checkNew(app, pkg)?.let { Security.notify(app, it); Security.addLog(prefs, listOf(it), setOf(pkg)) } }
                 }
             }
         }

@@ -128,6 +128,43 @@ object Security {
         return sb.toString().trim()
     }
 
+    // ---- history: kab kaun sa app khatarnak laga (Security log screen ke liye) ----
+    class Entry(val t: Long, val pkg: String, val label: String, val score: Int, val fresh: Boolean, val text: String)
+
+    private fun spoken(f: Finding): String =
+        "${f.label} par shak hai. " + f.reasons.joinToString(". ") + ". Jaante ho to rehne do, nahi jaante to Settings se hata do."
+
+    fun addLog(p: android.content.SharedPreferences, list: List<Finding>, fresh: Set<String>) {
+        if (list.isEmpty()) return
+        try {
+            synchronized(this) {
+                val a = org.json.JSONArray(p.getString("sec_log", "[]"))
+                val day = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)
+                val today = day.format(java.util.Date())
+                val keep = ArrayList<org.json.JSONObject>()
+                for (i in 0 until a.length()) {
+                    val o = a.getJSONObject(i)
+                    // aaj usi app ki purani entry hata do, nayi daalenge
+                    if (day.format(java.util.Date(o.getLong("t"))) == today && list.any { it.pkg == o.getString("pkg") }) continue
+                    keep.add(o)
+                }
+                val now = System.currentTimeMillis()
+                for (f in list) keep.add(org.json.JSONObject().put("t", now).put("pkg", f.pkg).put("label", f.label)
+                    .put("score", f.score).put("fresh", f.pkg in fresh).put("text", spoken(f)))
+                val out = org.json.JSONArray()
+                keep.takeLast(300).forEach { out.put(it) }
+                p.edit().putString("sec_log", out.toString()).apply()
+            }
+        } catch (e: Exception) { }
+    }
+
+    fun logs(p: android.content.SharedPreferences): List<Entry> = try {
+        val a = org.json.JSONArray(p.getString("sec_log", "[]"))
+        (0 until a.length()).map { a.getJSONObject(it) }.map {
+            Entry(it.getLong("t"), it.getString("pkg"), it.getString("label"), it.optInt("score"), it.optBoolean("fresh"), it.getString("text"))
+        }.sortedByDescending { it.t }
+    } catch (e: Exception) { emptyList() }
+
     // App khulte hi apne aap jaanch: sirf tab bolta hai jab kuch shak wala mile
     // (zyada shak wale har baar, thode shak wale sirf pehli baar jab dikhe, ya naye aaye app)
     fun autoCheck(c: Context, p: android.content.SharedPreferences): String? {
@@ -143,6 +180,7 @@ object Security {
         val show = f.filter { it.score >= 5 || (it.score >= 3 && (it.pkg !in seen || it.pkg in fresh)) }
         if (show.isEmpty()) return null
         p.edit().putStringSet("sec_seen", seen + show.map { it.pkg }).apply()
+        addLog(p, show, fresh)
         val sb = StringBuilder()
         for (x in show.take(6)) {
             val tag = if (x.pkg in fresh) "NAYA APP, " else ""

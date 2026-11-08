@@ -826,23 +826,9 @@ class MainActivity : Activity() {
         r2.gravity = Gravity.CENTER_VERTICAL
         r2.setPadding(0, dp(14), 0, dp(14))
         r2.addView(IconView(this).apply { kind = 20 }, LinearLayout.LayoutParams(dp(48), dp(40)))
-        r2.addView(TextView(this).apply { text = "Security check"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+        r2.addView(TextView(this).apply { text = "Security log"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
-        r2.setOnClickListener {
-            dlg.dismiss()
-            if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
-            showChat("Tum: Phone ki security check")
-            Toast.makeText(this, "Jaanch ho rahi hai...", Toast.LENGTH_SHORT).show()
-            val e = AssistantService.engine
-            if (e == null) { removePending(); return@setOnClickListener }
-            e.securityScan { rep ->
-                runOnUiThread {
-                    removePending()
-                    addAi(rep)
-                    if (::orbList.isInitialized) orbAdd(false, rep)
-                }
-            }
-        }
+        r2.setOnClickListener { dlg.dismiss(); showSecurityLog() }
         col.addView(r2)
         dlg.setContentView(col)
         dlg.window?.apply {
@@ -850,6 +836,80 @@ class MainActivity : Activity() {
             setLayout((resources.displayMetrics.widthPixels * 0.78f).toInt(), ViewGroup.LayoutParams.MATCH_PARENT)
             setGravity(Gravity.START)
         }
+        dlg.show()
+    }
+
+    // Security log: din ke hisaab se wo app jinpar shak hua tha, aur sunne ke liye speaker
+    private fun showSecurityLog() {
+        val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val root = FrameLayout(this)
+        root.setBackgroundColor(Color.BLACK)
+        val content = LinearLayout(this)
+        content.orientation = LinearLayout.VERTICAL
+        content.setPadding(dp(16), dp(96), dp(16), dp(30))
+        val sv = ScrollView(this)
+        sv.isVerticalScrollBarEnabled = false
+        sv.addView(content)
+        root.addView(sv, FrameLayout.LayoutParams(-1, -1))
+        val topBar = FrameLayout(this)
+        topBar.setBackgroundColor(Color.BLACK)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#303030")
+        topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
+        topBar.addView(TextView(this).apply { text = "Security log"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
+        root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
+
+        val list = Security.logs(getSharedPreferences("p", Context.MODE_PRIVATE))
+        if (list.isEmpty()) {
+            content.addView(TextView(this).apply {
+                text = "Abhi tak koi khatra nahi mila.\nAssistant har baar khulte hi phone ki jaanch karta hai, shak wala app milte hi yahan din ke hisaab se likh dega."
+                textSize = 15f; setTextColor(Color.parseColor("#B0B0B8")); setPadding(0, dp(20), 0, 0)
+            })
+        }
+        val dayFmt = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US)
+        val nice = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.ENGLISH)
+        val timeFmt = java.text.SimpleDateFormat("h:mm a", java.util.Locale.ENGLISH)
+        val today = dayFmt.format(java.util.Date())
+        val yest = dayFmt.format(java.util.Date(System.currentTimeMillis() - 86400000L))
+        var last = ""
+        for (e in list) {
+            val d = dayFmt.format(java.util.Date(e.t))
+            if (d != last) {
+                last = d
+                val head = when (d) { today -> "Aaj"; yest -> "Kal"; else -> nice.format(java.util.Date(e.t)) }
+                content.addView(TextView(this).apply {
+                    text = head; textSize = 15f; setTextColor(Color.parseColor("#8D8D95")); typeface = Typeface.DEFAULT_BOLD
+                    setPadding(0, dp(18), 0, dp(8))
+                })
+            }
+            val high = e.score >= 5
+            val card = LinearLayout(this)
+            card.orientation = LinearLayout.HORIZONTAL
+            card.setPadding(dp(14), dp(12), dp(8), dp(12))
+            card.background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor("#1E1E22")); cornerRadius = dp(14).toFloat()
+                setStroke(dp(1), Color.parseColor(if (high) "#7A2E2E" else "#6B5A2A"))
+            }
+            val tv = LinearLayout(this)
+            tv.orientation = LinearLayout.VERTICAL
+            tv.addView(TextView(this).apply {
+                text = e.label + (if (e.fresh) "  \u2022 naya app" else "")
+                textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
+            })
+            tv.addView(TextView(this).apply {
+                text = (if (high) "Zyada shak" else "Thoda shak") + "  \u2022  " + timeFmt.format(java.util.Date(e.t)) + "  \u2022  " + e.pkg
+                textSize = 12f; setTextColor(Color.parseColor(if (high) "#FF8A8A" else "#E5C06A"))
+            })
+            tv.addView(TextView(this).apply {
+                text = e.text; textSize = 14f; setTextColor(Color.parseColor("#D0D0D6")); setPadding(0, dp(6), 0, 0)
+            })
+            card.addView(tv, LinearLayout.LayoutParams(0, -2, 1f))
+            card.addView(icon(10, 44) { AssistantService.engine?.replay(e.text) },
+                LinearLayout.LayoutParams(dp(44), dp(44)).apply { leftMargin = dp(6) })
+            content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        }
+        dlg.setContentView(root)
         dlg.show()
     }
 
