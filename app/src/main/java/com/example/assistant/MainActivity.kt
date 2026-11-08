@@ -1258,7 +1258,9 @@ class MainActivity : Activity() {
                 col.addView(row("Medium", "Balanced depth", null, lv == "medium") { p.edit().putString("think", "medium").apply(); render() })
                 col.addView(row("High", "Extra thorough", null, lv == "high") { p.edit().putString("think", "high").apply(); render() })
             }
-            val all = Models.list(p)
+            // sirf free models dikhte hain, paid sab hata diye
+            for ((k, _) in Models.CATS) Models.sel(p, k)?.let { if (!it.free || Usage.paidOnly(it)) Models.setSel(p, k, null) }
+            val all = Models.list(p).filter { it.free && !Usage.paidOnly(it) }
             for (prov in listOf("gemini", "openai", "groq", "openrouter")) {
                 val mine = all.filter { it.prov == prov }
                 if (mine.isEmpty()) continue
