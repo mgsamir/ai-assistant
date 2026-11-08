@@ -652,6 +652,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
             JSONObject().put("query", str("What to search")), listOf("query")))
         f.put(fn("youtube_search", "Search or play something on YouTube",
             JSONObject().put("query", str("What to search")), listOf("query")))
+        f.put(fn("show_on_earth", "Show a place on Google Earth (3D satellite view). Use when the user says Google Earth, earth mein dikhao, satellite view",
+            JSONObject().put("place", str("Place name")), listOf("place")))
         f.put(fn("open_settings", "Open phone settings",
             JSONObject().put("page", str("wifi, bluetooth, location, display, sound or general")),
             listOf("page")))
@@ -951,6 +953,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     Reply("Google par khoj raha hoon", "गूगल पर खोज रहा हूँ"))
                 "youtube_search" -> openUrl("https://www.youtube.com/results?search_query=" + Uri.encode(a.getString("query")),
                     Reply("YouTube par khoj raha hoon", "यूट्यूब पर खोज रहा हूँ"))
+                "show_on_earth" -> openUrl("https://earth.google.com/web/search/" + Uri.encode(a.getString("place")),
+                    Reply("Google Earth mein khol raha hoon", "गूगल अर्थ में खोल रहा हूँ"))
                 "open_settings" -> openSettings(a.optString("page", "general"))
                 "wake_screen" -> wakeScreen(a.optInt("seconds", 20))
                 "remember" -> remember(a.getString("fact"))
