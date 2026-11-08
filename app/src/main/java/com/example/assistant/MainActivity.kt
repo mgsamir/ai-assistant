@@ -510,17 +510,9 @@ class MainActivity : Activity() {
         val wv = android.webkit.WebView(this)
         fun needApp() {
             dlg.dismiss()
-            android.app.AlertDialog.Builder(this)
-                .setTitle("Google Earth ka app chahiye")
-                .setMessage("Phone ke browser mein Google Earth nahi chalta, Google ise sirf app mein deta hai. App free hai (kareeb 29 MB).")
-                .setPositiveButton("Install karo") { _, _ ->
-                    try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=com.google.earth"))) }
-                    catch (e: Exception) { try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=com.google.earth"))) } catch (e2: Exception) { } }
-                }
-                .setNegativeButton("Abhi nahi", null)
-                .show()
+            Toast.makeText(this, "Earth ki website phone par nahi chalti, isliye satellite map khol raha hoon", Toast.LENGTH_LONG).show()
+            showSatellite(place)
         }
-        val bar = android.widget.ProgressBar(this)
         wv.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -550,8 +542,9 @@ class MainActivity : Activity() {
             override fun onReceivedError(v: android.webkit.WebView?, r: android.webkit.WebResourceRequest?, e: android.webkit.WebResourceError?) {
                 if (r?.isForMainFrame == true && !failed) {
                     failed = true
-                    Toast.makeText(this@MainActivity, "Earth load nahi hua, net check karo", Toast.LENGTH_LONG).show()
                     dlg.dismiss()
+                    Toast.makeText(this@MainActivity, "Earth load nahi hua, satellite map khol raha hoon", Toast.LENGTH_LONG).show()
+                    showSatellite(place)
                 }
             }
         }
@@ -573,6 +566,47 @@ class MainActivity : Activity() {
     }
 
     private fun openEarthDirect() = showEarth(null)
+
+    // Assistant ka apna satellite map: asli satellite tasveer (Esri), pinch se zoom, jagah khojne ka box
+    @Suppress("SetJavaScriptEnabled")
+    private fun showSatellite(place: String?) {
+        val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val root = FrameLayout(this)
+        root.setBackgroundColor(Color.BLACK)
+        val wv = android.webkit.WebView(this)
+        wv.settings.apply { javaScriptEnabled = true; domStorageEnabled = true }
+        val first = org.json.JSONObject.quote(place ?: "")
+        val html = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>html,body,#map{margin:0;height:100%;background:#000}
+#bar{position:absolute;top:44px;left:64px;right:12px;z-index:1000;display:flex;gap:6px}
+#q{flex:1;padding:10px 14px;border-radius:22px;border:0;font-size:16px;background:rgba(20,20,24,.88);color:#fff;outline:0}
+#b{padding:0 16px;border-radius:22px;border:0;background:#2F6BFF;color:#fff;font-size:15px}</style></head><body>
+<div id="bar"><input id="q" placeholder="Jagah ka naam" enterkeyhint="search"><button id="b">Khojo</button></div>
+<div id="map"></div><script>
+var map=L.map('map',{zoomControl:false}).setView([10.59,92.55],11);
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:17,maxZoom:19,attribution:'Esri'}).addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:17,maxZoom:19}).addTo(map);
+var mk=null;
+function go(q){if(!q)return;fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q)).then(function(r){return r.json()}).then(function(a){
+ if(!a.length){alert('Jagah nahi mili');return}
+ var b=a[0].boundingbox;map.fitBounds([[+b[0],+b[2]],[+b[1],+b[3]]]);
+ if(mk)map.removeLayer(mk);mk=L.marker([+a[0].lat,+a[0].lon]).addTo(map)}).catch(function(){alert('Net check karo')})}
+document.getElementById('b').onclick=function(){go(document.getElementById('q').value)};
+document.getElementById('q').onkeydown=function(e){if(e.key==='Enter')go(this.value)};
+var first=$first;if(first){document.getElementById('q').value=first;go(first)}
+</script></body></html>"""
+        wv.loadDataWithBaseURL("https://assistant.local/", html, "text/html", "utf-8", null)
+        root.addView(wv, FrameLayout.LayoutParams(-1, -1))
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#99000000")
+        root.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.TOP).apply { leftMargin = dp(14); topMargin = dp(44) })
+        dlg.setContentView(root)
+        dlg.setOnDismissListener { try { wv.stopLoading(); wv.destroy() } catch (e: Exception) { } }
+        dlg.show()
+    }
 
     private fun setMode(m: String) {
         pendMode = m
