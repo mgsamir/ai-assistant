@@ -24,7 +24,7 @@ object Models {
     }
 
     val CATS = listOf("chat" to "Chat", "coding" to "Coding", "web" to "Web search",
-        "photo" to "Photo", "video" to "Video", "music" to "Music")
+        "photo" to "Photo", "video" to "Video", "music" to "Music", "agent" to "Agent")
 
     fun nice(id: String): String =
         id.substringAfterLast('/').removePrefix("models/").split('-', '_', ':').filter { it.isNotEmpty() }
@@ -53,7 +53,8 @@ object Models {
         M("openai", "gpt-image-1", "photo"),
         M("openai", "dall-e-3", "photo"),
         M("gemini", "gemini-omni-1.1-flash", "video"),
-        M("gemini", "lyria-3-clip-preview", "music"), M("gemini", "lyria-3.5", "music")
+        M("gemini", "lyria-3-clip-preview", "music"), M("gemini", "lyria-3.5", "music"),
+        M("gemini", "antigravity-preview-05-2026", "agent")
     )
 
     fun list(p: SharedPreferences): List<M> {

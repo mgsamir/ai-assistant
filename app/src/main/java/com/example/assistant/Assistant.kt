@@ -583,6 +583,12 @@ The user is an adult. Answer questions about the human body, sex education, repr
         thread { cb(Research.run(key, q, p)) }
     }
 
+    fun agent(q: String, cb: (String) -> Unit) {
+        val key = Keys.get(prefs)
+        val id = Models.sel(prefs, "agent")?.id ?: "antigravity-preview-05-2026"
+        thread { cb(Agent.run(key, q, id)) }
+    }
+
     private fun systemText(): String {
         val mem = if (personal) loadMem() else emptyList()
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", Locale.ENGLISH).format(java.util.Date())

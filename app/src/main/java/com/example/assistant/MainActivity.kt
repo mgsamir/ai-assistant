@@ -397,6 +397,7 @@ class MainActivity : Activity() {
             pendMode == "music" -> "Kaisa gaana banana hai?"
             pendMode == "map" -> "Kaunsi jagah ya raasta?"
             pendMode == "research" -> "Kis baare mein report chahiye?"
+            pendMode == "agent" -> "Agent ko kya kaam dena hai?"
             pendAtt != null -> "\uD83D\uDCCE " + pendName + " - sawal likho"
             else -> "Ask AI"
         }
@@ -467,6 +468,7 @@ class MainActivity : Activity() {
         col.addView(item(19, "Create music", "Gaana banao") { setMode("music") })
         val eng = AssistantService.engine
         col.addView(item(20, "Deep Research", "Poori jaanch ke saath lamba report") { setMode("research") })
+        col.addView(item(20, "Agent", "Google ka agent kai kadam mein kaam karta hai") { setMode("agent") })
         col.addView(item(21, "Guided Learning", "Kadam-kadam par sikho", if (eng?.learn == true) "ON" else "OFF") {
             val e = AssistantService.engine
             if (e != null) {
@@ -623,6 +625,23 @@ class MainActivity : Activity() {
                 startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(t))))
             } catch (e: Exception) {
                 Toast.makeText(this, "Maps app nahi mila", Toast.LENGTH_SHORT).show()
+            }
+            return true
+        }
+        if (mode == "agent") {
+            pendMode = ""
+            refreshHints()
+            if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
+            showChat("Tum: $t")
+            Toast.makeText(this, "Agent ko kaam mein kuch minute lag sakte hain", Toast.LENGTH_LONG).show()
+            val e = AssistantService.engine
+            if (e == null) { removePending(); return true }
+            e.agent(t) { rep ->
+                runOnUiThread {
+                    removePending()
+                    addAi(rep)
+                    if (::orbList.isInitialized) orbAdd(false, rep)
+                }
             }
             return true
         }
