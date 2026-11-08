@@ -9,7 +9,15 @@ import java.net.URL
 
 // Model ki list (kaam ke hisaab se) aur chuna hua model
 object Models {
-    class M(val prov: String, val id: String, val cat: String) {
+    // free: OpenRouter ke liye asli daam se, baaki ke liye andaza (Gemini flash/Groq free, OpenAI paid)
+    fun guessFree(prov: String, id: String, cat: String): Boolean = when (prov) {
+        "groq" -> true
+        "openai" -> false
+        "gemini" -> cat != "photo" && cat != "video" && cat != "music" && !id.contains("pro")
+        else -> false
+    }
+
+    class M(val prov: String, val id: String, val cat: String, val free: Boolean = guessFree(prov, id, cat)) {
         val key: String get() = "$prov|$id"
         val name: String get() = nice(id)
         val tag: String get() = when (prov) { "gemini" -> "Gemini"; "groq" -> "Groq"; "openai" -> "OpenAI"; else -> "OpenRouter" }
@@ -36,7 +44,7 @@ object Models {
         M("gemini", "gemini-3.8-flash", "coding"), M("gemini", "gemini-2.5-flash", "coding"),
         M("groq", "llama-3.3-70b-versatile", "coding"),
         M("gemini", "gemini-3.8-flash", "web"), M("gemini", "gemini-2.5-flash", "web"),
-        M("openrouter", "perplexity/sonar", "web"),
+        M("openrouter", "perplexity/sonar", "web", false),
         M("gemini", "gemini-2.5-flash-image", "photo"), M("gemini", "gemini-3.1-flash-image-preview", "photo"),
         M("gemini", "gemini-3-pro-image-preview", "photo"), M("openai", "gpt-image-1", "photo"),
         M("openai", "dall-e-3", "photo"),
@@ -51,7 +59,7 @@ object Models {
             val out = ArrayList<M>()
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
-                out.add(M(o.getString("p"), o.getString("i"), o.getString("c")))
+                out.add(M(o.getString("p"), o.getString("i"), o.getString("c"), o.optBoolean("f", guessFree(o.getString("p"), o.getString("i"), o.getString("c")))))
             }
             // jo hamesha chalte hain unhe bhi rakho
             for (b in builtin) if (out.none { it.key == b.key && it.cat == b.cat }) out.add(b)
@@ -65,7 +73,7 @@ object Models {
         val v = p.getString("sel_$cat", null) ?: return null
         val i = v.indexOf('|')
         if (i < 0) return null
-        return M(v.substring(0, i), v.substring(i + 1), cat)
+        return M(v.substring(0, i), v.substring(i + 1), cat, true)
     }
 
     fun setSel(p: SharedPreferences, cat: String, m: M?) {
@@ -85,7 +93,7 @@ object Models {
     // internet se sab providers ki asli list laata hai (background mein)
     fun refresh(p: SharedPreferences, gemKey: String) {
         val out = ArrayList<M>()
-        fun add(prov: String, id: String, cat: String) { if (out.none { it.prov == prov && it.id == id && it.cat == cat }) out.add(M(prov, id, cat)) }
+        fun add(prov: String, id: String, cat: String, free: Boolean = guessFree(prov, id, cat)) { if (out.none { it.prov == prov && it.id == id && it.cat == cat }) out.add(M(prov, id, cat, free)) }
 
         if (gemKey.isNotEmpty()) get("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", mapOf("x-goog-api-key" to gemKey))?.let { s ->
             try {
@@ -141,35 +149,45 @@ object Models {
         get("https://openrouter.ai/api/v1/models", emptyMap())?.let { s ->
             try {
                 val a = JSONObject(s).optJSONArray("data") ?: JSONArray()
-                class R(val id: String, val created: Long, val img: Boolean)
+                class R(val id: String, val created: Long, val img: Boolean, val free: Boolean)
                 val rs = ArrayList<R>()
                 for (i in 0 until a.length()) {
                     val o = a.getJSONObject(i)
                     val outm = o.optJSONObject("architecture")?.optJSONArray("output_modalities")?.toString() ?: ""
-                    rs.add(R(o.getString("id"), o.optLong("created"), outm.contains("image")))
+                    val pr = o.optJSONObject("pricing")
+                    val fr = pr != null && pr.optString("prompt") == "0" && pr.optString("completion") == "0"
+                    rs.add(R(o.getString("id"), o.optLong("created"), outm.contains("image"), fr))
                 }
                 rs.sortByDescending { it.created }
                 var nImg = 0
                 var nCode = 0
+                var fChat = 0
+                var fCode = 0
                 var nWeb = 0
                 val perProv = HashMap<String, Int>()
                 val top = listOf("anthropic", "openai", "google", "deepseek", "qwen", "moonshotai", "x-ai", "meta-llama", "mistralai")
                 for (r in rs) {
                     val prov = r.id.substringBefore('/')
-                    if (r.img) { if (nImg < 6) { add("openrouter", r.id, "photo"); nImg++ }; continue }
-                    if (prov == "perplexity") { if (nWeb < 5) { add("openrouter", r.id, "web"); nWeb++ }; continue }
+                    if (r.free && !r.img && prov != "perplexity") {
+                        val code = listOf("coder", "code", "devstral").any { r.id.contains(it) }
+                        if (code && fCode < 6) { add("openrouter", r.id, "coding", true); fCode++ }
+                        else if (!code && fChat < 10) { add("openrouter", r.id, "chat", true); fChat++ }
+                        continue
+                    }
+                    if (r.img) { if (nImg < 6) { add("openrouter", r.id, "photo", r.free); nImg++ }; continue }
+                    if (prov == "perplexity") { if (nWeb < 5) { add("openrouter", r.id, "web", false); nWeb++ }; continue }
                     if (prov !in top || r.id.contains(":free") || r.id.contains("-preview-")) continue
                     val n = perProv[prov] ?: 0
-                    if (n < 2) { add("openrouter", r.id, "chat"); perProv[prov] = n + 1 }
+                    if (n < 2) { add("openrouter", r.id, "chat", false); perProv[prov] = n + 1 }
                     if (nCode < 8 && (listOf("coder", "code", "devstral").any { r.id.contains(it) } || prov == "anthropic" || prov == "deepseek")) {
-                        add("openrouter", r.id, "coding"); nCode++
+                        add("openrouter", r.id, "coding", false); nCode++
                     }
                 }
             } catch (e: Exception) { }
         }
         if (out.isEmpty()) return
         val arr = JSONArray()
-        for (m in out) arr.put(JSONObject().put("p", m.prov).put("i", m.id).put("c", m.cat))
+        for (m in out) arr.put(JSONObject().put("p", m.prov).put("i", m.id).put("c", m.cat).put("f", m.free))
         p.edit().putString("models_json", arr.toString()).putLong("models_time", System.currentTimeMillis()).apply()
     }
 }

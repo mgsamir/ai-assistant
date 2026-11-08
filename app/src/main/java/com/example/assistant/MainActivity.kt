@@ -1060,6 +1060,7 @@ class MainActivity : Activity() {
         sv.addView(col)
         sv.background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#1E1E1E")) }
         var thinkOpen = true
+        var showFree = true
 
         lateinit var render: () -> Unit
         fun row(title: String, sub: String?, tag: String?, checked: Boolean, go: () -> Unit): View {
@@ -1111,7 +1112,19 @@ class MainActivity : Activity() {
                 col.addView(row("High", "Extra thorough", null, lv == "high") { p.edit().putString("think", "high").apply(); render() })
             }
             col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(14), dp(6), dp(14), dp(2)) })
-            val all = Models.list(p)
+            val sides = LinearLayout(this)
+            fun side(isFree: Boolean, name: String): TextView = TextView(this).apply {
+                text = name
+                textSize = 16f
+                gravity = Gravity.CENTER
+                setTextColor(if (showFree == isFree) Color.WHITE else Color.parseColor("#9AA3B5"))
+                background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(if (showFree == isFree) Color.parseColor("#2F6BFF") else Color.parseColor("#2A2A2A")) }
+                setOnClickListener { showFree = isFree; render() }
+            }
+            sides.addView(side(true, "Free"), LinearLayout.LayoutParams(0, dp(40), 1f).apply { rightMargin = dp(4) })
+            sides.addView(side(false, "Paid"), LinearLayout.LayoutParams(0, dp(40), 1f).apply { leftMargin = dp(4) })
+            col.addView(sides, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(14), dp(8), dp(14), dp(4)) })
+            val all = Models.list(p).filter { it.free == showFree }
             for ((cat, label) in Models.CATS) {
                 val items = all.filter { it.cat == cat }
                 if (items.isEmpty()) continue
