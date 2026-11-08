@@ -448,7 +448,6 @@ class MainActivity : Activity() {
             r.gravity = Gravity.CENTER_VERTICAL
             r.setPadding(dp(6), dp(12), dp(6), dp(12))
             r.addView(IconView(this).apply { this.kind = kind }, LinearLayout.LayoutParams(dp(48), dp(40)))
-            if (prov != null) r.addView(badge(prov, 30), LinearLayout.LayoutParams(dp(30), dp(30)).apply { leftMargin = dp(4) })
             val tx = LinearLayout(this)
             tx.orientation = LinearLayout.VERTICAL
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
@@ -1203,6 +1202,7 @@ class MainActivity : Activity() {
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
             }, LinearLayout.LayoutParams(dp(34), -2))
+            if (prov != null) r.addView(badge(prov, 30), LinearLayout.LayoutParams(dp(30), dp(30)).apply { leftMargin = dp(4) })
             val tx = LinearLayout(this)
             tx.orientation = LinearLayout.VERTICAL
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
