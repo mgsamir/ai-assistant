@@ -63,21 +63,49 @@ object Media {
         return null
     }
 
-    fun video(key: String, prompt: String): Out? {
+    fun video(key: String, prompt: String, sel: Models.M? = null): Out? {
         lastErr = ""
-        return interaction(key, "gemini-omni-1.1-flash", prompt, "video", 240000)
+        return interaction(key, sel?.id ?: "gemini-omni-1.1-flash", prompt, "video", 240000)
     }
 
-    fun music(key: String, prompt: String): Out? {
+    fun music(key: String, prompt: String, sel: Models.M? = null): Out? {
         lastErr = ""
+        if (sel != null) interaction(key, sel.id, prompt, "audio", 150000)?.let { return it }
         interaction(key, "lyria-3-clip-preview", prompt, "audio", 120000)?.let { return it }
         return interaction(key, "lyria-3.5", prompt, "audio", 180000)
     }
 
     // attach = (mime, base64) photo ho to usi ko badalkar nayi image banata hai
-    fun image(key: String, prompt: String, attach: Pair<String, String>?): Out? {
+    fun image(key: String, prompt: String, attach: Pair<String, String>?, sel: Models.M? = null): Out? {
         lastErr = ""
-        for (m in listOf("gemini-2.5-flash-image", "gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview")) {
+        val ps = sel
+        val gem = listOf("gemini-2.5-flash-image", "gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview")
+        if (ps != null && ps.prov == "openrouter") {
+            try {
+                val body = JSONObject().put("model", ps.id)
+                    .put("modalities", JSONArray().put("image").put("text"))
+                    .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", prompt)))
+                val c = URL("https://openrouter.ai/api/v1/chat/completions").openConnection() as HttpURLConnection
+                c.requestMethod = "POST"
+                c.connectTimeout = 10000
+                c.readTimeout = 120000
+                c.setRequestProperty("Content-Type", "application/json")
+                c.setRequestProperty("Authorization", "Bearer " + Extra.openrouter)
+                c.doOutput = true
+                c.outputStream.use { it.write(body.toString().toByteArray()) }
+                val code = c.responseCode
+                val text = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText() ?: ""
+                if (code in 200..299) {
+                    val u = JSONObject(text).optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")
+                        ?.optJSONArray("images")?.optJSONObject(0)?.optJSONObject("image_url")?.optString("url") ?: ""
+                    if (u.startsWith("data:") && u.contains(",")) return Out(Base64.decode(u.substringAfter(","), Base64.DEFAULT), "image/png")
+                } else lastErr = "${ps.id}: " + why(code, text)
+            } catch (e: Exception) { }
+        }
+        val openaiFirst = ps != null && ps.prov == "openai"
+        if (openaiFirst && attach == null && Extra.openai.isNotEmpty()) openaiImage(prompt, listOf(ps!!.id))?.let { return it }
+        val gemList = if (ps != null && ps.prov == "gemini") listOf(ps.id) + gem.filter { it != ps.id } else gem
+        for (m in gemList) {
             try {
                 val parts = JSONArray().put(JSONObject().put("text", prompt))
                 if (attach != null) parts.put(JSONObject().put("inlineData",
@@ -103,28 +131,7 @@ object Media {
             }
         }
         // Google se na bane to OpenAI se
-        if (attach == null && Extra.openai.isNotEmpty()) {
-            for (model in listOf("gpt-image-1", "dall-e-3")) {
-                try {
-                    val body = JSONObject().put("model", model).put("prompt", prompt).put("size", "1024x1024")
-                    if (model == "dall-e-3") body.put("response_format", "b64_json")
-                    val c = URL("https://api.openai.com/v1/images/generations").openConnection() as HttpURLConnection
-                    c.requestMethod = "POST"
-                    c.connectTimeout = 10000
-                    c.readTimeout = 120000
-                    c.setRequestProperty("Content-Type", "application/json")
-                    c.setRequestProperty("Authorization", "Bearer " + Extra.openai)
-                    c.doOutput = true
-                    c.outputStream.use { it.write(body.toString().toByteArray()) }
-                    val code = c.responseCode
-                    val text = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText() ?: ""
-                    if (code in 200..299) {
-                        val b64 = JSONObject(text).optJSONArray("data")?.optJSONObject(0)?.optString("b64_json") ?: ""
-                        if (b64.isNotEmpty()) return Out(Base64.decode(b64, Base64.DEFAULT), "image/png")
-                    } else lastErr = "OpenAI $model: " + why(code, text)
-                } catch (e: Exception) { }
-            }
-        }
+        if (attach == null && Extra.openai.isNotEmpty() && !openaiFirst) openaiImage(prompt, listOf("gpt-image-1", "dall-e-3"))?.let { return it }
         // Google se na bane to free Pollinations se (photo badalna isme nahi hota)
         if (attach == null) {
             try {
@@ -136,6 +143,30 @@ object Media {
                     val b = c.inputStream.readBytes()
                     if (b.size > 2000) return Out(b, c.contentType ?: "image/jpeg")
                 }
+            } catch (e: Exception) { }
+        }
+        return null
+    }
+
+    private fun openaiImage(prompt: String, models: List<String>): Out? {
+        for (model in models) {
+            try {
+                val body = JSONObject().put("model", model).put("prompt", prompt).put("size", "1024x1024")
+                if (model.startsWith("dall-e")) body.put("response_format", "b64_json")
+                val c = URL("https://api.openai.com/v1/images/generations").openConnection() as HttpURLConnection
+                c.requestMethod = "POST"
+                c.connectTimeout = 10000
+                c.readTimeout = 120000
+                c.setRequestProperty("Content-Type", "application/json")
+                c.setRequestProperty("Authorization", "Bearer " + Extra.openai)
+                c.doOutput = true
+                c.outputStream.use { it.write(body.toString().toByteArray()) }
+                val code = c.responseCode
+                val text = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText() ?: ""
+                if (code in 200..299) {
+                    val b64 = JSONObject(text).optJSONArray("data")?.optJSONObject(0)?.optString("b64_json") ?: ""
+                    if (b64.isNotEmpty()) return Out(Base64.decode(b64, Base64.DEFAULT), "image/png")
+                } else lastErr = "OpenAI $model: " + why(code, text)
             } catch (e: Exception) { }
         }
         return null

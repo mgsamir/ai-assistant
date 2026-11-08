@@ -654,9 +654,9 @@ class MainActivity : Activity() {
         Toast.makeText(this, if (mode == "image") "Ban rahi hai..." else "Ban raha hai, 1-2 minute lag sakte hain", Toast.LENGTH_LONG).show()
         kotlin.concurrent.thread {
             val out = when (mode) {
-                "image" -> Media.image(key, t, att)
-                "video" -> Media.video(key, t)
-                else -> Media.music(key, t)
+                "image" -> Media.image(key, t, att, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "photo"))
+                "video" -> Media.video(key, t, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "video"))
+                else -> Media.music(key, t, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "music"))
             }
             val err = Media.lastErr
             runOnUiThread { finishMedia(out, mode, err) }
@@ -902,7 +902,7 @@ class MainActivity : Activity() {
                     (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(et.windowToken, 0)
                     render()
                     kotlin.concurrent.thread {
-                        val out = Media.image(key, t, null)
+                        val out = Media.image(key, t, null, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "photo"))
                         val err = Media.lastErr
                         runOnUiThread {
                             busyImg = false
@@ -1035,6 +1035,121 @@ class MainActivity : Activity() {
         dlg.show()
     }
 
+
+    // ---------- model chunna (Auto / Chat / Coding / Web search / Photo / Video / Music) ----------
+    private lateinit var titleV: TextView
+
+    private fun refreshTitle() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val c = Models.sel(p, "chat")
+        val base = if (c == null) "AI Auto" else "AI " + c.name
+        val s = SpannableString(base)
+        s.setSpan(ForegroundColorSpan(Color.parseColor("#9AA3B5")), 3, base.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        titleV.text = s
+    }
+
+    private fun showModels() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val dlg = android.app.Dialog(this)
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
+        col.setPadding(dp(6), dp(10), dp(6), dp(10))
+        val sv = ScrollView(this)
+        sv.isVerticalScrollBarEnabled = false
+        sv.addView(col)
+        sv.background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#1E1E1E")) }
+        var thinkOpen = true
+
+        lateinit var render: () -> Unit
+        fun row(title: String, sub: String?, tag: String?, checked: Boolean, go: () -> Unit): View {
+            val r = LinearLayout(this)
+            r.gravity = Gravity.CENTER_VERTICAL
+            r.setPadding(dp(14), dp(11), dp(16), dp(11))
+            r.addView(TextView(this).apply {
+                text = if (checked) "\u2713" else ""
+                textSize = 20f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+            }, LinearLayout.LayoutParams(dp(34), -2))
+            val tx = LinearLayout(this)
+            tx.orientation = LinearLayout.VERTICAL
+            tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
+            if (sub != null) tx.addView(TextView(this).apply { text = sub; textSize = 13.5f; setTextColor(Color.parseColor("#9AA3B5")) })
+            r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(6) })
+            if (tag != null) r.addView(TextView(this).apply { text = tag; textSize = 12f; setTextColor(Color.parseColor("#9AA3B5")) })
+            r.setOnClickListener { go() }
+            return r
+        }
+        fun head(t: String): View = TextView(this).apply {
+            text = t
+            textSize = 14f
+            setTextColor(Color.parseColor("#9AA3B5"))
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(20), dp(14), dp(16), dp(4))
+        }
+        fun line(): View = View(this).apply { setBackgroundColor(Color.parseColor("#333333")) }
+
+        render = {
+            col.removeAllViews()
+            val none = Models.CATS.all { Models.sel(p, it.first) == null }
+            col.addView(row("Auto", "Kaam ke hisaab se apne aap chunega", null, none) {
+                for ((k, _) in Models.CATS) Models.setSel(p, k, null)
+                refreshTitle(); render()
+            })
+            col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(14), dp(6), dp(14), dp(6)) })
+            val th = LinearLayout(this)
+            th.gravity = Gravity.CENTER_VERTICAL
+            th.setPadding(dp(54), dp(10), dp(20), dp(10))
+            th.addView(TextView(this).apply { text = "Thinking level"; textSize = 17f; setTextColor(Color.WHITE) }, LinearLayout.LayoutParams(0, -2, 1f))
+            th.addView(TextView(this).apply { text = if (thinkOpen) "\u2303" else "\u2304"; textSize = 20f; setTextColor(Color.WHITE) })
+            th.setOnClickListener { thinkOpen = !thinkOpen; render() }
+            col.addView(th)
+            if (thinkOpen) {
+                val lv = Models.think(p)
+                col.addView(row("Medium", "Balanced depth", null, lv == "medium") { p.edit().putString("think", "medium").apply(); render() })
+                col.addView(row("High", "Extra thorough", null, lv == "high") { p.edit().putString("think", "high").apply(); render() })
+            }
+            col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(14), dp(6), dp(14), dp(2)) })
+            val all = Models.list(p)
+            for ((cat, label) in Models.CATS) {
+                val items = all.filter { it.cat == cat }
+                if (items.isEmpty()) continue
+                col.addView(head(label))
+                val cur = Models.sel(p, cat)
+                for (mm in items) {
+                    val on = cur != null && cur.key == mm.key
+                    col.addView(row(mm.name, null, mm.tag, on) {
+                        Models.setSel(p, cat, if (on) null else mm)
+                        refreshTitle(); render()
+                    })
+                }
+                if (cat == "chat") col.addView(TextView(this).apply {
+                    text = "Groq, OpenAI aur OpenRouter se sirf jawab milta hai, phone ke kaam nahi."
+                    textSize = 12.5f
+                    setTextColor(Color.parseColor("#7C8499"))
+                    setPadding(dp(20), dp(2), dp(16), dp(6))
+                })
+            }
+        }
+        render()
+        dlg.setContentView(sv)
+        dlg.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            setLayout((resources.displayMetrics.widthPixels * 0.86f).toInt(), (resources.displayMetrics.heightPixels * 0.78f).toInt())
+            setGravity(Gravity.TOP or Gravity.START)
+            attributes = attributes.apply { x = dp(10); y = dp(80) }
+        }
+        dlg.show()
+        if (Models.stale(p)) {
+            val key = Keys.get(p)
+            kotlin.concurrent.thread {
+                Models.refresh(p, key)
+                runOnUiThread { if (dlg.isShowing) render() }
+            }
+        }
+    }
+
     private fun soon() {
         Toast.makeText(this, "Ye jald aayega", Toast.LENGTH_SHORT).show()
     }
@@ -1082,12 +1197,14 @@ class MainActivity : Activity() {
         }
         header.addView(icon(0, 44) { showDrawer() })
         val title = TextView(this).apply {
-            val s = SpannableString("AI Auto")
-            s.setSpan(ForegroundColorSpan(Color.parseColor("#9AA3B5")), 3, 7, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            text = s
             textSize = 19f
             setTextColor(Color.parseColor("#E8EAF0"))
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setOnClickListener { showModels() }
         }
+        titleV = title
+        refreshTitle()
         header.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = dp(12) })
         val avatar = TextView(this).apply {
             text = "S"

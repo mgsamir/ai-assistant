@@ -44,11 +44,12 @@ object Providers {
                 msgs.put(JSONObject().put("role", "assistant").put("content", a))
             }
             msgs.put(JSONObject().put("role", "user").put("content", q))
-            val body = JSONObject().put("model", model).put("messages", msgs).put("temperature", 0.6)
+            val body = JSONObject().put("model", model).put("messages", msgs)
+            if (!Regex("^(o\\d|gpt-5)").containsMatchIn(model)) body.put("temperature", 0.6)
             val c = URL(url).openConnection() as HttpURLConnection
             c.requestMethod = "POST"
             c.connectTimeout = 8000
-            c.readTimeout = 25000
+            c.readTimeout = 40000
             c.setRequestProperty("Content-Type", "application/json")
             c.setRequestProperty("Authorization", "Bearer $key")
             c.doOutput = true
@@ -57,6 +58,17 @@ object Providers {
             JSONObject(c.inputStream.bufferedReader().readText())
                 .optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
         } catch (e: Exception) { null }
+    }
+
+    // Chune hue model se seedha jawab (Groq / OpenAI / OpenRouter)
+    fun chatWith(prov: String, id: String, system: String, hist: List<Pair<String, String>>, q: String): String? {
+        val (url, key) = when (prov) {
+            "groq" -> Pair("https://api.groq.com/openai/v1/chat/completions", Extra.groq)
+            "openai" -> Pair("https://api.openai.com/v1/chat/completions", Extra.openai)
+            "openrouter" -> Pair("https://openrouter.ai/api/v1/chat/completions", Extra.openrouter)
+            else -> return null
+        }
+        return chat(url, key, id, system, hist, q)?.takeIf { it.isNotBlank() }
     }
 
     // Gemini na chale to pehle Groq, phir OpenAI, phir OpenRouter

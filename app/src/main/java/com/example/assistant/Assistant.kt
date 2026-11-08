@@ -677,7 +677,14 @@ The user is an adult. Answer questions about the human body, sex education, repr
     private fun webAnswer(key: String, q0: String): Reply {
         val q = if (Regex("hut\\s*bay", RegexOption.IGNORE_CASE).containsMatchIn(q0) && !q0.contains("andaman", true)) q0 + " Little Andaman Andaman Nicobar India" else q0
         val brave = Providers.brave(q)
-        val raw = WebSearch.ask(key, q, MODELS, brave)
+        val ws = Models.sel(prefs, "web")
+        if (ws != null && ws.prov != "gemini") {
+            val t = Providers.chatWith(ws.prov, ws.id,
+                "Search the internet and answer simply in everyday Hindustani, 2 to 6 short sentences, no markdown. The user lives in Hut Bay, Little Andaman, India. Write exactly two lines:\nS: answer in Hinglish (Roman letters)\nV: same answer in Hindi Devanagari",
+                emptyList(), q)
+            if (t != null) return parseReply(t)
+        }
+        val raw = WebSearch.ask(key, q, if (ws != null && ws.prov == "gemini") listOf(ws.id) + MODELS else MODELS, brave)
         if (raw != null) return parseReply(raw)
         if (brave != null) {
             val sys = "Answer the question using ONLY these search results. Simple everyday Hindustani, 1 to 4 short sentences, no markdown. " +
@@ -781,6 +788,16 @@ The user is an adult. Answer questions about the human body, sex education, repr
         chat("\nTum: $q\n")
         thread {
             try {
+                val codeQ = Regex("(?i)\\b(code|coding|program|script|function|bug|error|kotlin|java|python|html|css|javascript|sql|api|app banao|website banao)\\b|कोड|प्रोग्राम").containsMatchIn(q)
+                val pick = (if (codeQ) Models.sel(prefs, "coding") else null) ?: Models.sel(prefs, "chat")
+                if (pick != null && pick.prov != "gemini" && att == null) {
+                    val txt = Providers.chatWith(pick.prov, pick.id, systemText(), history.takeLast(6), q)
+                    if (txt != null) {
+                        main.post { deliver(parseReply(txt), q, true) }
+                        return@thread
+                    }
+                }
+                val order = if (pick != null && pick.prov == "gemini") listOf(pick.id) + MODELS else MODELS
                 val contents = JSONArray()
                 for ((u, a) in history.takeLast(6)) {
                     contents.put(JSONObject().put("role", "user")
@@ -801,9 +818,13 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 var code = 0
                 var resp = ""
                 val t0 = SystemClock.uptimeMillis()
-                for (m in MODELS) {
+                for (m in order) {
                     if (SystemClock.uptimeMillis() - t0 > 40000) break
                     try {
+                        val lvl = Models.think(prefs)
+                        val rb = JSONObject(body.toString())
+                        if (m.startsWith("gemini-3")) rb.put("generationConfig", JSONObject().put("thinkingConfig", JSONObject().put("thinkingLevel", lvl)))
+                        else if (m == "gemini-2.5-flash" || m == "gemini-2.5-pro") rb.put("generationConfig", JSONObject().put("thinkingConfig", JSONObject().put("thinkingBudget", if (lvl == "high") 8192 else 2048)))
                         val c = URL("https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent")
                             .openConnection() as HttpURLConnection
                         c.requestMethod = "POST"
@@ -812,7 +833,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         c.setRequestProperty("Content-Type", "application/json")
                         c.setRequestProperty("x-goog-api-key", key)
                         c.doOutput = true
-                        c.outputStream.use { it.write(body.toString().toByteArray()) }
+                        c.outputStream.use { it.write(rb.toString().toByteArray()) }
                         code = c.responseCode
                         resp = (if (code == 200) c.inputStream else c.errorStream).bufferedReader().readText()
                         if (code == 200 || code == 401 || code == 403 || (code == 400 && resp.contains("API key", ignoreCase = true))) break
