@@ -1455,6 +1455,29 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         attach(15)
+        autoSecurity()
+    }
+
+    // App khulte hi phone ki jaanch (peeche chalti hai), shak wala kuch mile tabhi dikhata hai
+    private fun autoSecurity() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        if (System.currentTimeMillis() - p.getLong("sec_last", 0L) < 5 * 60 * 1000L) return
+        Thread {
+            val msg = try { Security.autoCheck(applicationContext, p) } catch (e: Exception) { null }
+            if (msg != null) runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                try {
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Suraksha chetavni")
+                        .setMessage(msg)
+                        .setPositiveButton("Theek hai", null)
+                        .setNeutralButton("Apps kholo") { _, _ ->
+                            try { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS)) } catch (e: Exception) { }
+                        }
+                        .show()
+                } catch (e: Exception) { }
+            }
+        }.start()
     }
 
     override fun onStop() {

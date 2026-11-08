@@ -128,6 +128,31 @@ object Security {
         return sb.toString().trim()
     }
 
+    // App khulte hi apne aap jaanch: sirf tab bolta hai jab kuch shak wala mile
+    // (zyada shak wale har baar, thode shak wale sirf pehli baar jab dikhe, ya naye aaye app)
+    fun autoCheck(c: Context, p: android.content.SharedPreferences): String? {
+        val f = scan(c)
+        val pm = c.packageManager
+        val known = p.getStringSet("sec_known", null)
+        val now = try {
+            pm.getInstalledPackages(0).filter { it.applicationInfo != null && !isSystem(it.applicationInfo!!) }.map { it.packageName }.toSet()
+        } catch (e: Exception) { emptySet() }
+        p.edit().putStringSet("sec_known", now).putLong("sec_last", System.currentTimeMillis()).apply()
+        val fresh = if (known == null) emptySet() else now - known
+        val seen = p.getStringSet("sec_seen", emptySet()) ?: emptySet()
+        val show = f.filter { it.score >= 5 || (it.score >= 3 && (it.pkg !in seen || it.pkg in fresh)) }
+        if (show.isEmpty()) return null
+        p.edit().putStringSet("sec_seen", seen + show.map { it.pkg }).apply()
+        val sb = StringBuilder()
+        for (x in show.take(6)) {
+            val tag = if (x.pkg in fresh) "NAYA APP, " else ""
+            sb.append("• ${x.label}: $tag${x.reasons.joinToString("; ")}\n\n")
+        }
+        if (rooted()) sb.append("• Phone ke system mein badlaav (root / test-keys) dikh raha hai.\n\n")
+        sb.append("Ye asli antivirus nahi hai, sirf shak ki nishaniyan hain. Jaante ho to rehne do, nahi jaante to Settings > Apps se hata do.")
+        return sb.toString()
+    }
+
     // naya app install hua: turant jaanch, shak ho to notification
     @Suppress("DEPRECATION")
     fun checkNew(c: Context, pkg: String): Finding? {
