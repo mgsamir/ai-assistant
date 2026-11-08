@@ -6,7 +6,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-// Doosri services: Brave search, Groq / OpenRouter (Gemini ka badal), ElevenLabs (natural awaaz)
+// Doosri services: Brave search, Groq / OpenAI / OpenRouter (Gemini ka badal), ElevenLabs (natural awaaz)
 object Providers {
 
     // Brave Search: top natije "title - snippet" ki shakal mein
@@ -59,10 +59,12 @@ object Providers {
         } catch (e: Exception) { null }
     }
 
-    // Gemini na chale to pehle Groq, phir OpenRouter
+    // Gemini na chale to pehle Groq, phir OpenAI, phir OpenRouter
     fun fallback(system: String, hist: List<Pair<String, String>>, q: String): String? {
         chat("https://api.groq.com/openai/v1/chat/completions", Extra.groq,
             "llama-3.3-70b-versatile", system, hist, q)?.let { if (it.isNotBlank()) return it }
+        chat("https://api.openai.com/v1/chat/completions", Extra.openai,
+            "gpt-4o-mini", system, hist, q)?.let { if (it.isNotBlank()) return it }
         chat("https://openrouter.ai/api/v1/chat/completions", Extra.openrouter,
             "openrouter/auto", system, hist, q)?.let { if (it.isNotBlank()) return it }
         return null

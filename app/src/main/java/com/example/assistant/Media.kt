@@ -102,6 +102,29 @@ object Media {
                 lastErr = "$m: " + (e.message ?: "net nahi chala").take(60)
             }
         }
+        // Google se na bane to OpenAI se
+        if (attach == null && Extra.openai.isNotEmpty()) {
+            for (model in listOf("gpt-image-1", "dall-e-3")) {
+                try {
+                    val body = JSONObject().put("model", model).put("prompt", prompt).put("size", "1024x1024")
+                    if (model == "dall-e-3") body.put("response_format", "b64_json")
+                    val c = URL("https://api.openai.com/v1/images/generations").openConnection() as HttpURLConnection
+                    c.requestMethod = "POST"
+                    c.connectTimeout = 10000
+                    c.readTimeout = 120000
+                    c.setRequestProperty("Content-Type", "application/json")
+                    c.setRequestProperty("Authorization", "Bearer " + Extra.openai)
+                    c.doOutput = true
+                    c.outputStream.use { it.write(body.toString().toByteArray()) }
+                    val code = c.responseCode
+                    val text = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.readText() ?: ""
+                    if (code in 200..299) {
+                        val b64 = JSONObject(text).optJSONArray("data")?.optJSONObject(0)?.optString("b64_json") ?: ""
+                        if (b64.isNotEmpty()) return Out(Base64.decode(b64, Base64.DEFAULT), "image/png")
+                    } else lastErr = "OpenAI $model: " + why(code, text)
+                } catch (e: Exception) { }
+            }
+        }
         // Google se na bane to free Pollinations se (photo badalna isme nahi hota)
         if (attach == null) {
             try {

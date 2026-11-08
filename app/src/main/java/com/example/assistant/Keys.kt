@@ -18,4 +18,5 @@ object Extra {
     val groq: String get() = BuildConfig.GROQ_KEY
     val openrouter: String get() = BuildConfig.OPENROUTER_KEY
     val eleven: String get() = BuildConfig.ELEVEN_KEY
+    val openai: String get() = BuildConfig.OPENAI_KEY
 }
