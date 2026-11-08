@@ -439,7 +439,7 @@ class MainActivity : Activity() {
             chip(13, "Photos") { pick(101) },
             chip(14, "Camera") { camera() },
             chip(15, "Files") { pick(103) },
-            chip(16, "Map") { setMode("map") }
+            chip(16, "Map") { openMapDirect() }
         )
         for (c in chips) row.addView(c, LinearLayout.LayoutParams(0, dp(92), 1f).apply { rightMargin = dp(8) })
         col.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
@@ -464,7 +464,7 @@ class MainActivity : Activity() {
             r.setOnClickListener { dlg.dismiss(); go() }
             return r
         }
-        col.addView(item(16, "Google Earth", "Jagah ko satellite view mein dekho") { setMode("earth") })
+        col.addView(item(16, "Google Earth", "Seedha satellite view khulega") { openEarthDirect() })
         col.addView(item(17, "Create images", "Image banao ya photo badlo") { setMode("image") })
         val eng = AssistantService.engine
         col.addView(item(20, "Deep Research", "Poori jaanch ke saath lamba report") { setMode("research") })
@@ -493,6 +493,27 @@ class MainActivity : Activity() {
             setGravity(Gravity.BOTTOM)
         }
         dlg.show()
+    }
+
+    // Map dabate hi seedha khul jaata hai, phir tum khud zoom karke dekho
+    private fun openMapDirect() {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("geo:10.59,92.55?z=12")).setPackage("com.google.android.apps.maps"))
+        } catch (e: Exception) {
+            try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("geo:10.59,92.55?z=12"))) }
+            catch (e2: Exception) { Toast.makeText(this, "Maps app nahi mila", Toast.LENGTH_SHORT).show() }
+        }
+    }
+
+    // Google Earth app ho to wahi, nahi to Maps ka satellite view (Hut Bay ke upar se shuru)
+    private fun openEarthDirect() {
+        try {
+            val i = packageManager.getLaunchIntentForPackage("com.google.earth")
+            if (i != null) { startActivity(i); return }
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.google.com/maps/@10.59,92.55,12z/data=!3m1!1e3")))
+        } catch (e: Exception) {
+            Toast.makeText(this, "Map nahi khul paya", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun setMode(m: String) {
