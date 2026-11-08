@@ -943,19 +943,20 @@ class MainActivity : Activity() {
             val tabs = LinearLayout(this)
             fun tabV(i: Int, name: String): TextView = TextView(this).apply {
                 text = name
-                textSize = 17f
+                textSize = 16f
                 setTextColor(if (tab == i) Color.WHITE else Color.parseColor("#9AA3B5"))
-                setPadding(dp(22), dp(10), dp(22), dp(10))
+                setPadding(dp(16), dp(10), dp(16), dp(10))
                 background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setColor(if (tab == i) Color.parseColor("#3A3A3A") else Color.TRANSPARENT) }
                 setOnClickListener { tab = i; render() }
             }
             tabs.addView(tabV(0, "Trending"))
-            tabs.addView(tabV(1, "Templates"), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
+            tabs.addView(tabV(1, "Templates"), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
+            tabs.addView(tabV(2, "My images"), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
             content.addView(tabs, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(16) })
 
             val list = if (tab == 0) trending else templates
             var i = 0
-            while (i < list.size) {
+            while (tab < 2 && i < list.size) {
                 val row = LinearLayout(this)
                 for (j in 0..1) {
                     val idx = i + j
@@ -983,8 +984,7 @@ class MainActivity : Activity() {
                 i += 2
             }
 
-            content.addView(TextView(this).apply { text = "My images"; textSize = 20f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
-                LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(26); bottomMargin = dp(12) })
+            if (tab == 2) {
             if (busyImg) content.addView(TextView(this).apply {
                 text = "Image ban rahi hai..."
                 textSize = 15f
@@ -1027,6 +1027,7 @@ class MainActivity : Activity() {
                 }
                 content.addView(row)
                 k += 3
+            }
             }
         }
         render()
