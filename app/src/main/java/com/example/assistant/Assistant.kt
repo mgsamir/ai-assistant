@@ -1143,7 +1143,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         else Reply("Torch band kar di", "टॉर्च बंद कर दी")
     }
 
-    // Google Earth ka app ho to usme, nahi to Google Maps ke satellite view mein, warna Earth ki website
+    // Google Earth ka app ho to usme, nahi to Earth ki website
     @Suppress("DEPRECATION")
     fun openEarth(place: String) {
         thread {
@@ -1153,10 +1153,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 main.post { go(Intent(Intent.ACTION_VIEW, Uri.parse(earthUrl)).setPackage("com.google.earth")) }
                 return@thread
             }
-            val ll = try {
-                android.location.Geocoder(app, java.util.Locale.ENGLISH).getFromLocationName(place, 1)?.firstOrNull()
-            } catch (e: Exception) { null }
-            val url = if (ll != null) "https://www.google.com/maps/@${ll.latitude},${ll.longitude},16z/data=!3m1!1e3" else earthUrl
+            val url = earthUrl
             main.post { go(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
         }
     }
