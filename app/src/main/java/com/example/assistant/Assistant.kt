@@ -70,7 +70,6 @@ The user is an adult. Answer questions about the human body, sex education, repr
     val listeners = CopyOnWriteArrayList<UiCb>()
     val log = StringBuilder()
     var onQuit: (() -> Unit)? = null
-    var onEarth: ((String) -> Unit)? = null
     var ambient = false
 
     private val main = Handler(Looper.getMainLooper())
@@ -954,7 +953,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     Reply("Google par khoj raha hoon", "गूगल पर खोज रहा हूँ"))
                 "youtube_search" -> openUrl("https://www.youtube.com/results?search_query=" + Uri.encode(a.getString("query")),
                     Reply("YouTube par khoj raha hoon", "यूट्यूब पर खोज रहा हूँ"))
-                "show_on_earth" -> { openEarth(a.getString("place")); Reply("Satellite view mein khol raha hoon", "सैटेलाइट व्यू में खोल रहा हूँ") }
+                "show_on_earth" -> { openEarth(a.getString("place")); Reply("Google Earth browser mein khol raha hoon", "गूगल अर्थ ब्राउज़र में खोल रहा हूँ") }
                 "open_settings" -> openSettings(a.optString("page", "general"))
                 "wake_screen" -> wakeScreen(a.optInt("seconds", 20))
                 "remember" -> remember(a.getString("fact"))
@@ -1144,21 +1143,9 @@ The user is an adult. Answer questions about the human body, sex education, repr
         else Reply("Torch band kar di", "टॉर्च बंद कर दी")
     }
 
-    // Google Earth ka app ho to usme, nahi to Earth ki website
-    @Suppress("DEPRECATION")
+    // Google Earth browser mein
     fun openEarth(place: String) {
-        val inApp = onEarth
-        if (inApp != null) { main.post { inApp(place) }; return }
-        thread {
-            val earthUrl = "https://earth.google.com/web/search/" + Uri.encode(place)
-            val hasEarth = app.packageManager.getLaunchIntentForPackage("com.google.earth") != null
-            if (hasEarth) {
-                main.post { go(Intent(Intent.ACTION_VIEW, Uri.parse(earthUrl)).setPackage("com.google.earth")) }
-                return@thread
-            }
-            val url = earthUrl
-            main.post { go(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-        }
+        go(Intent(Intent.ACTION_VIEW, Uri.parse("https://earth.google.com/web/search/" + Uri.encode(place))))
     }
 
     private fun openUrl(url: String, msg: Reply): Reply {
