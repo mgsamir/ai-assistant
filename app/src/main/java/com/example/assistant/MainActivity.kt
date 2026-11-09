@@ -508,6 +508,7 @@ class MainActivity : Activity() {
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
         val wv = android.webkit.WebView(this)
+        val bar = android.widget.ProgressBar(this)
         fun needApp() {
             dlg.dismiss()
             Toast.makeText(this, "Earth ki website phone par nahi chalti, isliye satellite map khol raha hoon", Toast.LENGTH_LONG).show()
