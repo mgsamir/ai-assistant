@@ -1133,6 +1133,32 @@ class MainActivity : Activity() {
         }
         root.addView(bar, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(18) })
 
+        val thumbDir = java.io.File(filesDir, "thumbs").also { it.mkdirs() }
+        val thumbPool = java.util.concurrent.Executors.newSingleThreadExecutor()
+        dlg.setOnDismissListener { thumbPool.shutdownNow() }
+        fun loadThumb(prompt: String, target: android.widget.ImageView) {
+            val f = java.io.File(thumbDir, "t" + prompt.hashCode() + ".jpg")
+            fun show() {
+                val bm = try { android.graphics.BitmapFactory.decodeFile(f.path) } catch (e: Exception) { null }
+                if (bm != null) runOnUiThread { target.setImageBitmap(bm) }
+            }
+            if (f.exists() && f.length() > 2000) { show(); return }
+            try {
+                thumbPool.execute {
+                    try {
+                        val u = "https://image.pollinations.ai/prompt/" + java.net.URLEncoder.encode(prompt.take(220), "UTF-8") + "?width=384&height=384&nologo=true&seed=7"
+                        val c = java.net.URL(u).openConnection() as java.net.HttpURLConnection
+                        c.connectTimeout = 10000
+                        c.readTimeout = 60000
+                        if (c.responseCode == 200) {
+                            val b = c.inputStream.readBytes()
+                            if (b.size > 2000) { f.writeBytes(b); show() }
+                        }
+                    } catch (e: Exception) { }
+                }
+            } catch (e: Exception) { }
+        }
+
         fun viewer(f: java.io.File) {
             val v = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
             val iv = android.widget.ImageView(this)
@@ -1140,7 +1166,29 @@ class MainActivity : Activity() {
             iv.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             iv.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.path))
             iv.setOnClickListener { v.dismiss() }
-            v.setContentView(iv)
+            val frame = FrameLayout(this)
+            frame.setBackgroundColor(Color.BLACK)
+            frame.addView(iv, FrameLayout.LayoutParams(-1, -1))
+            val back2 = icon(23, 40) { v.dismiss() }
+            back2.background = oval("#303030")
+            frame.addView(back2, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.TOP).apply { leftMargin = dp(16); topMargin = dp(44) })
+            val more = icon(9, 40) { }
+            more.background = oval("#303030")
+            more.setOnClickListener {
+                val pm = android.widget.PopupMenu(this, more)
+                pm.menu.add("Delete")
+                pm.setOnMenuItemClickListener {
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Delete this image?")
+                        .setPositiveButton("Delete") { _, _ -> f.delete(); v.dismiss(); Toast.makeText(this, "Deleted", Toast.LENGTH_SHORT).show(); render() }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                    true
+                }
+                pm.show()
+            }
+            frame.addView(more, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.END or Gravity.TOP).apply { rightMargin = dp(16); topMargin = dp(44) })
+            v.setContentView(frame)
             v.show()
         }
 
@@ -1170,6 +1218,17 @@ class MainActivity : Activity() {
                         val (c1, c2) = palette[idx % palette.size]
                         val card = FrameLayout(this)
                         card.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(c1), Color.parseColor(c2))).apply { cornerRadius = dp(24).toFloat() }
+                        card.clipToOutline = true
+                        card.outlineProvider = object : android.view.ViewOutlineProvider() {
+                            override fun getOutline(v: View, ol: android.graphics.Outline) { ol.setRoundRect(0, 0, v.width, v.height, dp(24).toFloat()) }
+                        }
+                        val pic = android.widget.ImageView(this)
+                        pic.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                        card.addView(pic, FrameLayout.LayoutParams(-1, -1))
+                        loadThumb(list[idx].second, pic)
+                        card.addView(View(this).apply {
+                            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.TRANSPARENT, Color.parseColor("#B3000000")))
+                        }, FrameLayout.LayoutParams(-1, dp(70), Gravity.BOTTOM))
                         card.addView(TextView(this).apply {
                             text = list[idx].first
                             textSize = 17f
@@ -1183,8 +1242,8 @@ class MainActivity : Activity() {
                             et.requestFocus()
                             (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(et, 0)
                         }
-                        row.addView(card, LinearLayout.LayoutParams(0, dp(120), 1f).apply { setMargins(dp(5), dp(5), dp(5), dp(5)) })
-                    } else row.addView(View(this), LinearLayout.LayoutParams(0, dp(120), 1f))
+                        row.addView(card, LinearLayout.LayoutParams(0, dp(170), 1f).apply { setMargins(dp(5), dp(5), dp(5), dp(5)) })
+                    } else row.addView(View(this), LinearLayout.LayoutParams(0, dp(170), 1f))
                 }
                 content.addView(row)
                 i += 2
@@ -1222,12 +1281,6 @@ class MainActivity : Activity() {
                             override fun getOutline(v: View, ol: android.graphics.Outline) { ol.setRoundRect(0, 0, v.width, v.height, dp(14).toFloat()) }
                         }
                         iv.setOnClickListener { viewer(f) }
-                        iv.setOnLongClickListener {
-                            f.delete()
-                            Toast.makeText(this, "Hata diya", Toast.LENGTH_SHORT).show()
-                            render()
-                            true
-                        }
                         row.addView(iv, LinearLayout.LayoutParams(side, side).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
                     }
                 }
