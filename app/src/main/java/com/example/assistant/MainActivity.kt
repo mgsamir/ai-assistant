@@ -390,20 +390,56 @@ class MainActivity : Activity() {
     private var camUri: android.net.Uri? = null
     private var player: android.media.MediaPlayer? = null
 
+    private fun clearMode() {
+        if (pendMode == "learn") AssistantService.engine?.learn = false
+        pendMode = ""
+    }
+
+    private lateinit var chipRow: LinearLayout
+    private lateinit var pillRow: LinearLayout
+
     private fun refreshHints() {
         val t = when {
-            pendMode == "image" -> "Kaisi image banani hai?"
-            pendMode == "video" -> "Kaisa video banana hai?"
-            pendMode == "music" -> "Kaisa gaana banana hai?"
-            pendMode == "map" -> "Kaunsi jagah ya raasta?"
-            pendMode == "earth" -> "Kaunsi jagah Google Earth mein dekhni hai?"
-            pendMode == "research" -> "Kis baare mein report chahiye?"
-            pendMode == "agent" -> "Agent ko kya kaam dena hai?"
-            pendAtt != null -> "\uD83D\uDCCE " + pendName + " - sawal likho"
+            pendMode == "image" -> "Describe the image"
+            pendMode == "research" -> "What do you want to research?"
+            pendMode == "learn" -> "What do you want to learn?"
+            pendMode == "agent" -> "What should the agent do?"
+            pendAtt != null -> "\uD83D\uDCCE " + pendName + " - ask a question"
             else -> "Ask AI"
         }
         input.hint = t
         if (::orbInput.isInitialized) orbInput.hint = t
+        if (!::chipRow.isInitialized) return
+        chipRow.removeAllViews()
+        val label = when (pendMode) { "research" -> "Research"; "learn" -> "Learn"; "agent" -> "Agent"; "image" -> "Image"; else -> "" }
+        chipRow.visibility = if (label.isEmpty()) View.GONE else View.VISIBLE
+        if (label.isNotEmpty()) {
+            val c = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(6), dp(8), dp(6))
+                background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+            }
+            c.addView(TextView(this).apply { text = label; textSize = 15f; setTextColor(Color.WHITE) })
+            c.addView(TextView(this).apply {
+                text = "\u2715"; textSize = 12f; gravity = Gravity.CENTER
+                setTextColor(Color.BLACK)
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) }
+                setOnClickListener { clearMode(); refreshHints() }
+            }, LinearLayout.LayoutParams(dp(24), dp(24)).apply { leftMargin = dp(8) })
+            chipRow.addView(c)
+        }
+        pillRow.removeAllViews()
+        pillRow.visibility = if (pendMode == "research") View.VISIBLE else View.GONE
+        if (pendMode == "research") {
+            val p = TextView(this).apply {
+                text = "\u2B06  Files"; textSize = 15f; gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                setPadding(dp(18), dp(10), dp(18), dp(10))
+                background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setStroke(dp(1), Color.parseColor("#444444")); setColor(Color.TRANSPARENT) }
+                setOnClickListener { pick(103) }
+            }
+            pillRow.addView(p)
+        }
     }
 
     private fun showPlus() {
@@ -436,10 +472,9 @@ class MainActivity : Activity() {
         }
         val row = LinearLayout(this)
         val chips = listOf(
-            chip(13, "Photos") { pick(101) },
             chip(14, "Camera") { camera() },
-            chip(15, "Files") { pick(103) },
-            chip(16, "Earth") { openEarthDirect() }
+            chip(13, "Photos") { pick(101) },
+            chip(15, "Files") { pick(103) }
         )
         for (c in chips) row.addView(c, LinearLayout.LayoutParams(0, dp(92), 1f).apply { rightMargin = dp(8) })
         col.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
@@ -464,26 +499,19 @@ class MainActivity : Activity() {
             r.setOnClickListener { dlg.dismiss(); go() }
             return r
         }
-        col.addView(item(17, "Create images", "Image banao ya photo badlo") { setMode("image") })
         val eng = AssistantService.engine
-        col.addView(item(20, "Deep Research", "Poori jaanch ke saath lamba report") { setMode("research") })
-        col.addView(item(20, "Agent", "Google ka agent kai kadam mein kaam karta hai") { setMode("agent") })
-        col.addView(item(21, "Guided Learning", "Kadam-kadam par sikho", if (eng?.learn == true) "ON" else "OFF") {
-            val e = AssistantService.engine
-            if (e != null) {
-                e.learn = !e.learn
-                Toast.makeText(this, if (e.learn) "Guided Learning chalu" else "Guided Learning band", Toast.LENGTH_SHORT).show()
-            }
-        })
-        col.addView(item(22, "Personal Intelligence", "Tumhari yaad ki hui baatein use kare", if (eng?.personal != false) "ON" else "OFF") {
+        col.addView(item(20, "Deep Research", "Get detailed reports") { setMode("research") })
+        col.addView(item(20, "Agent", "Let the agent do multi-step work") { setMode("agent") })
+        col.addView(item(21, "Guided Learning", "Get step-by-step help") { setMode("learn") })
+        col.addView(item(22, "Personal Intelligence", "Personalise chat if helpful", if (eng?.personal != false) "ON" else "OFF") {
             val e = AssistantService.engine
             if (e != null) {
                 e.personal = !e.personal
-                Toast.makeText(this, if (e.personal) "Personal Intelligence chalu" else "Personal Intelligence band", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, if (e.personal) "Personal Intelligence on" else "Personal Intelligence off", Toast.LENGTH_SHORT).show()
             }
         })
         if (pendAtt != null || pendMode.isNotEmpty()) {
-            col.addView(item(1, "Hatao", "Jo jodha hai use hata do") { pendAtt = null; pendMode = ""; refreshHints() })
+            col.addView(item(1, "Remove", "Remove what is attached") { pendAtt = null; clearMode(); refreshHints() })
         }
         dlg.setContentView(col)
         dlg.window?.apply {
@@ -506,7 +534,9 @@ class MainActivity : Activity() {
 
 
     private fun setMode(m: String) {
+        if (pendMode == "learn" && m != "learn") AssistantService.engine?.learn = false
         pendMode = m
+        if (m == "learn") AssistantService.engine?.learn = true
         refreshHints()
         val v = if (orbScreen.visibility == View.VISIBLE) orbInput else input
         v.requestFocus()
@@ -622,7 +652,7 @@ class MainActivity : Activity() {
     // Map / image / video / music wale mode mein bheja gaya text
     private fun runSpecial(t: String): Boolean {
         val mode = pendMode
-        if (mode.isEmpty()) return false
+        if (mode.isEmpty() || mode == "learn") return false
         if (mode == "map") {
             pendMode = ""
             refreshHints()
@@ -1429,13 +1459,21 @@ class MainActivity : Activity() {
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+        }
+        chipRow = LinearLayout(this).apply { visibility = View.GONE }
+        pillRow = LinearLayout(this).apply { visibility = View.GONE }
+        val composer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(8))
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(36).toFloat()
+                cornerRadius = dp(30).toFloat()
                 setColor(Color.parseColor("#15181F"))
                 setStroke(dp(1), Color.parseColor("#1F2633"))
             }
+            addView(chipRow, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(4); topMargin = dp(4) })
+            addView(bar, LinearLayout.LayoutParams(-1, -2))
+            addView(pillRow, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(4); bottomMargin = dp(4) })
         }
         bar.addView(icon(1, 44) { showPlus() })
         input = EditText(this).apply {
@@ -1468,7 +1506,7 @@ class MainActivity : Activity() {
             setColor(Color.parseColor("#4F8BFF"))
         }
         bar.addView(voiceBtn)
-        root.addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+        root.addView(composer, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = dp(14)
             topMargin = dp(10)
         })
@@ -1519,7 +1557,7 @@ class MainActivity : Activity() {
     // ---------- bataon ke kaam ----------
     private fun sendInput() {
         var t = input.text.toString().trim()
-        if (t.isEmpty() && pendAtt == null && pendMode.isEmpty()) {
+        if (t.isEmpty() && pendAtt == null && (pendMode.isEmpty() || pendMode == "learn")) {
             openOrb()
             return
         }
