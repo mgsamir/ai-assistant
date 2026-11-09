@@ -648,7 +648,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         f.put(fn("get_weather", "Get today's weather for any place, even a small village or island",
             JSONObject().put("city", str("Place name in English, for example Little Andaman or Port Blair. If the user did not say, use the city from the remembered facts")),
             listOf("city")))
-        f.put(fn("web_search", "Search Google inside the app and get the real answer. Use for any news, live info, facts or question you are not sure about",
+        if (!noWebOnce) f.put(fn("web_search", "Search Google inside the app and get the real answer. Use for any news, live info, facts or question you are not sure about",
             JSONObject().put("query", str("What to search")), listOf("query")))
         f.put(fn("youtube_search", "Search or play something on YouTube",
             JSONObject().put("query", str("What to search")), listOf("query")))
@@ -696,6 +696,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
     private fun webAnswer(key: String, q0: String): Reply {
         val q = if (Regex("hut\\s*bay", RegexOption.IGNORE_CASE).containsMatchIn(q0) && !q0.contains("andaman", true)) q0 + " Little Andaman Andaman Nicobar India" else q0
         val brave = Providers.brave(q)
+        pendingSources = Providers.lastResults.takeIf { brave != null && it.isNotEmpty() }
         val ws = Models.sel(prefs, "web")
         if (ws != null && ws.prov != "gemini") {
             val t = Providers.chatWith(ws.prov, ws.id,
@@ -773,10 +774,59 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
 
     @Volatile var answeredBy = ""
+    @Volatile var lastQ = ""
+    @Volatile var noWebOnce = false
+    @Volatile var pendingSources: List<Triple<String, String, String>>? = null
+    val sourcesFor = HashMap<String, List<Triple<String, String, String>>>()
+
+    // Jawab dobara banao: web = true (internet se), false (bina internet), null (jaisa pehle)
+    fun regen(web: Boolean?) {
+        if (busy || lastQ.isBlank()) return
+        val i = log.lastIndexOf("\nAI: ")
+        if (i >= 0) log.setLength(i)
+        if (history.isNotEmpty()) history.removeAt(history.size - 1)
+        val q = lastQ
+        silent = true
+        if (web == true) {
+            val key = Keys.get(prefs)
+            if (key.isEmpty()) return
+            busy = true
+            mode(2)
+            pendingSources = null
+            thread {
+                val r = webAnswer(key, q)
+                main.post { deliver(r, q, true) }
+            }
+        } else {
+            noWebOnce = (web == false)
+            ask(q, null, false)
+        }
+    }
+
+    // Purani baat-cheet wapas kholo (naya chat / branch)
+    fun loadChat(text: String) {
+        log.setLength(0)
+        log.append(text)
+        history.clear()
+        val parts = text.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.filter { it.isNotEmpty() }
+        var q = ""
+        for (p in parts) {
+            if (p.startsWith("Tum:")) q = p.removePrefix("Tum:").trim()
+            else if (p.startsWith("AI:") && q.isNotEmpty()) {
+                val a = p.removePrefix("AI:").trim().substringBeforeLast('\u2063')
+                history.add(Pair(q, "S: $a\nV: $a"))
+                q = ""
+            }
+        }
+        while (history.size > 12) history.removeAt(0)
+    }
 
     private fun deliver(r: Reply, q: String, save: Boolean) {
         val who = answeredBy
         answeredBy = ""
+        pendingSources?.let { sourcesFor[r.text] = it }
+        pendingSources = null
+        noWebOnce = false
         chat("\nAI: ${r.text}" + (if (who.isNotEmpty()) "\u2063$who" else "") + "\n")
         voiceFor[r.text] = r.voice
         
@@ -798,7 +848,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         }
     }
 
-    private fun ask(q: String, att: Pair<String, String>? = null) {
+    private fun ask(q: String, att: Pair<String, String>? = null, echo: Boolean = true) {
         val key = Keys.get(prefs)
         if (key.isEmpty()) {
             mode(0)
@@ -809,7 +859,9 @@ The user is an adult. Answer questions about the human body, sex education, repr
         busy = true
         mode(2)
         status("Soch raha hoon...")
-        chat("\nTum: $q\n")
+        lastQ = q
+        pendingSources = null
+        if (echo) chat("\nTum: $q\n")
         thread {
             try {
                 val codeQ = Regex("(?i)\\b(code|coding|program|script|function|bug|error|kotlin|java|python|html|css|javascript|sql|api|app banao|website banao)\\b|कोड|प्रोग्राम").containsMatchIn(q)
@@ -843,6 +895,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     .put("tools", tools())
                     .put("safetySettings", WebSearch.safety())
                     .put("contents", contents)
+                noWebOnce = false
                 var code = 0
                 var resp = ""
                 val t0 = SystemClock.uptimeMillis()

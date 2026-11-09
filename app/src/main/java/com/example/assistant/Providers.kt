@@ -24,14 +24,19 @@ object Providers {
             val arr = JSONObject(c.inputStream.bufferedReader().readText())
                 .optJSONObject("web")?.optJSONArray("results") ?: return null
             val sb = StringBuilder()
+            val res = ArrayList<Triple<String, String, String>>()
             for (i in 0 until minOf(arr.length(), 6)) {
                 val o = arr.getJSONObject(i)
+                res.add(Triple(o.optString("title"), o.optString("url"), o.optString("description").replace(Regex("<[^>]*>"), "")))
                 sb.append("- ").append(o.optString("title")).append(": ")
                     .append(o.optString("description").replace(Regex("<[^>]*>"), "")).append("\n")
             }
+            lastResults = res
             sb.toString().ifBlank { null }
         } catch (e: Exception) { null }
     }
+
+    @Volatile var lastResults: List<Triple<String, String, String>> = emptyList()
 
     // OpenAI jaisa chat (Groq aur OpenRouter dono isi tarah chalte hain)
     private fun chat(url: String, key: String, model: String, system: String,

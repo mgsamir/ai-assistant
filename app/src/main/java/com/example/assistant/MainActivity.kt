@@ -66,6 +66,16 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawLine(4f, 8f, 20f, 8f, p); c.drawLine(4f, 16f, 20f, 16f, p)
                 c.drawCircle(15f, 8f, 2.2f, p); c.drawCircle(9f, 16f, 2.2f, p)
             }
+            26 -> {
+                c.drawLine(3f, 12f, 9f, 12f, p); c.drawLine(9f, 12f, 14f, 6f, p); c.drawLine(9f, 12f, 14f, 18f, p)
+                c.drawLine(14f, 6f, 21f, 6f, p); c.drawLine(14f, 18f, 21f, 18f, p)
+                c.drawLine(18f, 3.5f, 21f, 6f, p); c.drawLine(21f, 6f, 18f, 8.5f, p)
+                c.drawLine(18f, 15.5f, 21f, 18f, p); c.drawLine(21f, 18f, 18f, 20.5f, p)
+            }
+            27, 28 -> {
+                c.drawCircle(12f, 12f, 9f, p); c.drawOval(RectF(8f, 3f, 16f, 21f), p); c.drawLine(3f, 12f, 21f, 12f, p)
+                if (kind == 28) { c.drawLine(15f, 15f, 21f, 21f, p); c.drawLine(21f, 15f, 15f, 21f, p) }
+            }
             25 -> {
                 c.drawArc(RectF(4f, 4f, 20f, 20f), -60f, 290f, false, p)
                 c.drawLine(17.5f, 2.5f, 17.5f, 7f, p); c.drawLine(17.5f, 7f, 13f, 7f, p)
@@ -289,6 +299,8 @@ class MainActivity : Activity() {
     // Meri baat: daayin taraf, gol bubble
     private var lastUserText = ""
     private var lastExtraViews: Pair<View, View>? = null
+    private var lastBox: View? = null
+    private var aiCount = 0
 
     private fun addUser(text: String) {
         lastUserText = text
@@ -333,6 +345,7 @@ class MainActivity : Activity() {
     private fun addAi(text: String, who: String = "") {
         lastExtraViews?.let { it.first.visibility = View.GONE; it.second.visibility = View.GONE }
         lastExtraViews = null
+        val myIdx = aiCount++
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val tv = TextView(this).apply {
             this.text = styled(text)
@@ -376,7 +389,21 @@ class MainActivity : Activity() {
             }
         }
         acts.addView(regen, 2)
-        acts.addView(icon(9, 44) { soon() })
+        val more = icon(9, 44) { }
+        more.setOnClickListener { showMsgMenu(more, text, myIdx, regen) }
+        acts.addView(more)
+        val srcs = AssistantService.engine?.sourcesFor?.get(text)
+        if (srcs != null && srcs.isNotEmpty()) {
+            val pill = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(10), dp(6), dp(12), dp(6))
+                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+                setOnClickListener { showSources(srcs) }
+            }
+            pill.addView(IconView(this).apply { kind = 27; tint = Color.parseColor("#E8EAF0") }, LinearLayout.LayoutParams(dp(30), dp(24)))
+            pill.addView(TextView(this).apply { this.text = "Sources"; textSize = 13.5f; setTextColor(Color.parseColor("#E8EAF0")) })
+            acts.addView(pill, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
+        }
         acts.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         acts.addView(icon(10, 44) { AssistantService.engine?.replay(text) })
         box.addView(acts, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -392,11 +419,186 @@ class MainActivity : Activity() {
         box.addView(foot, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(2); bottomMargin = dp(2) })
         // sirf sabse nayi baat par: dobara jawab ka button aur neeche model ka naam
         lastExtraViews = Pair(regen, foot)
+        lastBox = box
         chatList.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dp(8)
             bottomMargin = dp(6)
         })
         scrollDown()
+    }
+
+    private fun menuRow(kind: Int, label: String, go: () -> Unit): View {
+        val r = LinearLayout(this)
+        r.gravity = Gravity.CENTER_VERTICAL
+        r.setPadding(dp(8), dp(14), dp(16), dp(14))
+        r.addView(IconView(this).apply { this.kind = kind }, LinearLayout.LayoutParams(dp(44), dp(30)))
+        r.addView(TextView(this).apply { text = label; textSize = 17f; setTextColor(Color.WHITE) })
+        r.setOnClickListener { go() }
+        return r
+    }
+
+    // "..." dabane par: Branch in new chat / Retry / Search the web
+    private fun showMsgMenu(anchor: View, text: String, idx: Int, regen: View) {
+        val latest = lastExtraViews?.first === regen
+        val e = AssistantService.engine
+        val hasWeb = e?.sourcesFor?.containsKey(text) == true
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(10), dp(14), dp(8))
+            background = GradientDrawable().apply { cornerRadius = dp(26).toFloat(); setColor(Color.parseColor("#2B2B2B")) }
+        }
+        val pw = android.widget.PopupWindow(col, dp(290), ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        pw.elevation = dp(8).toFloat()
+        pw.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+        col.addView(TextView(this).apply {
+            this.text = "Today, " + java.text.SimpleDateFormat("h:mm a", java.util.Locale.ENGLISH).format(java.util.Date()).lowercase()
+            textSize = 15f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(dp(8), dp(8), 0, dp(6))
+        })
+        col.addView(menuRow(26, "Branch in new chat") { pw.dismiss(); branchFrom(idx) })
+        if (latest && e != null) {
+            col.addView(View(this).apply { setBackgroundColor(Color.parseColor("#444444")) }, LinearLayout.LayoutParams(-1, dp(1)).apply { leftMargin = dp(8); rightMargin = dp(8) })
+            col.addView(menuRow(25, "Retry") { pw.dismiss(); retryLast(null) })
+            if (hasWeb) col.addView(menuRow(28, "Remove web results") { pw.dismiss(); retryLast(false) })
+            else col.addView(menuRow(27, "Search the web") { pw.dismiss(); retryLast(true) })
+        }
+        pw.showAsDropDown(anchor, -dp(20), -dp(10))
+    }
+
+    private fun retryLast(web: Boolean?) {
+        val e = AssistantService.engine ?: return
+        lastBox?.let { chatList.removeView(it) }
+        lastBox = null
+        lastExtraViews = null
+        if (aiCount > 0) aiCount--
+        addPending()
+        e.regen(web)
+    }
+
+    private fun showSources(list: List<Triple<String, String, String>>) {
+        val dlg = android.app.Dialog(this)
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(14), dp(20), dp(10))
+            background = GradientDrawable().apply {
+                val r = dp(26).toFloat()
+                cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
+                setColor(Color.parseColor("#2B2B2B"))
+            }
+        }
+        col.addView(View(this).apply { background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(Color.parseColor("#666666")) } },
+            LinearLayout.LayoutParams(dp(40), dp(5)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(12) })
+        col.addView(TextView(this).apply { text = "Sources"; textSize = 14f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(0, 0, 0, dp(8)) })
+        val inner = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        for ((title, url, desc) in list) {
+            val host = try { android.net.Uri.parse(url).host?.removePrefix("www.") ?: "" } catch (e: Exception) { "" }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(12), 0, dp(12))
+                setOnClickListener { try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) } catch (e: Exception) { } }
+            }
+            row.addView(TextView(this).apply { text = host; textSize = 14f; setTextColor(Color.parseColor("#C8CCD6")) })
+            row.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
+            row.addView(TextView(this).apply { text = desc; textSize = 14.5f; setTextColor(Color.parseColor("#9AA3B5")); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
+            inner.addView(row)
+            inner.addView(View(this).apply { setBackgroundColor(Color.parseColor("#3A3A3A")) }, LinearLayout.LayoutParams(-1, dp(1)))
+        }
+        col.addView(ScrollView(this).apply { addView(inner) }, LinearLayout.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.6f).toInt()))
+        dlg.setContentView(col)
+        dlg.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setGravity(Gravity.BOTTOM)
+        }
+        dlg.show()
+    }
+
+    // ---- purani baat-cheet ka sangrah: Branch in new chat aur Chat history ----
+    private fun archiveChat(text: String) {
+        try {
+            val parts = text.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.filter { it.isNotEmpty() }
+            if (parts.none { it.startsWith("AI:") }) return
+            val title = parts.firstOrNull { it.startsWith("Tum:") }?.removePrefix("Tum:")?.trim()?.take(40) ?: "Chat"
+            val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
+            val arr = org.json.JSONArray(sp.getString("chats", "[]"))
+            val out = org.json.JSONArray()
+            out.put(org.json.JSONObject().put("t", title).put("time", System.currentTimeMillis()).put("log", text))
+            for (i in 0 until minOf(arr.length(), 29)) out.put(arr.getJSONObject(i))
+            sp.edit().putString("chats", out.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
+    private fun branchFrom(idx: Int) {
+        val e = AssistantService.engine ?: return
+        val full = e.log.toString()
+        val parts = full.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.filter { it.isNotEmpty() }
+        val keep = ArrayList<String>()
+        var n = -1
+        for (p in parts) {
+            keep.add(p)
+            if (p.startsWith("AI:")) { n++; if (n == idx) break }
+        }
+        archiveChat(full)
+        val sub = keep.joinToString("") { "\n$it\n" }
+        e.loadChat(sub)
+        rebuildChat(sub)
+        Toast.makeText(this, "New chat started from this message", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showChatHistory() {
+        val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val arr = try { org.json.JSONArray(sp.getString("chats", "[]")) } catch (e: Exception) { org.json.JSONArray() }
+        val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
+        val top = FrameLayout(this)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#303030")
+        top.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.CENTER_VERTICAL))
+        top.addView(TextView(this).apply { text = "Chat history"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        if (arr.length() == 0) list.addView(TextView(this).apply { text = "No saved chats yet. A chat is saved when you branch it."; textSize = 15f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(dp(4), dp(20), dp(4), 0) })
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val row = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(14), dp(8), dp(14))
+                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#1E1E1E")) }
+            }
+            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            tx.addView(TextView(this).apply { text = o.optString("t"); textSize = 16f; setTextColor(Color.WHITE); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+            tx.addView(TextView(this).apply {
+                text = java.text.SimpleDateFormat("d MMM, h:mm a", java.util.Locale.ENGLISH).format(java.util.Date(o.optLong("time")))
+                textSize = 13f; setTextColor(Color.parseColor("#9AA3B5"))
+            })
+            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(TextView(this).apply {
+                text = "Delete"; textSize = 14f; setTextColor(Color.parseColor("#FF8A8A")); setPadding(dp(12), dp(8), dp(12), dp(8))
+                setOnClickListener {
+                    android.app.AlertDialog.Builder(this@MainActivity).setTitle("Delete this chat?")
+                        .setPositiveButton("Delete") { _, _ ->
+                            val keepArr = org.json.JSONArray()
+                            for (k in 0 until arr.length()) if (k != i) keepArr.put(arr.getJSONObject(k))
+                            sp.edit().putString("chats", keepArr.toString()).apply()
+                            dlg.dismiss(); showChatHistory()
+                        }.setNegativeButton("Cancel", null).show()
+                }
+            })
+            row.setOnClickListener {
+                val e = AssistantService.engine
+                if (e != null) {
+                    archiveChat(e.log.toString())
+                    val lg = o.optString("log")
+                    e.loadChat(lg)
+                    rebuildChat(lg)
+                }
+                dlg.dismiss()
+            }
+            list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        }
+        root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        dlg.setContentView(root)
+        dlg.show()
     }
 
     // jawab ko saaf, line-by-line dikhao: heading mote akshar mein, 1. 2. 3. alag-alag line par
@@ -425,6 +627,9 @@ class MainActivity : Activity() {
     private fun rebuildChat(log: String) {
         chatList.removeAllViews()
         pending = null
+        aiCount = 0
+        lastBox = null
+        lastExtraViews = null
         for (part in log.split(Regex("\n(?=(?:Tum|AI): )"))) {
             val t = part.trim()
             if (t.startsWith("Tum:")) addUser(t.removePrefix("Tum:").trim())
@@ -659,7 +864,10 @@ class MainActivity : Activity() {
         }
         val bo = java.io.ByteArrayOutputStream()
         b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, bo)
-        pendAtt = Pair("image/jpeg", android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP))
+        val b64 = android.util.Base64.encodeToString(bo.toByteArray(), android.util.Base64.NO_WRAP)
+        val icb = imgAttCb
+        if (icb != null) { runOnUiThread { icb(Pair("image/jpeg", b64)) }; return }
+        pendAtt = Pair("image/jpeg", b64)
         pendName = name
         runOnUiThread {
             refreshHints()
@@ -904,11 +1112,11 @@ class MainActivity : Activity() {
     // ---------- side menu + Images screen (Trending / Templates / My images) ----------
     private val genDir: java.io.File get() = java.io.File(filesDir, "gen").also { it.mkdirs() }
 
-    private fun saveGenerated(out: Media.Out) {
-        try {
+    private fun saveGenerated(out: Media.Out): java.io.File? {
+        return try {
             val ext = if (out.mime.contains("png")) "png" else if (out.mime.contains("webp")) "webp" else "jpg"
-            java.io.File(genDir, "img_" + System.currentTimeMillis() + "." + ext).writeBytes(out.bytes)
-        } catch (e: Exception) { }
+            java.io.File(genDir, "img_" + System.currentTimeMillis() + "." + ext).also { it.writeBytes(out.bytes) }
+        } catch (e: Exception) { null }
     }
 
     private fun showDrawer() {
@@ -935,6 +1143,14 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r2.setOnClickListener { dlg.dismiss(); showSecurityLog() }
         col.addView(r2)
+        val r3 = LinearLayout(this)
+        r3.gravity = Gravity.CENTER_VERTICAL
+        r3.setPadding(0, dp(14), 0, dp(14))
+        r3.addView(IconView(this).apply { kind = 26 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        r3.addView(TextView(this).apply { text = "Chat history"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        r3.setOnClickListener { dlg.dismiss(); showChatHistory() }
+        col.addView(r3)
         dlg.setContentView(col)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -1018,70 +1234,130 @@ class MainActivity : Activity() {
         dlg.show()
     }
 
+    private class Tpl(val name: String, val photo: Boolean, val thumb: String, val prompt: String)
+
     private val trending = listOf(
-        "Anime reaction" to "An anime style cartoon character with big heart eyes, excited happy face, sparkles around, clean colourful background",
-        "Diwali wishes" to "A beautiful Happy Diwali greeting card with a glowing diya, colourful rangoli, golden text and warm lights",
-        "Diwali decor" to "A cosy Indian living room decorated for Diwali with marigold garlands, diyas and cushions, warm light",
-        "80s flashback" to "A retro 1980s style portrait of an Indian man with big sunglasses and a colourful shirt, film grain, vintage photo",
-        "Movie poster" to "A colourful Bollywood style movie poster of a road trip comedy with a big bold title and a smiling hero beside a yellow taxi",
-        "Rickshaw selfie" to "Two friends laughing in a colourful auto rickshaw taking a selfie, warm evening light, realistic photo",
-        "Comic hero" to "A comic book cover of a neighbourhood kite rescue adventure with kids, bright colours, bold title",
-        "Indian mixtape" to "A cassette tape and handwritten tracklist lying on a wooden table at dusk, warm moody light, realistic photo",
-        "Good morning" to "A steaming cup of chai on a wooden table with a notebook, flowers and a sunrise over green hills, good morning photo",
-        "Cricket victory" to "A joyful crowd celebrating a cricket victory in a floodlit stadium, a player raising her arms, cinematic",
-        "Caricature" to "A fun cartoon caricature of a doctor and artist with a big smile, books and a paint palette, blue sky background",
-        "Stickers" to "A set of cute die cut stickers: a black cat, a potted plant and a smiling bearded man, white borders",
-        "Sketch" to "A simple hand drawn black line sketch of a flower with a small bee, clean white paper",
-        "3D avatar" to "A cute 3D avatar of a young woman with orange sunglasses and flower hairclips, soft clouds background",
-        "Tarot card" to "A tarot card style illustration of a woman in a green cloak and cap with a sun and moon, vintage print",
-        "Impressionist painting" to "An impressionist oil painting of a woman looking at a sunset sea from a boat, thick brush strokes",
-        "16-bit arcade" to "A 16 bit pixel art fighting game hero with silver hair and red jacket on a night city bridge",
-        "Wallpaper" to "A hyperreal macro wallpaper of a green fern curling in a spiral, deep forest light"
+        Tpl("Anime reaction GIF", true,
+            "anime style girl with orange bob hair and heart shaped eyes, excited happy face, hands clasped, pink hearts and sparkles, cream background, clean cel shading",
+            "Use my uploaded photo to create a high quality anime style reaction sticker of me. Keep my face shape, hairstyle, skin tone, glasses and clothing recognisable. Show an exaggerated joyful reaction: heart shaped eyes, a wide open smile and both hands pressed to my cheeks, with small sparkles and hearts floating around. Use clean confident line art, cel shading, a soft cream background and a thin white outline so it works as a chat reaction. No text, logos or watermarks."),
+        Tpl("Mithai Mini-Me", true,
+            "photorealistic young woman in a rose coloured kurta sitting inside a large open gift box of Indian sweets, laddoo, kaju katli, marigold flowers, warm Diwali light",
+            "Use my uploaded photo to create a photoreal Diwali mithai scene with miniature versions of me. Keep my recognisable face, skin tone, hair and clothing. Show one to four tiny mini-mes in natural, different poses interacting with a big open gift box of Indian sweets such as motichoor laddoo, kaju katli or pista barfi. Pick a distinct box shape and colour palette, a festive setting with marigold flowers, diyas and rich fabric, a flattering camera angle and one playful action. Keep one clear focal point, believable scale, realistic food texture and soft contact shadows. Warm, rich festive light. No invented people, text, logos or watermarks."),
+        Tpl("Diwali Décor", true,
+            "cosy Indian living room decorated for Diwali with marigold garlands, fairy lights, brass diya and festive cushions, warm light, realistic photo",
+            "Use my uploaded photo of a room or entrance and decorate it for Diwali while keeping the layout, walls, windows and furniture exactly as they are. Add marigold and mango leaf toran garlands, strings of warm fairy lights, brass diyas, a floor rangoli, a tray of flowers, and festive cushions and throws in red, teal and gold. Natural daylight with warm accents, realistic scale and shadows, elegant and tidy rather than cluttered. No people, text or logos."),
+        Tpl("Diwali Wishes", false,
+            "Happy Diwali greeting card, glowing diya on colourful rangoli, deep maroon background, gold lettering, warm bokeh lights",
+            "Create a premium square Diwali greeting card. Deep maroon background with soft bokeh lights across the top, a large glowing clay diya in the centre sitting on a colourful floor rangoli with marigold petals. Elegant gold serif lettering reading 'Happy Diwali' and a smaller line 'Wishing you and your family light, love and happiness', separated by a thin gold divider with a small lotus ornament. Rich, warm, celebratory and sharp. Spell all text exactly."),
+        Tpl("80s flashback", true,
+            "1980s style portrait of an Indian man with voluminous hair, aviator sunglasses, colour blocked jacket, chin resting on hand, vintage film photo grain",
+            "Use my uploaded photo to create an authentic 1980s family album portrait of me. Keep my face, skin tone and hair recognisable but restyle me for the era: a bold colour blocked jacket, aviator sunglasses and a voluminous period hairstyle. Pose me resting my chin on my hand in a living room with a patterned wall, a vase of flowers and a framed picture. Soft on-camera flash, slightly faded film colours, fine grain and a hint of print wear. No text, logos or watermarks."),
+        Tpl("Childhood Portrait", true,
+            "two Indian children, a boy and a girl, laughing and playing with diyas indoors on Diwali evening, warm window light, candid family photo",
+            "Use my uploaded photo to imagine my childhood self at about seven years old. Keep the family resemblance: the same eyes, smile, skin tone and hair colour, with a hairstyle suited to a child. Show that child playing happily at home with a sibling during a festival evening, with sparklers and diyas nearby, wearing simple festive clothes. Warm natural window light, shallow depth of field and a candid family photo feel. No text, logos or watermarks."),
+        Tpl("Rickshaw selfie", true,
+            "friends laughing in a colourful auto rickshaw taking a selfie, busy Indian street, golden hour, realistic photo",
+            "Use my uploaded photo to place me in a colourful auto rickshaw on a busy Indian street at golden hour, laughing and taking a selfie with two friends squeezed in beside me. Keep my face, hair and clothing recognisable and make the friends look clearly distinct. Soft motion blur in the background, warm evening light, bright seat covers and shopping bags. Natural smartphone selfie framing. No text, logos or watermarks."),
+        Tpl("Movie poster", true,
+            "colourful Bollywood style movie poster, smiling hero in front of a yellow taxi at sunset, bold title, cinematic lighting",
+            "Use my uploaded photo to make a cinematic Bollywood style movie poster with me as the hero. Keep my face and look recognisable. Show me striding in front of a bright yellow taxi at sunset with a city skyline behind, confident and smiling. Add the bold original title 'ROAD TRIP' at the top, a short tagline, and a tidy billing block at the bottom. Rich colour grading, dramatic lighting and proper poster typography. No real actors' names or logos."),
+        Tpl("Comic hero", true,
+            "vintage comic book cover, hero with glasses flying kites above rooftops, kids cheering below, bold ink outlines, halftone dots, bright colours",
+            "Use my uploaded photo to create a vintage style comic book cover with me as the hero. Keep my face, hair and glasses recognisable, drawn with bold ink outlines and halftone shading. Show me on a kite rescue mission above a rooftop town while kids cheer below. Add the original title 'KITE GUARDIAN', an issue number and a price box. Bright flat colours and a dynamic angle. No existing characters, studio logos or copyrighted marks."),
+        Tpl("Indian mixtape", false,
+            "cassette tape with a handwritten tracklist on a wooden table at dusk, old headphones, cup of chai, warm moody light, realistic photo",
+            "A realistic top down photo of a cassette tape, a handwritten tracklist on lined paper and a pair of old headphones lying on a dark wooden table at dusk, with a cup of chai and a few marigold petals. Warm, moody lamp light, shallow depth of field, tactile detail on the plastic and the paper. The handwritten song titles should be legible but invented. No logos."),
+        Tpl("Good morning", false,
+            "steaming glass of masala chai on a wooden table with notebook and flowers, sunrise over green hills, golden light, good morning photo",
+            "A cheerful good morning photo: a steaming glass of masala chai on a rustic wooden table beside a notebook and fresh flowers, with a soft sunrise over green hills in the background, gentle mist and warm golden light, crisp focus on the cup. Leave a little clear space at the top for a greeting. Natural, inviting, no logos."),
+        Tpl("Caricature", true,
+            "fun cartoon caricature of a smiling man with a big head, books and a paint palette, bright blue background, bold outlines",
+            "Use my uploaded photo to draw a fun, flattering caricature of me. Keep my recognisable features but exaggerate them playfully: a slightly bigger head, expressive eyes and a big smile. Surround me with items that suit my work or hobbies, such as books, a paint palette or headphones. Clean digital illustration, bold outlines, vibrant colours and a plain bright sky blue background. No text or watermarks.")
     )
     private val templates = listOf(
-        "Poster" to "A bold modern poster with a big red poppy flower and large title text BLOOM, cream background",
-        "Interior design" to "An isometric miniature living room with big window, sofa, plants and wall art, soft pastel background",
-        "Logo" to "A clean round blue badge logo with a simple fish symbol, flat vector style",
-        "Illustration" to "A warm flat illustration of a girl hugging her cat, soft colours, storybook style",
-        "Headshot" to "A professional studio headshot of a smiling person in a cream sweater, soft grey background",
-        "Icon" to "A set of four friendly flat icons: peace hand, shooting star, frog and planet, on a teal background",
-        "Product photo" to "A product photo of a pink scented candle on a pink background with soft shadow, studio light",
-        "Merch" to "A white t-shirt hanging on a clothesline with a cool frog DJ print, blue sky background",
-        "Infographic" to "A simple clear infographic explaining how rain forms from a cloud, with arrows and labels",
-        "Flyer" to "A black and white lost pet flyer with a big title, a photo and a phone number, photocopy style",
-        "Book cover" to "A book cover with a sunset over the sea and a deck chair, calm teal colours, elegant title text",
-        "App mockup" to "A music player app screen mockup on a phone with colourful album art and play controls",
-        "Packaging" to "A tea box packaging design with green leaf art and the name LEAF, peach background",
-        "Advertisement" to "A bright pink advertisement for a skincare bottle held by a hand, with bold script text Shop now",
-        "Thumbnail" to "A social media thumbnail of a smiling chef holding a pastry with big white text one day in my life",
-        "Website mockup" to "A website homepage mockup for a pottery shop with warm terracotta colours and product photos"
+        Tpl("Poster", false,
+            "modern poster, big red poppy flower, bold red title BLOOM, cream paper on terracotta background, editorial illustration",
+            "Design a striking modern poster. One large red poppy with a thin dark green stem and leaves, in a graphic editorial illustration style, centred on a cream rectangle that sits on a warm terracotta background. A huge condensed red serif title 'BLOOM' at the top. Clean margins, balanced composition and subtle paper grain. Spell the text exactly."),
+        Tpl("Interior design", false,
+            "isometric cutaway miniature living room, big window, cream sofa, green armchair, plants, soft lilac background, clean 3D render",
+            "A charming isometric cutaway of a small living room, like a miniature diorama: a big gridded window, a cream sofa, a green armchair, a floor lamp, house plants, a rug and framed art on the wall. Soft pastel lilac background with gentle light, a clean 3D render with tidy details. No people, no text."),
+        Tpl("Logo", false,
+            "round navy badge logo with a simple white fish symbol, flat vector style, light grey background",
+            "A minimal circular badge logo for a small seafood cafe. A bold navy ring with a simple stylised fish drawn in clean white line art inside, and two small dots on the sides. Flat vector style, strong silhouette, shown on a light grey background. No extra text."),
+        Tpl("Illustration", false,
+            "warm storybook illustration of a girl with a bun hugging a large black and white cat, yellow cardigan, lavender background, soft gouache texture",
+            "A warm, hand painted storybook illustration of a girl with a bun sitting cross legged on the floor and hugging a large black and white cat. She wears a yellow cardigan and green trousers, drawn in soft gouache texture, against a calm lavender background with gentle shading. No text."),
+        Tpl("Headshot", true,
+            "professional studio headshot of a smiling woman, cream sweater, soft grey backdrop, soft light",
+            "Use my uploaded photo to make a professional studio headshot. Keep my face, skin tone, hairstyle and expression natural and recognisable, with no heavy retouching. Dress me in a clean cream sweater or a neat shirt, with a soft key light and gentle fill, a neutral light grey backdrop, shallow depth of field and sharp eyes. Shoulders up framing. No text or watermarks."),
+        Tpl("Icon", false,
+            "four flat icons, peace sign hand, shooting star, smiling frog, ringed planet, white and mint on deep teal background",
+            "A set of four friendly flat icons arranged in a 2 by 2 grid: a peace sign hand, a shooting star, a smiling frog and a ringed planet. Chunky rounded shapes in white and soft mint on a deep teal background, consistent line weight, minimal and clean. No text."),
+        Tpl("Product photo", true,
+            "pink scented candle in a glass jar on a pink studio background, soft shadow, commercial product photo",
+            "Use my uploaded photo of a product and turn it into a polished studio product shot. Keep the product's shape, colours and label exactly as they are. Place it on a seamless soft pink backdrop with a gentle shadow and a subtle reflection, lit by soft diffused light from the left. Crisp, commercial and uncluttered. No added text or logos."),
+        Tpl("Merch", false,
+            "white t-shirt hanging on a clothesline against a blue sky with a cartoon frog DJ print, natural sunlight",
+            "A realistic mockup of a plain white t-shirt hanging on a thin clothesline against a clear blue sky, printed with a cool cartoon frog wearing headphones and DJing. A slight breeze moves the fabric, natural sunlight, crisp detail. No extra text."),
+        Tpl("Infographic", false,
+            "clean flat infographic of the water cycle, sun, sea, clouds, rain, river, pastel colours, numbered steps",
+            "A clean, easy infographic explaining how rain forms: the sun heating the sea, evaporation arrows, a cloud with condensation droplets, rain falling on hills and a river flowing back to the sea. Flat pastel colours, steps numbered 1 to 4 and labelled in simple English, with a tidy layout."),
+        Tpl("Flyer", false,
+            "black and white photocopied lost dog flyer with big title, grainy dog photo and tear off phone number strips",
+            "A black and white photocopied 'LOST DOG' flyer: a huge bold title, a grainy photo of a friendly dog, a short description and a row of tear-off strips with a phone number at the bottom (use 'XXXXX XXXXX'). An authentic xerox look."),
+        Tpl("Book cover", false,
+            "calm book cover, sunset over a teal sea with a striped deck chair on the sand, elegant serif title, muted colours",
+            "A calm, premium book cover: a quiet sunset over a teal sea with a single striped deck chair on the sand, an elegant serif title 'THE LONG EVENING' and a smaller author line 'A. Rao'. Muted colours with lots of negative space."),
+        Tpl("App mockup", false,
+            "music player app screen on a modern phone, colourful album art, play controls, soft gradient background",
+            "A clean music player app screen on a modern phone, shown straight on against a soft gradient background: large colourful album art, track title and artist name, a progress bar, and play, next and previous controls. Rounded UI with tidy spacing and sample text in English.")
     )
     private val palette = listOf(
         "#5B247A" to "#1BCEDF", "#B24592" to "#F15F79", "#0F2027" to "#2C5364", "#134E5E" to "#71B280",
         "#8E2DE2" to "#4A00E0", "#C33764" to "#1D2671", "#CC5333" to "#23074D", "#1F4037" to "#4CA58A"
     )
 
+    private class Turn(var photo: String?, val prompt: String) {
+        var file: java.io.File? = null
+        var err: String? = null
+        var busy = true
+    }
+
+    private var imgAttCb: ((Pair<String, String>) -> Unit)? = null
+
     private fun showImages() {
         val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         dlg.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        dlg.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.BLACK))
+        dlg.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
         val content = LinearLayout(this)
         content.orientation = LinearLayout.VERTICAL
-        content.setPadding(dp(16), dp(96), dp(16), dp(110))
+        content.setPadding(dp(16), dp(96), dp(16), dp(170))
         val sv = ScrollView(this)
         sv.isVerticalScrollBarEnabled = false
         sv.addView(content)
         root.addView(sv, FrameLayout.LayoutParams(-1, -1))
 
+        var tab = 0
+        var busyImg = false
+        var imgAtt: Pair<String, String>? = null
+        val turns = ArrayList<Turn>()
+        lateinit var render: () -> Unit
+        lateinit var refreshAtt: () -> Unit
+
         val topBar = FrameLayout(this)
         topBar.setBackgroundColor(Color.BLACK)
-        val back = icon(23, 40) { dlg.dismiss() }
+        val back = icon(23, 40) { if (tab == 3) { tab = 0; render() } else dlg.dismiss() }
         back.background = oval("#303030")
         topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
         topBar.addView(TextView(this).apply { text = "Images"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
         root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
+        dlg.setOnKeyListener { _, k, ev ->
+            if (k == android.view.KeyEvent.KEYCODE_BACK && ev.action == android.view.KeyEvent.ACTION_UP && tab == 3) { tab = 0; render(); true } else false
+        }
 
         val et = EditText(this).apply {
             hint = "Describe an image"
@@ -1089,35 +1365,47 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE)
             textSize = 16f
             background = null
-            maxLines = 4
+            maxLines = 5
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         }
-        var tab = 0
-        var busyImg = false
 
-        lateinit var render: () -> Unit
+        fun b64bitmap(b64: String, sample: Int = 2): android.graphics.Bitmap? = try {
+            val bytes = android.util.Base64.decode(b64, android.util.Base64.NO_WRAP)
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+        } catch (e: Exception) { null }
+
+        fun run(t: Turn) {
+            val key = Keys.get(getSharedPreferences("p", Context.MODE_PRIVATE))
+            if (key.isEmpty()) { Toast.makeText(this, "API key nahi mili", Toast.LENGTH_SHORT).show(); t.busy = false; t.err = "API key nahi mili"; render(); return }
+            t.busy = true; t.err = null; t.file = null
+            busyImg = true
+            val att = t.photo?.let { Pair("image/jpeg", it) }
+            render()
+            kotlin.concurrent.thread {
+                val out = Media.image(key, t.prompt, att, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "photo"))
+                val err = Media.lastErr
+                runOnUiThread {
+                    busyImg = false
+                    t.busy = false
+                    if (out != null) t.file = saveGenerated(out)
+                    else t.err = "Could not create the image. " + err.ifBlank { "Please try again." }
+                    render()
+                    sv.post { sv.fullScroll(View.FOCUS_DOWN) }
+                }
+            }
+        }
+
         val send = {
             val t = et.text.toString().trim()
-            val key = Keys.get(getSharedPreferences("p", Context.MODE_PRIVATE))
             if (t.isNotEmpty() && !busyImg) {
-                if (key.isEmpty()) {
-                    Toast.makeText(this, "API key nahi mili", Toast.LENGTH_SHORT).show()
-                } else {
-                    busyImg = true
-                    et.text?.clear()
-                    (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(et.windowToken, 0)
-                    render()
-                    kotlin.concurrent.thread {
-                        val out = Media.image(key, t, null, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "photo"))
-                        val err = Media.lastErr
-                        runOnUiThread {
-                            busyImg = false
-                            if (out != null) saveGenerated(out)
-                            else Toast.makeText(this, "Nahi ban paayi. " + err.ifBlank { "Dobara try karo." }, Toast.LENGTH_LONG).show()
-                            render()
-                        }
-                    }
-                }
+                val turn = Turn(imgAtt?.second, t)
+                turns.add(turn)
+                imgAtt = null
+                refreshAtt()
+                et.text?.clear()
+                tab = 3
+                (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(et.windowToken, 0)
+                run(turn)
             }
         }
         val sendB = icon(4, 38) { send() }
@@ -1131,30 +1419,99 @@ class MainActivity : Activity() {
             addView(et, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
             addView(sendB, LinearLayout.LayoutParams(dp(38), dp(38)))
         }
-        root.addView(bar, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(18) })
+        // chuni hui photo ka chhota dikhawa (bar ke upar)
+        val attRow = FrameLayout(this)
+        attRow.visibility = View.GONE
+        val attThumb = android.widget.ImageView(this)
+        attThumb.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+        attThumb.clipToOutline = true
+        attThumb.outlineProvider = object : android.view.ViewOutlineProvider() {
+            override fun getOutline(v: View, ol: android.graphics.Outline) { ol.setRoundRect(0, 0, v.width, v.height, dp(14).toFloat()) }
+        }
+        attRow.addView(attThumb, FrameLayout.LayoutParams(dp(64), dp(64)).apply { topMargin = dp(8); rightMargin = dp(8) })
+        attRow.addView(TextView(this).apply {
+            text = "✕"; textSize = 12f; gravity = Gravity.CENTER; setTextColor(Color.BLACK)
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) }
+            setOnClickListener { imgAtt = null; refreshAtt() }
+        }, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.TOP or Gravity.START).apply { leftMargin = dp(52) })
+        refreshAtt = {
+            val a = imgAtt
+            attRow.visibility = if (a == null) View.GONE else View.VISIBLE
+            if (a != null) attThumb.setImageBitmap(b64bitmap(a.second, 4))
+        }
+        val bottom = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        bottom.addView(attRow, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
+        bottom.addView(bar, LinearLayout.LayoutParams(-1, -2))
+        root.addView(bottom, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { leftMargin = dp(16); rightMargin = dp(16); bottomMargin = dp(18) })
+
+        // photo wali template par: "Choose photo / Take photo"
+        fun askPhoto(tpl: Tpl) {
+            val d = android.app.Dialog(this)
+            d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+            val col = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(26), dp(26), dp(26), dp(18))
+                background = GradientDrawable().apply { cornerRadius = dp(30).toFloat(); setColor(Color.parseColor("#1E1E1E")) }
+            }
+            col.addView(TextView(this).apply { text = tpl.name; textSize = 25f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+            col.addView(TextView(this).apply { text = "Choose how you’d like to add a photo."; textSize = 17f; setTextColor(Color.parseColor("#C8CCD6")); setPadding(0, dp(8), 0, dp(18)) })
+            fun pill(label: String, go: () -> Unit) {
+                col.addView(TextView(this).apply {
+                    text = label; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+                    setTextColor(Color.BLACK)
+                    background = GradientDrawable().apply { cornerRadius = dp(30).toFloat(); setColor(Color.WHITE) }
+                    setOnClickListener { go() }
+                }, LinearLayout.LayoutParams(-1, dp(54)).apply { bottomMargin = dp(12) })
+            }
+            val got: (Pair<String, String>) -> Unit = { a ->
+                imgAtt = a
+                refreshAtt()
+                et.setText(tpl.prompt)
+                et.setSelection(et.text.length)
+            }
+            pill("Choose photo") { d.dismiss(); imgAttCb = got; pick(101) }
+            pill("Take photo") { d.dismiss(); imgAttCb = got; camera() }
+            col.addView(TextView(this).apply {
+                text = "Cancel"; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                setOnClickListener { d.dismiss() }
+            }, LinearLayout.LayoutParams(-1, dp(48)))
+            d.setContentView(col)
+            d.window?.apply {
+                setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+                setLayout((resources.displayMetrics.widthPixels * 0.88f).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
+            }
+            d.show()
+        }
 
         val thumbDir = java.io.File(filesDir, "thumbs").also { it.mkdirs() }
         val thumbPool = java.util.concurrent.Executors.newSingleThreadExecutor()
-        dlg.setOnDismissListener { thumbPool.shutdownNow() }
+        dlg.setOnDismissListener { thumbPool.shutdownNow(); imgAttCb = null }
         fun loadThumb(prompt: String, target: android.widget.ImageView) {
-            val f = java.io.File(thumbDir, "t" + prompt.hashCode() + ".jpg")
+            val f = java.io.File(thumbDir, "p" + prompt.hashCode() + ".jpg")
             fun show() {
                 val bm = try { android.graphics.BitmapFactory.decodeFile(f.path) } catch (e: Exception) { null }
-                if (bm != null) runOnUiThread { target.setImageBitmap(bm) }
+                if (bm != null) {
+                    // neeche ka chhota watermark kaat do
+                    val c = try { android.graphics.Bitmap.createBitmap(bm, 0, 0, bm.width, (bm.height * 0.92f).toInt()) } catch (e: Exception) { bm }
+                    runOnUiThread { target.setImageBitmap(c) }
+                }
             }
             if (f.exists() && f.length() > 2000) { show(); return }
             try {
                 thumbPool.execute {
-                    try {
-                        val u = "https://image.pollinations.ai/prompt/" + java.net.URLEncoder.encode(prompt.take(220), "UTF-8") + "?width=384&height=384&nologo=true&seed=7"
-                        val c = java.net.URL(u).openConnection() as java.net.HttpURLConnection
-                        c.connectTimeout = 10000
-                        c.readTimeout = 60000
-                        if (c.responseCode == 200) {
-                            val b = c.inputStream.readBytes()
-                            if (b.size > 2000) { f.writeBytes(b); show() }
-                        }
-                    } catch (e: Exception) { }
+                    for (attempt in 0..2) {
+                        try {
+                            val u = "https://image.pollinations.ai/prompt/" + java.net.URLEncoder.encode(prompt.take(260), "UTF-8") + "?width=512&height=640&nologo=true&seed=7"
+                            val c = java.net.URL(u).openConnection() as java.net.HttpURLConnection
+                            c.connectTimeout = 10000
+                            c.readTimeout = 70000
+                            if (c.responseCode == 200) {
+                                val b = c.inputStream.readBytes()
+                                if (b.size > 2000) { f.writeBytes(b); show(); break }
+                            }
+                        } catch (e: Exception) { }
+                        try { Thread.sleep(4000) } catch (e: InterruptedException) { break }
+                    }
                 }
             } catch (e: Exception) { }
         }
@@ -1192,101 +1549,181 @@ class MainActivity : Activity() {
             v.show()
         }
 
+        fun saveToGallery(f: java.io.File) {
+            try {
+                val cv = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, f.name)
+                    put(android.provider.MediaStore.Images.Media.MIME_TYPE, if (f.name.endsWith("png")) "image/png" else "image/jpeg")
+                    if (Build.VERSION.SDK_INT >= 29) put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/AI Assistant")
+                }
+                val u = contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)
+                if (u != null) contentResolver.openOutputStream(u)?.use { it.write(f.readBytes()) }
+                Toast.makeText(this, "Saved to gallery", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) { Toast.makeText(this, "Could not save", Toast.LENGTH_SHORT).show() }
+        }
+
+        fun roundOutline(iv: View, r: Int) {
+            iv.clipToOutline = true
+            iv.outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(v: View, ol: android.graphics.Outline) { ol.setRoundRect(0, 0, v.width, v.height, dp(r).toFloat()) }
+            }
+        }
+
         render = {
             content.removeAllViews()
-            val tabs = LinearLayout(this)
-            fun tabV(i: Int, name: String): TextView = TextView(this).apply {
-                text = name
-                textSize = 16f
-                setTextColor(if (tab == i) Color.WHITE else Color.parseColor("#9AA3B5"))
-                setPadding(dp(16), dp(10), dp(16), dp(10))
-                background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setColor(if (tab == i) Color.parseColor("#3A3A3A") else Color.TRANSPARENT) }
-                setOnClickListener { tab = i; render() }
-            }
-            tabs.addView(tabV(0, "Trending"))
-            tabs.addView(tabV(1, "Templates"), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
-            tabs.addView(tabV(2, "My images"), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
-            content.addView(tabs, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(16) })
-
-            val list = if (tab == 0) trending else templates
-            var i = 0
-            while (tab < 2 && i < list.size) {
-                val row = LinearLayout(this)
-                for (j in 0..1) {
-                    val idx = i + j
-                    if (idx < list.size) {
-                        val (c1, c2) = palette[idx % palette.size]
-                        val card = FrameLayout(this)
-                        card.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(c1), Color.parseColor(c2))).apply { cornerRadius = dp(24).toFloat() }
-                        card.clipToOutline = true
-                        card.outlineProvider = object : android.view.ViewOutlineProvider() {
-                            override fun getOutline(v: View, ol: android.graphics.Outline) { ol.setRoundRect(0, 0, v.width, v.height, dp(24).toFloat()) }
-                        }
-                        val pic = android.widget.ImageView(this)
-                        pic.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                        card.addView(pic, FrameLayout.LayoutParams(-1, -1))
-                        loadThumb(list[idx].second, pic)
-                        card.addView(View(this).apply {
-                            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.TRANSPARENT, Color.parseColor("#B3000000")))
-                        }, FrameLayout.LayoutParams(-1, dp(70), Gravity.BOTTOM))
-                        card.addView(TextView(this).apply {
-                            text = list[idx].first
-                            textSize = 17f
-                            setTextColor(Color.WHITE)
-                            typeface = Typeface.DEFAULT_BOLD
-                            setPadding(dp(16), dp(14), dp(16), dp(14))
-                        }, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
-                        card.setOnClickListener {
-                            et.setText(list[idx].second)
-                            et.setSelection(et.text.length)
-                            et.requestFocus()
-                            (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(et, 0)
-                        }
-                        row.addView(card, LinearLayout.LayoutParams(0, dp(170), 1f).apply { setMargins(dp(5), dp(5), dp(5), dp(5)) })
-                    } else row.addView(View(this), LinearLayout.LayoutParams(0, dp(170), 1f))
+            if (tab != 3) {
+                val tabs = LinearLayout(this)
+                fun tabV(i: Int, name: String): TextView = TextView(this).apply {
+                    text = name
+                    textSize = 16f
+                    setTextColor(if (tab == i) Color.WHITE else Color.parseColor("#9AA3B5"))
+                    setPadding(dp(16), dp(10), dp(16), dp(10))
+                    background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setColor(if (tab == i) Color.parseColor("#3A3A3A") else Color.TRANSPARENT) }
+                    setOnClickListener { tab = i; render() }
                 }
-                content.addView(row)
-                i += 2
+                tabs.addView(tabV(0, "Trending"))
+                tabs.addView(tabV(1, "Templates"), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
+                tabs.addView(tabV(2, "My images"), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
+                content.addView(tabs, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(16) })
+            }
+
+            if (tab == 0 || tab == 1) {
+                val list = if (tab == 0) trending else templates
+                var i = 0
+                while (i < list.size) {
+                    val row = LinearLayout(this)
+                    for (j in 0..1) {
+                        val idx = i + j
+                        if (idx < list.size) {
+                            val tpl = list[idx]
+                            val (c1, c2) = palette[idx % palette.size]
+                            val card = FrameLayout(this)
+                            card.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(c1), Color.parseColor(c2))).apply { cornerRadius = dp(24).toFloat() }
+                            roundOutline(card, 24)
+                            val pic = android.widget.ImageView(this)
+                            pic.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                            card.addView(pic, FrameLayout.LayoutParams(-1, -1))
+                            loadThumb(tpl.thumb, pic)
+                            card.addView(View(this).apply {
+                                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.TRANSPARENT, Color.parseColor("#B3000000")))
+                            }, FrameLayout.LayoutParams(-1, dp(70), Gravity.BOTTOM))
+                            card.addView(TextView(this).apply {
+                                text = tpl.name
+                                textSize = 17f
+                                setTextColor(Color.WHITE)
+                                typeface = Typeface.DEFAULT_BOLD
+                                setPadding(dp(16), dp(14), dp(16), dp(14))
+                            }, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
+                            card.setOnClickListener {
+                                if (tpl.photo) askPhoto(tpl)
+                                else {
+                                    imgAtt = null
+                                    refreshAtt()
+                                    et.setText(tpl.prompt)
+                                    et.setSelection(et.text.length)
+                                    et.requestFocus()
+                                }
+                            }
+                            row.addView(card, LinearLayout.LayoutParams(0, dp(205), 1f).apply { setMargins(dp(5), dp(5), dp(5), dp(5)) })
+                        } else row.addView(View(this), LinearLayout.LayoutParams(0, dp(205), 1f))
+                    }
+                    content.addView(row)
+                    i += 2
+                }
+            }
+
+            if (tab == 3) {
+                val sw = resources.displayMetrics.widthPixels - dp(32)
+                for (t in turns) {
+                    val ph = t.photo?.let { b64bitmap(it, 2) }
+                    if (ph != null) {
+                        val iv = android.widget.ImageView(this)
+                        iv.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                        iv.setImageBitmap(ph)
+                        roundOutline(iv, 22)
+                        content.addView(iv, LinearLayout.LayoutParams((sw * 0.66f).toInt(), (sw * 0.66f * 0.9f).toInt()).apply { gravity = Gravity.END; bottomMargin = dp(8) })
+                    }
+                    content.addView(TextView(this).apply {
+                        text = t.prompt; textSize = 16f; setTextColor(Color.WHITE); setLineSpacing(0f, 1.2f)
+                        setPadding(dp(18), dp(14), dp(18), dp(14))
+                        background = GradientDrawable().apply { cornerRadius = dp(26).toFloat(); setColor(Color.parseColor("#10106A")) }
+                    }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.END; leftMargin = dp(48); bottomMargin = dp(18) })
+                    val f = t.file
+                    if (t.busy) {
+                        content.addView(TextView(this).apply { text = "Creating image..."; textSize = 16f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(dp(4), dp(8), 0, dp(24)) })
+                    } else if (f != null) {
+                        val iv = android.widget.ImageView(this)
+                        iv.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                        iv.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }))
+                        roundOutline(iv, 24)
+                        iv.setOnClickListener { viewer(f) }
+                        content.addView(iv, LinearLayout.LayoutParams(sw, sw).apply { bottomMargin = dp(10) })
+                        content.addView(TextView(this).apply {
+                            text = "Created successfully"; textSize = 14f; setTextColor(Color.parseColor("#2FD06B"))
+                            setPadding(dp(14), dp(6), dp(14), dp(6))
+                            background = GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(Color.parseColor("#123B22")) }
+                        }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(12) })
+                        content.addView(TextView(this).apply { text = "Your image is ready."; textSize = 17f; setTextColor(Color.WHITE) })
+                        val acts = LinearLayout(this)
+                        val more = icon(9, 44) { }
+                        more.setOnClickListener {
+                            val pm = android.widget.PopupMenu(this, more)
+                            pm.menu.add("Retry"); pm.menu.add("Save to gallery"); pm.menu.add("Delete")
+                            pm.setOnMenuItemClickListener { mi ->
+                                when (mi.title.toString()) {
+                                    "Retry" -> { if (!busyImg) run(t) }
+                                    "Save to gallery" -> saveToGallery(f)
+                                    else -> android.app.AlertDialog.Builder(this)
+                                        .setTitle("Delete this image?")
+                                        .setPositiveButton("Delete") { _, _ -> f.delete(); turns.remove(t); if (turns.isEmpty()) tab = 0; render() }
+                                        .setNegativeButton("Cancel", null).show()
+                                }
+                                true
+                            }
+                            pm.show()
+                        }
+                        acts.addView(more)
+                        content.addView(acts, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = -dp(10); bottomMargin = dp(20) })
+                    } else if (t.err != null) {
+                        content.addView(TextView(this).apply { text = t.err; textSize = 15f; setTextColor(Color.parseColor("#FF8A8A")) })
+                        content.addView(TextView(this).apply {
+                            text = "Retry"; textSize = 15f; setTextColor(Color.WHITE)
+                            setPadding(dp(18), dp(8), dp(18), dp(8))
+                            background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+                            setOnClickListener { if (!busyImg) run(t) }
+                        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8); bottomMargin = dp(20) })
+                    }
+                }
             }
 
             if (tab == 2) {
-            if (busyImg) content.addView(TextView(this).apply {
-                text = "Image ban rahi hai..."
-                textSize = 15f
-                setTextColor(Color.parseColor("#9AA3B5"))
-                setPadding(dp(4), 0, 0, dp(10))
-            })
-            val files = (genDir.listFiles() ?: emptyArray()).filter { it.isFile }.sortedByDescending { it.lastModified() }.take(60)
-            if (files.isEmpty() && !busyImg) {
-                content.addView(TextView(this).apply {
-                    text = "Abhi koi image nahi hai. Neeche likhkar banao."
-                    textSize = 15f
-                    setTextColor(Color.parseColor("#9AA3B5"))
-                })
-            }
-            val side = (resources.displayMetrics.widthPixels - dp(32) - dp(12)) / 3
-            var k = 0
-            while (k < files.size) {
-                val row = LinearLayout(this)
-                for (j in 0..2) {
-                    val idx = k + j
-                    if (idx < files.size) {
-                        val f = files[idx]
-                        val o = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
-                        val iv = android.widget.ImageView(this)
-                        iv.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                        iv.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.path, o))
-                        iv.clipToOutline = true
-                        iv.outlineProvider = object : android.view.ViewOutlineProvider() {
-                            override fun getOutline(v: View, ol: android.graphics.Outline) { ol.setRoundRect(0, 0, v.width, v.height, dp(14).toFloat()) }
-                        }
-                        iv.setOnClickListener { viewer(f) }
-                        row.addView(iv, LinearLayout.LayoutParams(side, side).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
-                    }
+                val files = (genDir.listFiles() ?: emptyArray()).filter { it.isFile }.sortedByDescending { it.lastModified() }.take(60)
+                if (files.isEmpty()) {
+                    content.addView(TextView(this).apply {
+                        text = "No images yet. Describe one below."
+                        textSize = 15f
+                        setTextColor(Color.parseColor("#9AA3B5"))
+                    })
                 }
-                content.addView(row)
-                k += 3
-            }
+                val side = (resources.displayMetrics.widthPixels - dp(32) - dp(12)) / 3
+                var k = 0
+                while (k < files.size) {
+                    val row = LinearLayout(this)
+                    for (j in 0..2) {
+                        val idx = k + j
+                        if (idx < files.size) {
+                            val f = files[idx]
+                            val iv = android.widget.ImageView(this)
+                            iv.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                            iv.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }))
+                            roundOutline(iv, 14)
+                            iv.setOnClickListener { viewer(f) }
+                            row.addView(iv, LinearLayout.LayoutParams(side, side).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
+                        }
+                    }
+                    content.addView(row)
+                    k += 3
+                }
             }
         }
         render()
