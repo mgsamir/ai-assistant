@@ -57,7 +57,7 @@ ALWAYS write every reply as exactly two lines:
 S: the reply in Hinglish, meaning Hindi written in English (Roman) letters, for the screen
 V: the same reply in Hindi Devanagari script, for the voice
 If the user speaks English, write both lines in English.
-Never use markdown, asterisks, hashes or emojis.
+The S: reply may run over several lines. For information questions, how-to questions and explanations format S: clean and line by line: first a short heading line ending with a colon, then a blank line, then the points one per line as 1. 2. 3. (or short lines starting with "- "), each point one short simple sentence, with a blank line between sections and one short closing line. Never one big paragraph. The V: reply stays one single spoken paragraph. Never use markdown symbols like asterisks or hashes, and no emojis.
 When the user asks for a phone action (call, alarm, timer, open app, close app, message, torch, settings), do not just talk: use the provided functions.
 When the user says to stop or quit the assistant (for example "band ho ja", "stop assistant", "bas ab chup"), call stop_assistant.
 For weather ALWAYS use the get_weather function, even for small places, villages and islands (like Little Andaman, Hut Bay, Diglipur). Never say weather information is unavailable. Write the place name in English. If the user's city is in the remembered facts use it, otherwise ask.
@@ -724,7 +724,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         val tag = Regex("^([SV])\\s*:\\s*(.*)$")
         for (line in t.lines()) {
             val l = line.trim()
-            if (l.isEmpty()) continue
+            if (l.isEmpty()) { if (cur == 1 && !s.endsWith("\n")) s += "\n"; continue }
             val m = tag.find(l)
             if (m != null) {
                 if (m.groupValues[1] == "S") {
@@ -737,9 +737,10 @@ The user is an adult. Answer questions about the human body, sex education, repr
             } else if (cur == 2) {
                 v = (v + " " + l).trim()
             } else {
-                s = (s + " " + l).trim()
+                s = (s + "\n" + l).trim()
             }
         }
+        s = s.replace(Regex("\n{3,}"), "\n\n").trim()
         if (s.isEmpty() && v.isEmpty()) return Reply(t, t)
         if (s.isEmpty()) s = v
         if (v.isEmpty()) v = s
@@ -771,8 +772,12 @@ The user is an adult. Answer questions about the human body, sex education, repr
         }
     }
 
+    @Volatile var answeredBy = ""
+
     private fun deliver(r: Reply, q: String, save: Boolean) {
-        chat("\nAI: ${r.text}\n")
+        val who = answeredBy
+        answeredBy = ""
+        chat("\nAI: ${r.text}" + (if (who.isNotEmpty()) "\u2063$who" else "") + "\n")
         voiceFor[r.text] = r.voice
         
         if (save) {
@@ -811,14 +816,11 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 val pick0 = (if (codeQ) Models.sel(prefs, "coding") else null) ?: Models.sel(prefs, "chat")
                 val pick = if (pick0 != null && Usage.paidOnly(pick0)) null else pick0
                 var okModel = ""
-                fun note(who: String) {
-                    if (pick == null) return
-                    val nm = Models.list(prefs).firstOrNull { it.id == who }?.name ?: who
-                    main.post { android.widget.Toast.makeText(app, "${pick.name} nahi chala, $nm se jawab aaya", android.widget.Toast.LENGTH_LONG).show() }
-                }
+                fun nameOf(id: String) = Models.list(prefs).firstOrNull { it.id == id }?.name ?: id
                 if (pick != null && pick.prov != "gemini" && att == null) {
                     val txt = Providers.chatWith(pick.prov, pick.id, systemText(), history.takeLast(6), q)
                     if (txt != null) {
+                        answeredBy = pick.name
                         main.post { deliver(parseReply(txt), q, true) }
                         return@thread
                     }
@@ -870,11 +872,11 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         resp = ""
                     }
                 }
-                if (code == 200 && pick != null && okModel != pick.id) note(okModel)
+                if (code == 200) answeredBy = nameOf(okModel)
                 if (code != 200) {
                     val fb = Providers.fallback(systemText(), history.takeLast(6), q)
                     if (fb != null) {
-                        note("dusre model")
+                        answeredBy = nameOf(Providers.lastModel)
                         main.post { deliver(parseReply(fb), q, true) }
                         return@thread
                     }

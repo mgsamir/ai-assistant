@@ -66,6 +66,10 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawLine(4f, 8f, 20f, 8f, p); c.drawLine(4f, 16f, 20f, 16f, p)
                 c.drawCircle(15f, 8f, 2.2f, p); c.drawCircle(9f, 16f, 2.2f, p)
             }
+            25 -> {
+                c.drawArc(RectF(4f, 4f, 20f, 20f), -60f, 290f, false, p)
+                c.drawLine(17.5f, 2.5f, 17.5f, 7f, p); c.drawLine(17.5f, 7f, 13f, 7f, p)
+            }
             1 -> { c.drawLine(12f, 5f, 12f, 19f, p); c.drawLine(5f, 12f, 19f, 12f, p) }
             2, 12 -> {
                 c.drawRoundRect(RectF(9f, 3f, 15f, 14f), 3f, 3f, p)
@@ -228,8 +232,11 @@ class MainActivity : Activity() {
             if (::orbList.isInitialized) orbAdd(true, t.removePrefix("Tum:").trim())
         } else if (t.startsWith("AI:")) {
             removePending()
-            addAi(t.removePrefix("AI:").trim())
-            if (::orbList.isInitialized) orbAdd(false, t.removePrefix("AI:").trim())
+            val body = t.removePrefix("AI:").trim()
+            val who = body.substringAfterLast('\u2063', "")
+            val txt = body.substringBeforeLast('\u2063').trim()
+            addAi(txt, who)
+            if (::orbList.isInitialized) orbAdd(false, txt)
         }
     }
 
@@ -280,7 +287,11 @@ class MainActivity : Activity() {
     }
 
     // Meri baat: daayin taraf, gol bubble
+    private var lastUserText = ""
+    private var lastExtraViews: Pair<View, View>? = null
+
     private fun addUser(text: String) {
+        lastUserText = text
         val row = LinearLayout(this).apply { gravity = Gravity.END }
         val tv = TextView(this).apply {
             this.text = text
@@ -319,13 +330,15 @@ class MainActivity : Activity() {
     }
 
     // AI ka jawab: baayin taraf, bina bubble, neeche chhote buttons
-    private fun addAi(text: String) {
+    private fun addAi(text: String, who: String = "") {
+        lastExtraViews?.let { it.first.visibility = View.GONE; it.second.visibility = View.GONE }
+        lastExtraViews = null
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val tv = TextView(this).apply {
-            this.text = text
+            this.text = styled(text)
             textSize = 16.5f
             setTextColor(Color.parseColor("#E8EAF0"))
-            setLineSpacing(0f, 1.25f)
+            setLineSpacing(0f, 1.3f)
             setTextIsSelectable(true)
             isFocusable = false
             isFocusableInTouchMode = false
@@ -356,6 +369,13 @@ class MainActivity : Activity() {
             cm.setPrimaryClip(ClipData.newPlainText("AI", text))
             Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
         })
+        val regen = icon(25, 44) {
+            if (lastUserText.isNotEmpty()) {
+                if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
+                AssistantService.engine?.sendText(lastUserText, false, null)
+            }
+        }
+        acts.addView(regen, 2)
         acts.addView(icon(9, 44) { soon() })
         acts.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         acts.addView(icon(10, 44) { AssistantService.engine?.replay(text) })
@@ -364,11 +384,41 @@ class MainActivity : Activity() {
             leftMargin = -dp(10)
             rightMargin = dp(4)
         })
+        val foot = TextView(this).apply {
+            this.text = if (who.isNotEmpty()) "$who \u00B7 AI can make mistakes." else "AI can make mistakes."
+            textSize = 12.5f
+            setTextColor(Color.parseColor("#8A93A6"))
+        }
+        box.addView(foot, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(2); bottomMargin = dp(2) })
+        // sirf sabse nayi baat par: dobara jawab ka button aur neeche model ka naam
+        lastExtraViews = Pair(regen, foot)
         chatList.addView(box, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dp(8)
             bottomMargin = dp(6)
         })
         scrollDown()
+    }
+
+    // jawab ko saaf, line-by-line dikhao: heading mote akshar mein, 1. 2. 3. alag-alag line par
+    private fun styled(t: String): CharSequence {
+        val sb = android.text.SpannableStringBuilder()
+        val lines = t.split("\n")
+        for ((i, raw) in lines.withIndex()) {
+            val l = raw.trimEnd()
+            val st = sb.length
+            sb.append(l)
+            val head = l.isNotBlank() && l.endsWith(":") && l.length < 70 && !l.startsWith("-") && !l[0].isDigit()
+            if (head) {
+                sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), st, sb.length, 0)
+                sb.setSpan(android.text.style.RelativeSizeSpan(1.12f), st, sb.length, 0)
+            } else if (Regex("^(\\d+[.)]|-)\\s").containsMatchIn(l)) {
+                val n = l.indexOf(' ')
+                sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), st, st + n, 0)
+                sb.setSpan(android.text.style.LeadingMarginSpan.Standard(0, dp(22)), st, sb.length, 0)
+            }
+            if (i < lines.size - 1) sb.append("\n")
+        }
+        return sb
     }
 
     // Purani baat-cheet dobara dikhao (ऐप wapas kholne par)
@@ -378,7 +428,10 @@ class MainActivity : Activity() {
         for (part in log.split(Regex("\n(?=(?:Tum|AI): )"))) {
             val t = part.trim()
             if (t.startsWith("Tum:")) addUser(t.removePrefix("Tum:").trim())
-            else if (t.startsWith("AI:")) addAi(t.removePrefix("AI:").trim())
+            else if (t.startsWith("AI:")) {
+                val body = t.removePrefix("AI:").trim()
+                addAi(body.substringBeforeLast('\u2063').trim(), body.substringAfterLast('\u2063', ""))
+            }
         }
     }
 

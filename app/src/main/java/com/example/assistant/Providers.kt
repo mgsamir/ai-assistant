@@ -59,6 +59,7 @@ object Providers {
             if (prov == "groq") Usage.groqHeaders(model, c)
             val jo = JSONObject(c.inputStream.bufferedReader().readText())
             Usage.hit(prov, model, jo.optJSONObject("usage")?.optInt("total_tokens") ?: 0)
+            lastModel = model
             jo.optJSONArray("choices")?.optJSONObject(0)?.optJSONObject("message")?.optString("content")
         } catch (e: Exception) { null }
     }
@@ -75,6 +76,8 @@ object Providers {
     }
 
     // Gemini na chale to pehle Groq, phir OpenAI, phir OpenRouter
+    @Volatile var lastModel = ""
+
     fun fallback(system: String, hist: List<Pair<String, String>>, q: String): String? {
         chat("https://api.groq.com/openai/v1/chat/completions", Extra.groq,
             "llama-3.3-70b-versatile", system, hist, q)?.let { if (it.isNotBlank()) return it }
