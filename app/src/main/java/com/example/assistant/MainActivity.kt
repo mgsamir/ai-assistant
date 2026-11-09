@@ -1234,9 +1234,7 @@ class MainActivity : Activity() {
         dlg.show()
     }
 
-    private class Tpl(val name: String, val photo: Boolean, val thumb: String, val prompt: String)
-
-    private val trending = listOf(
+    private val builtinTrending = listOf(
         Tpl("Anime reaction GIF", true,
             "anime style girl with orange bob hair and heart shaped eyes, excited happy face, hands clasped, pink hearts and sparkles, cream background, clean cel shading",
             "Use my uploaded photo to create a high quality anime style reaction sticker of me. Keep my face shape, hairstyle, skin tone, glasses and clothing recognisable. Show an exaggerated joyful reaction: heart shaped eyes, a wide open smile and both hands pressed to my cheeks, with small sparkles and hearts floating around. Use clean confident line art, cel shading, a soft cream background and a thin white outline so it works as a chat reaction. No text, logos or watermarks."),
@@ -1274,7 +1272,7 @@ class MainActivity : Activity() {
             "fun cartoon caricature of a smiling man with a big head, books and a paint palette, bright blue background, bold outlines",
             "Use my uploaded photo to draw a fun, flattering caricature of me. Keep my recognisable features but exaggerate them playfully: a slightly bigger head, expressive eyes and a big smile. Surround me with items that suit my work or hobbies, such as books, a paint palette or headphones. Clean digital illustration, bold outlines, vibrant colours and a plain bright sky blue background. No text or watermarks.")
     )
-    private val templates = listOf(
+    private val builtinTemplates = listOf(
         Tpl("Poster", false,
             "modern poster, big red poppy flower, bold red title BLOOM, cream paper on terracotta background, editorial illustration",
             "Design a striking modern poster. One large red poppy with a thin dark green stem and leaves, in a graphic editorial illustration style, centred on a cream rectangle that sits on a warm terracotta background. A huge condensed red serif title 'BLOOM' at the top. Clean margins, balanced composition and subtle paper grain. Spell the text exactly."),
@@ -1312,6 +1310,8 @@ class MainActivity : Activity() {
             "music player app screen on a modern phone, colourful album art, play controls, soft gradient background",
             "A clean music player app screen on a modern phone, shown straight on against a soft gradient background: large colourful album art, track title and artist name, a progress bar, and play, next and previous controls. Rounded UI with tidy spacing and sample text in English.")
     )
+    private var trending: List<Tpl> = builtinTrending
+    private var templates: List<Tpl> = builtinTemplates
     private val palette = listOf(
         "#5B247A" to "#1BCEDF", "#B24592" to "#F15F79", "#0F2027" to "#2C5364", "#134E5E" to "#71B280",
         "#8E2DE2" to "#4A00E0", "#C33764" to "#1D2671", "#CC5333" to "#23074D", "#1F4037" to "#4CA58A"
@@ -1723,6 +1723,20 @@ class MainActivity : Activity() {
                     }
                     content.addView(row)
                     k += 3
+                }
+            }
+        }
+        // Gemini se roz apne aap nayi Trending / Templates (naya mile to yahin badal jaata hai)
+        val tsp = getSharedPreferences("p", Context.MODE_PRIVATE)
+        Trends.load(tsp)?.let { trending = it.first; templates = it.second }
+        if (Trends.due(tsp)) {
+            val tkey = Keys.get(tsp)
+            if (tkey.isNotEmpty()) kotlin.concurrent.thread {
+                val r = Trends.refresh(tkey, tsp)
+                if (r != null) runOnUiThread {
+                    trending = r.first
+                    templates = r.second
+                    if (dlg.isShowing && (tab == 0 || tab == 1)) render()
                 }
             }
         }
