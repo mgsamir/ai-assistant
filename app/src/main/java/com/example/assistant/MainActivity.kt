@@ -411,7 +411,7 @@ class MainActivity : Activity() {
         if (::orbInput.isInitialized) orbInput.hint = t
         if (!::chipRow.isInitialized) return
         chipRow.removeAllViews()
-        val label = when (pendMode) { "research" -> "Research"; "learn" -> "Learn"; "agent" -> "Agent"; "image" -> "Image"; else -> "" }
+        val label = when (pendMode) { "research" -> "Research"; "learn" -> "Learn"; "agent" -> "Agent"; "image" -> "Create image"; else -> "" }
         chipRow.visibility = if (label.isEmpty()) View.GONE else View.VISIBLE
         if (label.isNotEmpty()) {
             val c = LinearLayout(this).apply {
@@ -500,6 +500,7 @@ class MainActivity : Activity() {
             return r
         }
         val eng = AssistantService.engine
+        col.addView(item(17, "Create images", "Visualise and edit") { setMode("image") })
         col.addView(item(20, "Deep Research", "Get detailed reports") { setMode("research") })
         col.addView(item(20, "Agent", "Let the agent do multi-step work") { setMode("agent") })
         col.addView(item(21, "Guided Learning", "Get step-by-step help") { setMode("learn") })
