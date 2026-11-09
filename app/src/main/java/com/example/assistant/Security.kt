@@ -13,8 +13,8 @@ import android.os.Build
 import android.provider.Settings
 import java.io.File
 
-// Phone ki suraksha jaanch. Ye asli antivirus nahi hai: code ke andar nahi dekhta,
-// sirf shak wali nishaniyan pakadta hai (chhupa app, fake naam, accessibility, device admin, SMS/call ki ijazat...)
+// Phone ki suraksha jaanch. Ye asli antivirus nahi hai: virus ke pakke fingerprint nahi, sirf shak wali nishaniyan pakadta hai
+// (app ke code mein bhi, CodeScan.kt) (chhupa app, fake naam, accessibility, device admin, SMS/call ki ijazat...)
 object Security {
     class Finding(val score: Int, val label: String, val pkg: String, val reasons: List<String>)
 
@@ -101,6 +101,11 @@ object Security {
             }
         }
         if (SPY.any { low.contains(it) || pkg.lowercase().contains(it) }) { s += 5; why.add("Naam jasoosi (spy / tracking) app jaisa hai") }
+        // code ke andar jhaanko: bahar se aaye ya pehle se shak wale app ke liye
+        if (soft || pkg in acc || pkg in ad || pkg in nl) {
+            val cs = CodeScan.inspect(c, pkg, ai.sourceDir, perms, pi.lastUpdateTime, pkg in acc)
+            if (cs != null && cs.score > 0) { s += cs.score; why.addAll(cs.why) }
+        }
         if (why.isEmpty()) return null
         return Finding(s, label, pkg, why)
     }
@@ -112,6 +117,7 @@ object Security {
         val nl = enabledPkgs(c, "enabled_notification_listeners")
         val ad = admins(c)
         val out = ArrayList<Finding>()
+        CodeScan.deadline = System.currentTimeMillis() + 25000
         try {
             for (pi in pm.getInstalledPackages(PackageManager.GET_PERMISSIONS)) judge(c, pm, pi, acc, nl, ad)?.let { out.add(it) }
         } catch (e: Exception) { }
@@ -137,7 +143,7 @@ object Security {
             mid.take(6).forEach { sb.append("• ${it.label}: ${it.reasons.joinToString("; ")}\n") }
         }
         if (rooted()) sb.append("\nPhone ke system mein badlaav (root / test-keys) dikh raha hai, ye khatarnak ho sakta hai.\n")
-        sb.append("\nYe asli antivirus nahi hai. Sirf shak wali nishaniyan dekhta hai, code ke andar nahi jhaankta. ")
+        sb.append("\nYe asli antivirus nahi hai. Sirf shak wali nishaniyan dekhta hai (app ke code mein bhi), virus ka pakka fingerprint nahi milata. ")
         sb.append("Shak wala app tum jaante ho to rehne do. Nahi jaante to Settings > Apps mein jaakar hata do, aur Play Store > Play Protect > Scan bhi chalao. ")
         sb.append("Phone ka data dark web par bika ya nahi, ye koi app phone se nahi bata sakta.")
         return sb.toString().trim()
@@ -219,6 +225,7 @@ object Security {
         return try {
             val pm = c.packageManager
             val pi = pm.getPackageInfo(pkg, PackageManager.GET_PERMISSIONS)
+            CodeScan.deadline = System.currentTimeMillis() + 20000
             judge(c, pm, pi, enabledPkgs(c, "enabled_accessibility_services"), enabledPkgs(c, "enabled_notification_listeners"), admins(c))
                 ?.takeIf { it.score >= 3 }
         } catch (e: Exception) { null }
