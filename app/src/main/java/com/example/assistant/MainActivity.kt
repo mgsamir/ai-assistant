@@ -545,10 +545,18 @@ class MainActivity : Activity() {
         Toast.makeText(this, "New chat started from this message", Toast.LENGTH_SHORT).show()
     }
 
+    // poori screen wala pannaa: peechhe ka header jhalakna band
+    private fun fullDlg(): android.app.Dialog {
+        val d = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.BLACK))
+        d.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        return d
+    }
+
     private fun showChatHistory() {
         val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
         val arr = try { org.json.JSONArray(sp.getString("chats", "[]")) } catch (e: Exception) { org.json.JSONArray() }
-        val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val dlg = fullDlg()
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
         val top = FrameLayout(this)
         val back = icon(23, 40) { dlg.dismiss() }
@@ -1162,7 +1170,7 @@ class MainActivity : Activity() {
 
     // Security log: din ke hisaab se wo app jinpar shak hua tha, aur sunne ke liye speaker
     private fun showSecurityLog() {
-        val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val dlg = fullDlg()
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
         val content = LinearLayout(this)
@@ -1326,7 +1334,7 @@ class MainActivity : Activity() {
     private var imgAttCb: ((Pair<String, String>) -> Unit)? = null
 
     private fun showImages() {
-        val dlg = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val dlg = fullDlg()
         dlg.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         dlg.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.BLACK))
         dlg.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -1517,7 +1525,7 @@ class MainActivity : Activity() {
         }
 
         fun viewer(f: java.io.File) {
-            val v = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+            val v = fullDlg()
             val iv = android.widget.ImageView(this)
             iv.setBackgroundColor(Color.BLACK)
             iv.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
