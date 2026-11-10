@@ -106,6 +106,16 @@ object Security {
             val cs = CodeScan.inspect(c, pkg, ai.sourceDir, perms, pi.lastUpdateTime, pkg in acc)
             if (cs != null && cs.score > 0) { s += cs.score; why.addAll(cs.why) }
         }
+        // VirusTotal: kya ye file pehle se virus ke roop mein jaani jaati hai (sirf bahar se aaye app)
+        if (soft) {
+            val vt = VtScan.cached(c, pkg, pi.lastUpdateTime)
+            if (vt == null) VtScan.enqueue(c, pkg, ai.sourceDir, pi.lastUpdateTime, label)
+            else if (vt.mal >= 5) {
+                s += 8; why.add("VirusTotal par ${vt.mal} antivirus ise virus bata rahe hain" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+            } else if (vt.mal >= 1) {
+                s += 3; why.add("VirusTotal par ${vt.mal} antivirus ne ise shak mein daala hai" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+            } else if (vt.susp >= 3) { s += 2; why.add("VirusTotal par kuch antivirus ise shak wala maan rahe hain") }
+        }
         if (why.isEmpty()) return null
         return Finding(s, label, pkg, why)
     }
