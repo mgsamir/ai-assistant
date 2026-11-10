@@ -107,11 +107,11 @@ object Security {
             val vt = VtScan.cached(c, pkg, pi.lastUpdateTime)
             if (vt == null) VtScan.enqueue(c, pkg, ai.sourceDir, pi.lastUpdateTime, label)
             else if (vt.mal >= 5) {
-                s += 8; why.add("Virus: ${vt.mal} antivirus ne pakda" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+                s += 8; why.add("Virus: ${vt.mal} antivirus" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
             } else if (vt.mal >= 3) {
-                s += 4; why.add("Harmful: ${vt.mal} antivirus ne pakda" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+                s += 4; why.add("Harmful: ${vt.mal} antivirus" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
             } else if (vt.mal >= 1) {
-                s += 1; why.add("${vt.mal} antivirus ko shak" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+                s += 1; why.add("Shak: ${vt.mal} antivirus" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
             }
         }
         if (why.isEmpty()) return null
@@ -193,13 +193,13 @@ object Security {
 
     // App khulte hi apne aap jaanch: sirf tab bolta hai jab kuch shak wala mile
     // (zyada shak wale har baar, thode shak wale sirf pehli baar jab dikhe, ya naye aaye app)
-    fun autoCheck(c: Context, p: android.content.SharedPreferences): String? {
+    fun autoCheck(c: Context, p: android.content.SharedPreferences): List<Finding>? {
         if (!p.getBoolean("sec_v2", false)) {
             p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putBoolean("sec_v2", true).apply()
         }
-        if (p.getInt("sec_ver", 0) < 4) {
+        if (p.getInt("sec_ver", 0) < 5) {
             // purani galat chetavniyan saaf
-            p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putInt("sec_ver", 4).apply()
+            p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putInt("sec_ver", 5).apply()
         }
         val f = scan(c)
         val pm = c.packageManager
@@ -214,13 +214,7 @@ object Security {
         if (show.isEmpty()) return null
         p.edit().putStringSet("sec_seen", seen + show.map { it.pkg }).apply()
         addLog(p, show, fresh)
-        val sb = StringBuilder()
-        for (x in show.take(6)) {
-            val tag = if (x.pkg in fresh) "Naya app: " else ""
-            sb.append("• ${x.label} — $tag${x.reasons.joinToString(", ")}\n")
-        }
-        if (rooted()) sb.append("• Phone ke system mein badlaav (root / test-keys) dikh raha hai.\n\n")
-        return sb.toString().trim()
+        return show.take(6)
     }
 
     // naya app install hua: turant jaanch, shak ho to notification
