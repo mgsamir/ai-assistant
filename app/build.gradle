@@ -39,8 +39,11 @@ android {
     }
 
     kotlinOptions { jvmTarget = '17' }
+
+    packaging { resources { excludes += ['META-INF/*', 'META-INF/**'] } }
 }
 
 dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'org.smali:baksmali:2.5.2'
 }

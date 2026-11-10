@@ -1334,22 +1334,24 @@ class MainActivity : Activity() {
             if (s == null) {
                 body.addView(TextView(this).apply { text = "Khul raha hai..."; setTextColor(Color.parseColor("#8B949E")); textSize = 14f })
             } else if (v != null) {
+                var full = ""
                 val tv = TextView(this).apply {
                     text = "Padh raha hu..."; textSize = 11.5f; setTextColor(Color.parseColor("#D0D0D6")); typeface = Typeface.MONOSPACE; setTextIsSelectable(true)
                 }
                 val bar = LinearLayout(this)
                 bar.addView(pill("Copy") {
                     val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("code", tv.text)); toast("Copy ho gaya")
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("code", full.ifEmpty { tv.text.toString() })); toast("Copy ho gaya")
                 }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(8) })
                 bar.addView(pill("Save") {
-                    val txt = tv.text.toString(); val nm = v.replace('/', '_') + ".txt"
+                    val txt = full.ifEmpty { tv.text.toString() }; val nm = v.replace('/', '_') + ".txt"
                     Thread { try { toast("Save hua: " + ApkSource.saveToDownloads(this, nm, "text/plain") { it.write(txt.toByteArray()) }) } catch (e: Exception) { toast("Save nahi hua: ${e.message}") } }.start()
                 })
                 body.addView(bar, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(10) })
                 body.addView(tv)
                 Thread {
                     var r = try { s.read(v) } catch (e: Throwable) { "Padh nahi paya: ${e.message}" }
+                    full = r
                     if (r.length > 200_000) r = r.take(200_000) + "\n...(aage ka chhota kiya, Save mein poora milega)"
                     runOnUiThread { tv.text = r }
                 }.start()

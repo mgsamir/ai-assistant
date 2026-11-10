@@ -12,6 +12,11 @@ import java.nio.ByteOrder
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
+import org.jf.baksmali.Adaptors.ClassDefinition
+import org.jf.baksmali.BaksmaliOptions
+import org.jf.dexlib2.Opcodes
+import org.jf.dexlib2.dexbacked.DexBackedDexFile
+import org.jf.util.IndentingWriter
 
 // APK ke andar ki files aur code ko GitHub jaise folder / file mein dikhata hai.
 // Dhyan: APK mein Java source nahi hota, sirf compile kiya hua code (dex). Isliye class ka dhancha (naam, fields, methods) dikhta hai.
@@ -169,6 +174,22 @@ class ApkSource(private val apk: String) {
         }
     } catch (e: Throwable) { null }
 
+    private val smaliDex = HashMap<String, Pair<DexBackedDexFile, Map<String, org.jf.dexlib2.iface.ClassDef>>>()
+    // asli smali lines (baksmali se); na bane to None
+    private fun smali(dexName: String, cls: String): String? = try {
+        val p = smaliDex.getOrPut(dexName) {
+            val bytes = ZipFile(apk).use { z -> z.getInputStream(z.getEntry(dexName)).use { it.readBytes() } }
+            val f = DexBackedDexFile(Opcodes.getDefault(), bytes)
+            f to f.classes.associateBy { it.type }
+        }
+        val cd = p.second["L$cls;"]
+        if (cd == null) null else {
+            val sw = java.io.StringWriter()
+            ClassDefinition(BaksmliOptions(), cd).writeTo(IndentingWriter(sw))
+            sw.toString()
+        }
+    } catch (e: Throwable) { null }
+
     private fun classes(name: String): List<Pair<String, Int>> = dexClasses.getOrPut(name) {
         val d = dex(name) ?: return@getOrPut emptyList()
         (0 until d.clsN).map { d.className(it).replace('.', '/') to it }.sortedBy { it.first }
@@ -206,7 +227,7 @@ class ApkSource(private val apk: String) {
             val d = dex(seg[0]) ?: return "Dex padh nahi paya"
             val want = seg.drop(1).joinToString("/")
             val c = classes(seg[0]).firstOrNull { it.first == want } ?: return "Class nahi mili"
-            return d.describe(c.second)
+            return smali(seg[0], want) ?: ("(smali nahi ban paya, sirf dhancha)\n\n" + d.describe(c.second))
         }
         return try {
             ZipFile(apk).use { z ->
