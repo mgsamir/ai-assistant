@@ -77,7 +77,18 @@ object VtScan {
                 200 -> {
                     val a = JSONObject(c.inputStream.bufferedReader().readText()).getJSONObject("data").getJSONObject("attributes")
                     val st = a.optJSONObject("last_analysis_stats")
-                    val label = a.optJSONObject("popular_threat_classification")?.optString("suggested_threat_label", "") ?: ""
+                    val cls = a.optJSONObject("popular_threat_classification")?.optString("suggested_threat_label", "") ?: ""
+                    // kin antivirus ne kya naam diya: top 3 alag naam
+                    val names = LinkedHashSet<String>()
+                    val lr = a.optJSONObject("last_analysis_results")
+                    if (lr != null) {
+                        val ks = lr.keys()
+                        while (ks.hasNext() && names.size < 3) {
+                            val o = lr.optJSONObject(ks.next()) ?: continue
+                            if (o.optString("category") == "malicious") o.optString("result").takeIf { x -> x.isNotBlank() && x != "null" }?.let { x -> names.add(x) }
+                        }
+                    }
+                    val label = (listOf(cls) + names).filter { it.isNotBlank() }.joinToString(", ").replace("|", "/").replace("§", "/")
                     R(st?.optInt("malicious") ?: 0, st?.optInt("suspicious") ?: 0, true, label)
                 }
                 404 -> R(0, 0, false, "")          // VirusTotal ne ye file kabhi dekhi nahi

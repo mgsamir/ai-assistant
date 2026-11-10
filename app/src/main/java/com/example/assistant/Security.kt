@@ -84,13 +84,9 @@ object Security {
         val perms = (pi.requestedPermissions ?: emptyArray()).map { it.substringAfterLast('.') }
         val sms = "READ_SMS" in perms || "RECEIVE_SMS" in perms
         val sens = SENS.count { it in perms }
-        val risky = sms || sens >= 2 || pkg in acc || pkg in ad || pkg in nl
-        if (soft) {
-            s += 1; why.add("Play Store ke bahar se aaya (file se install)")
-            if (!hasLauncher(pm, pkg) && risky) { s += 3; why.add("Icon chhupa hua hai, app list mein nahi dikhta") }
-            if (sms) { s += 2; why.add("SMS padhne ki ijazat (OTP chura sakta hai)") }
-            if (sens >= 4) { s += 2; why.add("Bahut saari nijee ijazatein maangta hai ($sens)") }
-        } else if (trusted && sms) { s += 1; why.add("SMS padhne ki ijazat (OTP chura sakta hai)") }
+        val risky = pkg in acc || pkg in ad || pkg in nl
+        // sirf asli khatre ginte hain: aam baatein (Play Store ke bahar se aana, bahut ijazatein, SMS ki ijazat) ab warning nahi banati
+        if (soft && !hasLauncher(pm, pkg) && risky) { s += 3; why.add("Icon chhupa hua hai, app list mein nahi dikhta") }
         if (pkg in acc) { s += 4; why.add("Accessibility chalu hai, ye screen padh sakta hai aur khud tap kar sakta hai") }
         if (pkg in ad) { s += 4; why.add("Device admin bana hua hai, hatana mushkil kar sakta hai") }
         if (pkg in nl) { s += 2; why.add("Tumhare saare notification (OTP bhi) padh sakta hai") }
@@ -111,10 +107,12 @@ object Security {
             val vt = VtScan.cached(c, pkg, pi.lastUpdateTime)
             if (vt == null) VtScan.enqueue(c, pkg, ai.sourceDir, pi.lastUpdateTime, label)
             else if (vt.mal >= 5) {
-                s += 8; why.add("VirusTotal par ${vt.mal} antivirus ise virus bata rahe hain" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+                s += 8; why.add("Virus mila: ${vt.mal} antivirus ise virus bata rahe hain" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+            } else if (vt.mal >= 3) {
+                s += 4; why.add("Harmful nishaan: ${vt.mal} antivirus ise khatarnak bata rahe hain" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
             } else if (vt.mal >= 1) {
-                s += 3; why.add("VirusTotal par ${vt.mal} antivirus ne ise shak mein daala hai" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
-            } else if (vt.susp >= 3) { s += 2; why.add("VirusTotal par kuch antivirus ise shak wala maan rahe hain") }
+                s += 1; why.add("${vt.mal} antivirus ne ise shak mein daala hai" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+            }
         }
         if (why.isEmpty()) return null
         return Finding(s, label, pkg, why)
@@ -153,9 +151,6 @@ object Security {
             mid.take(6).forEach { sb.append("• ${it.label}: ${it.reasons.joinToString("; ")}\n") }
         }
         if (rooted()) sb.append("\nPhone ke system mein badlaav (root / test-keys) dikh raha hai, ye khatarnak ho sakta hai.\n")
-        sb.append("\nYe asli antivirus nahi hai. Sirf shak wali nishaniyan dekhta hai (app ke code mein bhi), virus ka pakka fingerprint nahi milata. ")
-        sb.append("Shak wala app tum jaante ho to rehne do. Nahi jaante to Settings > Apps mein jaakar hata do, aur Play Store > Play Protect > Scan bhi chalao. ")
-        sb.append("Phone ka data dark web par bika ya nahi, ye koi app phone se nahi bata sakta.")
         return sb.toString().trim()
     }
 
@@ -163,7 +158,7 @@ object Security {
     class Entry(val t: Long, val pkg: String, val label: String, val score: Int, val fresh: Boolean, val text: String)
 
     private fun spoken(f: Finding): String =
-        "${f.label} par shak hai. " + f.reasons.joinToString(". ") + ". Jaante ho to rehne do, nahi jaante to Settings se hata do."
+        "${f.label}: " + f.reasons.joinToString(". ") + "."
 
     fun addLog(p: android.content.SharedPreferences, list: List<Finding>, fresh: Set<String>) {
         if (list.isEmpty()) return
@@ -225,8 +220,7 @@ object Security {
             sb.append("• ${x.label}: $tag${x.reasons.joinToString("; ")}\n\n")
         }
         if (rooted()) sb.append("• Phone ke system mein badlaav (root / test-keys) dikh raha hai.\n\n")
-        sb.append("Ye asli antivirus nahi hai, sirf shak ki nishaniyan hain. Jaante ho to rehne do, nahi jaante to Settings > Apps se hata do.")
-        return sb.toString()
+        return sb.toString().trim()
     }
 
     // naya app install hua: turant jaanch, shak ho to notification
