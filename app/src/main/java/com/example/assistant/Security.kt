@@ -197,9 +197,9 @@ object Security {
         if (!p.getBoolean("sec_v2", false)) {
             p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putBoolean("sec_v2", true).apply()
         }
-        if (p.getInt("sec_ver", 0) < 2) {
+        if (p.getInt("sec_ver", 0) < 3) {
             // purani galat chetavniyan saaf
-            p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putInt("sec_ver", 2).apply()
+            p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putInt("sec_ver", 3).apply()
         }
         val f = scan(c)
         val pm = c.packageManager
