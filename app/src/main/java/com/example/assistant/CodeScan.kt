@@ -25,7 +25,7 @@ object CodeScan {
     fun inspect(c: Context, pkg: String, apk: String?, perms: List<String>, update: Long, accOn: Boolean): R? {
         if (apk == null) return null
         val sp = c.getSharedPreferences("p", Context.MODE_PRIVATE)
-        val key = "cs_$pkg"
+        val key = "cs2_$pkg"
         val old = sp.getString(key, null)
         if (old != null && old.startsWith("$update|")) return parse(old)
         if (System.currentTimeMillis() > deadline) return null   // is baar waqt khatam, agli baar
@@ -60,26 +60,36 @@ object CodeScan {
                     if (has("MediaProjection") && has("ImageReader")) flags.add("screen")
                     if (has("TYPE_VIEW_TEXT_CHANGED") && has("onAccessibilityEvent")) flags.add("keylog")
                     if (has("wipeData") || has("lockNow")) flags.add("admin")
+                    if (has("MediaRecorder") && has("VOICE_CALL")) flags.add("callrec")
+                    if (has("dispatchGesture")) flags.add("gesture")
+                    if (has("PackageInstaller") && has("REQUEST_INSTALL_PACKAGES")) flags.add("install")
                 }
             }
         }
         var s = 0
-        val why = ArrayList<String>()
-        if ("tg" in flags) { s += 3; why.add("Code mein Telegram bot ka link hai (chori ka data bhejne ka aam raasta)") }
-        if ("dc" in flags) { s += 3; why.add("Code mein Discord webhook ka link hai (chori ka data bhejne ka raasta)") }
+        val strong = ArrayList<String>()
+        val weak = ArrayList<String>()
+        if ("tg" in flags) { s += 3; strong.add("Code mein Telegram bot ka link hai (chori ka data bhejne ka aam raasta)") }
+        if ("dc" in flags) { s += 3; strong.add("Code mein Discord webhook ka link hai (chori ka data bhejne ka raasta)") }
         val banks = flags.count { it.startsWith("bank:") }
         if (banks >= 4) {
-            s += 3; why.add("Code mein kai bank / UPI apps ke naam hain")
-            if ("overlay" in flags) { s += 1; why.add("Dusre app ke upar nakli screen dikha sakta hai (fake login)") }
+            s += 3; strong.add("Code mein kai bank / UPI apps ke naam hain")
+            if ("overlay" in flags) { s += 1; strong.add("Dusre app ke upar nakli screen dikha sakta hai (fake login)") }
         }
-        if ("smssend" in flags && ("READ_SMS" in perms || "RECEIVE_SMS" in perms)) { s += 3; why.add("SMS padhkar aage SMS bhej bhi sakta hai (OTP chori)") }
-        if (embedded) { s += 3; why.add("Andar dusra chhupa app / code rakha hai") }
-        if ("dyn" in flags) { s += 2; why.add("Baad mein chhupa code chalane ka tareeka maujood hai") }
-        if ("keylog" in flags && accOn) { s += 2; why.add("Keyboard mein likha text pakadne ka code hai") }
-        if ("screen" in flags && "overlay" in flags) { s += 2; why.add("Screen record karne ka code hai") }
-        if ("admin" in flags) { s += 2; why.add("Phone lock / saaf karne ka code hai") }
-        if ("su" in flags) { s += 1; why.add("Root (su) commands ka zikr hai") }
-        // ek akeli chhoti nishani (jaise sirf ad SDK) ko gino hi nahi
-        return if (s >= 3) R(minOf(s, 7), why) else R(0, emptyList())
+        if ("smssend" in flags) {
+            if ("READ_SMS" in perms || "RECEIVE_SMS" in perms) { s += 3; strong.add("SMS padhkar aage SMS bhej bhi sakta hai (OTP chori)") }
+            else { s += 1; strong.add("Chupke se SMS bhejne ka code hai (paise kat sakte hain)") }
+        }
+        if (embedded) { s += 3; strong.add("Andar dusra chhupa app / code rakha hai") }
+        if ("screen" in flags) { s += 2; strong.add("Screen record karne ka code hai") }
+        if ("keylog" in flags) { s += 2; strong.add("Keyboard mein likha text pakadne ka code hai") }
+        if ("callrec" in flags) { s += 2; strong.add("Phone call record karne ka code hai") }
+        if ("gesture" in flags) { s += 1; strong.add("Khud screen par tap / swipe karne ka code hai") }
+        if ("install" in flags) { s += 2; strong.add("Dusre app chupke se install karne ka code hai") }
+        if ("admin" in flags) { s += 2; strong.add("Phone lock / saaf karne ka code hai") }
+        if (strong.isEmpty()) return R(0, emptyList())
+        if ("dyn" in flags) { s += 1; weak.add("Baad mein chhupa code chalane ka tareeka maujood hai") }
+        if ("su" in flags) { s += 1; weak.add("Root (su) commands ka zikr hai") }
+        return R(maxOf(3, minOf(s, 8)), strong + weak)
     }
 }
