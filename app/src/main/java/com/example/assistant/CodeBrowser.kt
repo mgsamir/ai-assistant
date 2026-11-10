@@ -16,7 +16,6 @@ import org.jf.baksmali.Adaptors.ClassDefinition
 import org.jf.baksmali.BaksmaliOptions
 import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.dexbacked.DexBackedDexFile
-import org.jf.util.IndentingWriter
 
 // APK ke andar ki files aur code ko GitHub jaise folder / file mein dikhata hai.
 // Dhyan: APK mein Java source nahi hota, sirf compile kiya hua code (dex). Isliye class ka dhancha (naam, fields, methods) dikhta hai.
@@ -185,7 +184,7 @@ class ApkSource(private val apk: String) {
         val cd = p.second["L$cls;"]
         if (cd == null) null else {
             val sw = java.io.StringWriter()
-            ClassDefinition(BaksmliOptions(), cd).writeTo(IndentingWriter(sw))
+            ClassDefinition(BaksmaliOptions(), cd).writeTo(org.jf.baksmali.formatter.BaksmaliWriter(sw))
             sw.toString()
         }
     } catch (e: Throwable) { null }
