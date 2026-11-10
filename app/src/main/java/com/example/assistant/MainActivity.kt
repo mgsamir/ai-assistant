@@ -72,6 +72,8 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawLine(18f, 3.5f, 21f, 6f, p); c.drawLine(21f, 6f, 18f, 8.5f, p)
                 c.drawLine(18f, 15.5f, 21f, 18f, p); c.drawLine(21f, 18f, 18f, 20.5f, p)
             }
+            29 -> { c.drawRoundRect(RectF(3f, 6f, 21f, 19f), 2f, 2f, p); c.drawLine(3f, 9f, 10f, 9f, p); c.drawLine(10f, 9f, 12f, 6f, p) }
+            30 -> { c.drawRoundRect(RectF(6f, 3f, 18f, 21f), 2f, 2f, p); c.drawLine(9f, 9f, 15f, 9f, p); c.drawLine(9f, 13f, 15f, 13f, p); c.drawLine(9f, 17f, 13f, 17f, p) }
             27, 28 -> {
                 c.drawCircle(12f, 12f, 9f, p); c.drawOval(RectF(8f, 3f, 16f, 21f), p); c.drawLine(3f, 12f, 21f, 12f, p)
                 if (kind == 28) { c.drawLine(15f, 15f, 21f, 21f, p); c.drawLine(21f, 15f, 15f, 21f, p) }
@@ -1170,6 +1172,14 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r3.setOnClickListener { dlg.dismiss(); showChatHistory() }
         col.addView(r3)
+        val r4 = LinearLayout(this)
+        r4.gravity = Gravity.CENTER_VERTICAL
+        r4.setPadding(0, dp(14), 0, dp(14))
+        r4.addView(IconView(this).apply { kind = 30 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        r4.addView(TextView(this).apply { text = "App code"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        r4.setOnClickListener { dlg.dismiss(); showAppPicker() }
+        col.addView(r4)
         dlg.setContentView(col)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -1210,6 +1220,7 @@ class MainActivity : Activity() {
                 startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, tv.text.toString()), "Report bhejo"))
             } catch (e: Exception) { }
         }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(6) })
+        btns.addView(btn("Code") { showCodeBrowser(pkg, label) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(6) })
         col.addView(btns, LinearLayout.LayoutParams(-1, -2))
         col.addView(sv, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(col, FrameLayout.LayoutParams(-1, -1))
@@ -1226,6 +1237,176 @@ class MainActivity : Activity() {
         Thread {
             val r = try { AppReport.build(applicationContext, pkg) } catch (e: Throwable) { "Report nahi ban paya: ${e.message}" }
             runOnUiThread { tv.text = r }
+        }.start()
+    }
+
+    // phone ke app chuno, phir unka code / files dekho
+    @Suppress("DEPRECATION")
+    private fun showAppPicker() {
+        val dlg = fullDlg()
+        val root = FrameLayout(this)
+        root.setBackgroundColor(Color.BLACK)
+        val content = LinearLayout(this)
+        content.orientation = LinearLayout.VERTICAL
+        content.setPadding(dp(16), dp(96), dp(16), dp(30))
+        val sv = ScrollView(this)
+        sv.isVerticalScrollBarEnabled = false
+        sv.addView(content)
+        root.addView(sv, FrameLayout.LayoutParams(-1, -1))
+        val topBar = FrameLayout(this)
+        topBar.setBackgroundColor(Color.BLACK)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#303030")
+        topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
+        topBar.addView(TextView(this).apply { text = "App code"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
+        root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
+        val pm = packageManager
+        val apps = try {
+            pm.getInstalledApplications(0).filter { it.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0 || it.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0 }
+                .map { it.loadLabel(pm).toString() to it.packageName }.sortedBy { it.first.lowercase() }
+        } catch (e: Exception) { emptyList() }
+        for ((lab, pk) in apps) {
+            val r = LinearLayout(this)
+            r.orientation = LinearLayout.VERTICAL
+            r.setPadding(dp(14), dp(12), dp(14), dp(12))
+            r.background = GradientDrawable().apply { setColor(Color.parseColor("#161B22")); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.parseColor("#30363D")) }
+            r.addView(TextView(this).apply { text = lab; textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+            r.addView(TextView(this).apply { text = pk; textSize = 12f; setTextColor(Color.parseColor("#8B949E")) })
+            r.setOnClickListener { showCodeBrowser(pk, lab) }
+            content.addView(r, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        }
+        dlg.setContentView(root)
+        dlg.show()
+    }
+
+    // GitHub jaisa file browser: folder, file, code. Save karne par Downloads/AppCode mein
+    private fun showCodeBrowser(pkg: String, label: String) {
+        val apk = try { packageManager.getApplicationInfo(pkg, 0).sourceDir } catch (e: Exception) { null }
+        if (apk == null) { Toast.makeText(this, "Ye app phone mein nahi hai", Toast.LENGTH_SHORT).show(); return }
+        val dlg = fullDlg()
+        val root = FrameLayout(this)
+        root.setBackgroundColor(Color.BLACK)
+        val body = LinearLayout(this)
+        body.orientation = LinearLayout.VERTICAL
+        body.setPadding(dp(12), dp(96), dp(12), dp(24))
+        val sv = ScrollView(this)
+        sv.isVerticalScrollBarEnabled = false
+        sv.addView(body)
+        root.addView(sv, FrameLayout.LayoutParams(-1, -1))
+        val title = TextView(this).apply { textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.START }
+        var cur = ""
+        var viewing: String? = null
+        var src: ApkSource? = null
+        val topBar = FrameLayout(this)
+        topBar.setBackgroundColor(Color.BLACK)
+        lateinit var render: () -> Unit
+        val goBack = {
+            if (viewing != null) { viewing = null; render() }
+            else if (cur.isEmpty()) dlg.dismiss()
+            else { cur = cur.substringBeforeLast("/", ""); render() }
+        }
+        val back = icon(23, 40) { goBack() }
+        back.background = oval("#303030")
+        topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
+        topBar.addView(title, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { leftMargin = dp(68); rightMargin = dp(16); bottomMargin = dp(20) })
+        root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
+        dlg.setOnKeyListener { _, k, ev -> if (k == android.view.KeyEvent.KEYCODE_BACK && ev.action == android.view.KeyEvent.ACTION_UP) { goBack(); true } else false }
+
+        fun pill(txt: String, onC: () -> Unit) = TextView(this).apply {
+            text = txt; textSize = 13f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = GradientDrawable().apply { setColor(Color.parseColor("#2B3A67")); cornerRadius = dp(10).toFloat() }
+            setOnClickListener { onC() }
+        }
+        fun toast(m: String) = runOnUiThread { Toast.makeText(this, m, Toast.LENGTH_LONG).show() }
+        fun card() = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply { setColor(Color.parseColor("#0D1117")); cornerRadius = dp(10).toFloat(); setStroke(dp(1), Color.parseColor("#30363D")) }
+        }
+
+        render = {
+            body.removeAllViews()
+            sv.scrollTo(0, 0)
+            val s = src
+            val v = viewing
+            title.text = label + (if (cur.isNotEmpty()) " / $cur" else "") + (if (v != null) " / " + v.substringAfterLast("/") else "")
+            if (s == null) {
+                body.addView(TextView(this).apply { text = "Khul raha hai..."; setTextColor(Color.parseColor("#8B949E")); textSize = 14f })
+            } else if (v != null) {
+                val tv = TextView(this).apply {
+                    text = "Padh raha hu..."; textSize = 11.5f; setTextColor(Color.parseColor("#D0D0D6")); typeface = Typeface.MONOSPACE; setTextIsSelectable(true)
+                }
+                val bar = LinearLayout(this)
+                bar.addView(pill("Copy") {
+                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("code", tv.text)); toast("Copy ho gaya")
+                }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(8) })
+                bar.addView(pill("Save") {
+                    val txt = tv.text.toString(); val nm = v.replace('/', '_') + ".txt"
+                    Thread { try { toast("Save hua: " + ApkSource.saveToDownloads(this, nm, "text/plain") { it.write(txt.toByteArray()) }) } catch (e: Exception) { toast("Save nahi hua: ${e.message}") } }.start()
+                })
+                body.addView(bar, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(10) })
+                body.addView(tv)
+                Thread {
+                    var r = try { s.read(v) } catch (e: Throwable) { "Padh nahi paya: ${e.message}" }
+                    if (r.length > 200_000) r = r.take(200_000) + "\n...(aage ka chhota kiya, Save mein poora milega)"
+                    runOnUiThread { tv.text = r }
+                }.start()
+            } else {
+                val ph = TextView(this).apply { text = "Khul raha hai..."; setTextColor(Color.parseColor("#8B949E")); textSize = 14f }
+                body.addView(ph)
+                Thread {
+                    val items = try { s.list(cur) } catch (e: Throwable) { emptyList() }
+                    runOnUiThread {
+                        body.removeAllViews()
+                        val c = card()
+                        val head = LinearLayout(this)
+                        head.gravity = Gravity.CENTER_VERTICAL
+                        head.setPadding(dp(14), dp(12), dp(10), dp(12))
+                        head.setBackgroundColor(Color.parseColor("#161B22"))
+                        val hv = LinearLayout(this); hv.orientation = LinearLayout.VERTICAL
+                        hv.addView(TextView(this).apply { text = label; textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+                        hv.addView(TextView(this).apply { text = pkg; textSize = 11f; setTextColor(Color.parseColor("#8B949E")) })
+                        head.addView(hv, LinearLayout.LayoutParams(0, -2, 1f))
+                        head.addView(pill("Save all") {
+                            toast("Zip ban rahi hai, thoda ruko...")
+                            Thread {
+                                try {
+                                    val where = ApkSource.saveToDownloads(this, pkg + "_code.zip", "application/zip") { o -> s.exportZip(o) { } }
+                                    toast("Save hua: $where")
+                                } catch (e: Throwable) { toast("Save nahi hua: ${e.message}") }
+                            }.start()
+                        })
+                        c.addView(head)
+                        if (items.isEmpty()) c.addView(TextView(this).apply { text = "Khali"; setTextColor(Color.parseColor("#8B949E")); setPadding(dp(14), dp(14), dp(14), dp(14)) })
+                        for (n in items) {
+                            val line = View(this); line.setBackgroundColor(Color.parseColor("#30363D"))
+                            c.addView(line, LinearLayout.LayoutParams(-1, dp(1)))
+                            val r = LinearLayout(this)
+                            r.gravity = Gravity.CENTER_VERTICAL
+                            r.setPadding(dp(14), dp(14), dp(14), dp(14))
+                            r.addView(IconView(this).apply { kind = if (n.dir) 29 else 30; tint = Color.parseColor(if (n.dir) "#8B98A9" else "#B8C0CC") }, LinearLayout.LayoutParams(dp(34), dp(24)))
+                            r.addView(TextView(this).apply { text = n.name; textSize = 15.5f; setTextColor(Color.WHITE) }, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+                            if (!n.dir && n.size > 0) r.addView(TextView(this).apply { text = if (n.size > 1024) "${n.size / 1024} KB" else "${n.size} B"; textSize = 12f; setTextColor(Color.parseColor("#8B949E")) })
+                            val full = if (cur.isEmpty()) n.name else cur + "/" + n.name
+                            r.setOnClickListener { if (n.dir) { cur = full; render() } else { viewing = full; render() } }
+                            c.addView(r)
+                        }
+                        body.addView(c, LinearLayout.LayoutParams(-1, -2))
+                    }
+                }.start()
+            }
+        }
+        dlg.setContentView(root)
+        dlg.show()
+        render()
+        Thread {
+            val s = try { ApkSource(apk) } catch (e: Throwable) { null }
+            runOnUiThread {
+                if (s == null) { Toast.makeText(this, "APK nahi khul paya", Toast.LENGTH_SHORT).show(); dlg.dismiss() }
+                else { src = s; render() }
+            }
         }.start()
     }
 
