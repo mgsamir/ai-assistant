@@ -37,7 +37,7 @@ object VtScan {
 
     // jaanch ki line mein daalo; ek peechhe ek (16 second ke fark se, free limit ke andar)
     fun enqueue(c: Context, pkg: String, apk: String?, update: Long, label: String) {
-        if (Keys.vt.isEmpty() || apk == null) return
+        if (Extra.vt.isEmpty() || apk == null) return
         if (cached(c, pkg, update) != null) return
         synchronized(queue) { queue[pkg] = Triple(apk, update, label) }
         if (worker?.isAlive == true) return
@@ -71,7 +71,7 @@ object VtScan {
             val c = URL("https://www.virustotal.com/api/v3/files/$h").openConnection() as HttpURLConnection
             c.connectTimeout = 10000
             c.readTimeout = 20000
-            c.setRequestProperty("x-apikey", Keys.vt)
+            c.setRequestProperty("x-apikey", Extra.vt)
             c.setRequestProperty("accept", "application/json")
             when (c.responseCode) {
                 200 -> {
