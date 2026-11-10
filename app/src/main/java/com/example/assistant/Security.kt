@@ -86,17 +86,17 @@ object Security {
         val sens = SENS.count { it in perms }
         val risky = pkg in acc || pkg in ad || pkg in nl
         // sirf asli khatre ginte hain: aam baatein (Play Store ke bahar se aana, bahut ijazatein, SMS ki ijazat) ab warning nahi banati
-        if (soft && !hasLauncher(pm, pkg) && risky) { s += 3; why.add("Icon chhupa hua hai, app list mein nahi dikhta") }
-        if (pkg in acc) { s += 4; why.add("Accessibility chalu hai, ye screen padh sakta hai aur khud tap kar sakta hai") }
-        if (pkg in ad) { s += 4; why.add("Device admin bana hua hai, hatana mushkil kar sakta hai") }
-        if (pkg in nl) { s += 2; why.add("Tumhare saare notification (OTP bhi) padh sakta hai") }
+        if (soft && !hasLauncher(pm, pkg) && risky) { s += 3; why.add("Icon chhupa hua") }
+        if (pkg in acc) { s += 4; why.add("Accessibility access (screen padhna / tap)") }
+        if (pkg in ad) { s += 4; why.add("Device admin (hatana mushkil)") }
+        if (pkg in nl) { s += 2; why.add("Notification access (OTP padh sakta hai)") }
         for ((nm, real) in REAL) {
             if ((low == nm || low.replace(" ", "") == nm.replace(" ", "")) && pkg != real) {
-                s += 5; why.add("Naam '$label' jaisa hai par asli app ka package nahi hai (fake ho sakta hai)")
+                s += 5; why.add("Fake app (naam '$label' jaisa, package alag)")
                 break
             }
         }
-        if (SPY.any { low.contains(it) || pkg.lowercase().contains(it) }) { s += 5; why.add("Naam jasoosi (spy / tracking) app jaisa hai") }
+        if (SPY.any { low.contains(it) || pkg.lowercase().contains(it) }) { s += 5; why.add("Spy / tracking app jaisa naam") }
         // code ke andar jhaanko: bahar se aaye ya pehle se shak wale app ke liye
         if (soft || pkg in acc || pkg in ad || pkg in nl) {
             val cs = CodeScan.inspect(c, pkg, ai.sourceDir, perms, pi.lastUpdateTime, pkg in acc)
@@ -107,11 +107,11 @@ object Security {
             val vt = VtScan.cached(c, pkg, pi.lastUpdateTime)
             if (vt == null) VtScan.enqueue(c, pkg, ai.sourceDir, pi.lastUpdateTime, label)
             else if (vt.mal >= 5) {
-                s += 8; why.add("Virus mila: ${vt.mal} antivirus ise virus bata rahe hain" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+                s += 8; why.add("Virus: ${vt.mal} antivirus ne pakda" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
             } else if (vt.mal >= 3) {
-                s += 4; why.add("Harmful nishaan: ${vt.mal} antivirus ise khatarnak bata rahe hain" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+                s += 4; why.add("Harmful: ${vt.mal} antivirus ne pakda" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
             } else if (vt.mal >= 1) {
-                s += 1; why.add("${vt.mal} antivirus ne ise shak mein daala hai" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+                s += 1; why.add("${vt.mal} antivirus ko shak" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
             }
         }
         if (why.isEmpty()) return null
@@ -144,11 +144,11 @@ object Security {
         if (hi.isEmpty() && mid.isEmpty()) sb.append("Jaanch poori: koi bada khatra nahi mila. ")
         if (hi.isNotEmpty()) {
             sb.append("ZYADA SHAK wale app:\n")
-            hi.take(6).forEach { sb.append("• ${it.label} (${it.pkg}): ${it.reasons.joinToString("; ")}\n") }
+            hi.take(6).forEach { sb.append("• ${it.label} — ${it.reasons.joinToString(", ")}\n") }
         }
         if (mid.isNotEmpty()) {
             sb.append("\nThoda shak wale app:\n")
-            mid.take(6).forEach { sb.append("• ${it.label}: ${it.reasons.joinToString("; ")}\n") }
+            mid.take(6).forEach { sb.append("• ${it.label} — ${it.reasons.joinToString(", ")}\n") }
         }
         if (rooted()) sb.append("\nPhone ke system mein badlaav (root / test-keys) dikh raha hai, ye khatarnak ho sakta hai.\n")
         return sb.toString().trim()
@@ -158,7 +158,7 @@ object Security {
     class Entry(val t: Long, val pkg: String, val label: String, val score: Int, val fresh: Boolean, val text: String)
 
     private fun spoken(f: Finding): String =
-        "${f.label}: " + f.reasons.joinToString(". ") + "."
+        "${f.label} — " + f.reasons.joinToString(", ")
 
     fun addLog(p: android.content.SharedPreferences, list: List<Finding>, fresh: Set<String>) {
         if (list.isEmpty()) return
@@ -197,9 +197,9 @@ object Security {
         if (!p.getBoolean("sec_v2", false)) {
             p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putBoolean("sec_v2", true).apply()
         }
-        if (p.getInt("sec_ver", 0) < 3) {
+        if (p.getInt("sec_ver", 0) < 4) {
             // purani galat chetavniyan saaf
-            p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putInt("sec_ver", 3).apply()
+            p.edit().remove("sec_log").remove("sec_seen").remove("sec_known").putInt("sec_ver", 4).apply()
         }
         val f = scan(c)
         val pm = c.packageManager
@@ -216,8 +216,8 @@ object Security {
         addLog(p, show, fresh)
         val sb = StringBuilder()
         for (x in show.take(6)) {
-            val tag = if (x.pkg in fresh) "NAYA APP, " else ""
-            sb.append("• ${x.label}: $tag${x.reasons.joinToString("; ")}\n\n")
+            val tag = if (x.pkg in fresh) "Naya app: " else ""
+            sb.append("• ${x.label} — $tag${x.reasons.joinToString(", ")}\n")
         }
         if (rooted()) sb.append("• Phone ke system mein badlaav (root / test-keys) dikh raha hai.\n\n")
         return sb.toString().trim()
@@ -242,9 +242,9 @@ object Security {
                 NotificationChannel("sec", "Suraksha chetavni", NotificationManager.IMPORTANCE_HIGH))
             val b = if (Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(c, "sec") else android.app.Notification.Builder(c)
             b.setSmallIcon(android.R.drawable.ic_dialog_alert)
-                .setContentTitle("Naye app par shak: ${f.label}")
-                .setStyle(android.app.Notification.BigTextStyle().bigText(f.reasons.joinToString("\n")))
-                .setContentText(f.reasons.first())
+                .setContentTitle("Harmful app: ${f.label}")
+                .setStyle(android.app.Notification.BigTextStyle().bigText(f.reasons.joinToString(", ")))
+                .setContentText(f.reasons.joinToString(", "))
                 .setAutoCancel(true)
             nm.notify(f.pkg.hashCode(), b.build())
         } catch (e: Exception) { }
