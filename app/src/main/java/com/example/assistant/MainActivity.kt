@@ -549,7 +549,18 @@ class MainActivity : Activity() {
     private fun fullDlg(): android.app.Dialog {
         val d = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         d.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.BLACK))
-        d.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        d.window?.let { w ->
+            w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            w.setGravity(Gravity.TOP or Gravity.START)
+            w.addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+            val lp = w.attributes
+            lp.x = 0; lp.y = 0
+            if (Build.VERSION.SDK_INT >= 28) lp.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            w.attributes = lp
+            if (Build.VERSION.SDK_INT >= 30) w.setDecorFitsSystemWindows(false)
+            w.statusBarColor = Color.BLACK
+            w.navigationBarColor = Color.BLACK
+        }
         return d
     }
 
