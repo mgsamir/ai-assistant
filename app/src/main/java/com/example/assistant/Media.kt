@@ -136,16 +136,30 @@ object Media {
         // Google se na bane to OpenAI se
                 // Google se na bane to free Pollinations se (photo badalna isme nahi hota)
         if (attach == null) {
-            try {
-                val u = "https://image.pollinations.ai/prompt/" + URLEncoder.encode(prompt, "UTF-8") + "?width=1024&height=1024&nologo=true"
-                val c = URL(u).openConnection() as HttpURLConnection
-                c.connectTimeout = 10000
-                c.readTimeout = 90000
-                if (c.responseCode == 200) {
-                    val b = c.inputStream.readBytes()
-                    if (b.size > 2000) return Out(b, c.contentType ?: "image/jpeg")
-                }
-            } catch (e: Exception) { }
+            val pr = URLEncoder.encode(prompt.take(600) + ", highly detailed, sharp focus, professional photo quality", "UTF-8")
+            for (model in listOf("flux", "turbo")) {
+                try {
+                    val u = "https://image.pollinations.ai/prompt/$pr?model=$model&width=1280&height=1280&nologo=true&enhance=true&seed=" + (System.currentTimeMillis() % 100000)
+                    val c = URL(u).openConnection() as HttpURLConnection
+                    c.connectTimeout = 10000
+                    c.readTimeout = 120000
+                    if (c.responseCode == 200) {
+                        val b = c.inputStream.readBytes()
+                        if (b.size > 2000) {
+                            // neeche ke kone ka watermark kaat do
+                            val bm = android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size)
+                            if (bm != null) {
+                                val cut = (bm.height * 0.075f).toInt()
+                                val cropped = android.graphics.Bitmap.createBitmap(bm, 0, 0, bm.width, bm.height - cut)
+                                val o = java.io.ByteArrayOutputStream()
+                                cropped.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, o)
+                                return Out(o.toByteArray(), "image/jpeg")
+                            }
+                            return Out(b, c.contentType ?: "image/jpeg")
+                        }
+                    }
+                } catch (e: Exception) { }
+            }
         }
         return null
     }
