@@ -12,6 +12,8 @@ object Media {
     class Out(val bytes: ByteArray, val mime: String)
 
     @Volatile var lastErr = ""
+    @Volatile var fallback = false
+    @Volatile var gemErr = ""
 
     private fun post(url: String, key: String, body: JSONObject, readMs: Int): Pair<Int, String> {
         val c = URL(url).openConnection() as HttpURLConnection
@@ -78,7 +80,7 @@ object Media {
 
     // attach = (mime, base64) photo ho to usi ko badalkar nayi image banata hai
     fun image(key: String, prompt: String, attach: Pair<String, String>?, sel: Models.M? = null): Out? {
-        lastErr = ""
+        lastErr = ""; fallback = false; gemErr = ""
         val ps = sel
         val gem = listOf("gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image", "gemini-3.1-flash-lite-image")
         if (ps != null && ps.prov == "openrouter") {
@@ -135,6 +137,7 @@ object Media {
         }
         // Google se na bane to OpenAI se
                 // Google se na bane to free Pollinations se (photo badalna isme nahi hota)
+        gemErr = lastErr
         if (attach == null) {
             val low = prompt.lowercase()
             val tall = listOf("9:16", "portrait", "wallpaper", "phone", "story", "vertical", "poster", "reel").any { low.contains(it) }
@@ -153,7 +156,7 @@ object Media {
                         c.setRequestProperty("Authorization", "Bearer " + Extra.polli)
                         if (c.responseCode == 200) {
                             val b = c.inputStream.readBytes()
-                            if (b.size > 2000) return Out(b, c.contentType ?: "image/jpeg")
+                            if (b.size > 2000) { fallback = true; return Out(b, c.contentType ?: "image/jpeg") }
                         } else lastErr = "Pollinations $model: HTTP ${c.responseCode}"
                     } catch (e: Exception) { }
                 }
@@ -178,9 +181,9 @@ object Media {
                                 val up = android.graphics.Bitmap.createScaledBitmap(cropped, cropped.width * 2, cropped.height * 2, true)
                                 val o = java.io.ByteArrayOutputStream()
                                 up.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, o)
-                                return Out(o.toByteArray(), "image/jpeg")
+                                fallback = true; return Out(o.toByteArray(), "image/jpeg")
                             }
-                            return Out(b, c.contentType ?: "image/jpeg")
+                            fallback = true; return Out(b, c.contentType ?: "image/jpeg")
                         }
                     }
                 } catch (e: Exception) { }

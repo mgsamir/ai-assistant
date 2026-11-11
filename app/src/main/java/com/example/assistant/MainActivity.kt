@@ -1606,6 +1606,7 @@ class MainActivity : Activity() {
         var file: java.io.File? = null
         var err: String? = null
         var busy = true
+        var note: String? = null
     }
 
     private var imgAttCb: ((Pair<String, String>) -> Unit)? = null
@@ -1669,9 +1670,11 @@ class MainActivity : Activity() {
             kotlin.concurrent.thread {
                 val out = Media.image(key, t.prompt, att, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "photo"))
                 val err = Media.lastErr
+                val fb = Media.fallback; val ge = Media.gemErr
                 runOnUiThread {
                     busyImg = false
                     t.busy = false
+                    t.note = if (out != null && fb) "Google ka image model nahi chala" + (if (ge.isNotBlank()) " (" + ge.take(140) + ")" else "") + ". Free Pollinations se bani." else null
                     if (out != null) t.file = saveGenerated(out)
                     else t.err = "Could not create the image. " + err.ifBlank { "Please try again." }
                     render()
@@ -1950,6 +1953,7 @@ class MainActivity : Activity() {
                             background = GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(Color.parseColor("#123B22")) }
                         }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(12) })
                         content.addView(TextView(this).apply { text = "Your image is ready."; textSize = 17f; setTextColor(Color.WHITE) })
+                        t.note?.let { nt -> content.addView(TextView(this).apply { text = nt; textSize = 12f; setTextColor(Color.parseColor("#E5C06A")); setPadding(0, dp(6), 0, 0) }) }
                         val acts = LinearLayout(this)
                         val more = icon(9, 44) { }
                         more.setOnClickListener {
