@@ -69,11 +69,13 @@ The user is an adult. Answer questions about the human body, sex education, repr
 
     val listeners = CopyOnWriteArrayList<UiCb>()
     val log = StringBuilder()
+    val full = StringBuilder()   // poori chat (history ke liye)
     var onQuit: (() -> Unit)? = null
     var ambient = false
 
     private val main = Handler(Looper.getMainLooper())
     private val prefs = app.getSharedPreferences("p", Context.MODE_PRIVATE)
+    init { prefs.edit().remove("cur_id").apply() }   // assistant naya chalu = naya chat
     private val tts: TextToSpeech = TextToSpeech(app, this)
     private var recognizer: SpeechRecognizer? = null
     private var tone: ToneGenerator? = null
@@ -126,9 +128,23 @@ The user is an adult. Answer questions about the human body, sex education, repr
     private fun status(s: String) { for (l in listeners) l.onStatus(s) }
     private fun mode(m: Int) { for (l in listeners) l.onMode(m) }
     private fun level(v: Float) { for (l in listeners) l.onLevel(v) }
+    // chat history mein isi chat ki entry badhao (naya chat na ho to usi mein judta hai)
+    fun persist() {
+        try {
+            val txt = full.toString()
+            if (!txt.contains("\nAI: ")) return
+            var id = Chats.cur(prefs)
+            if (id.isEmpty()) { id = Chats.newId(); Chats.setCur(prefs, id) }
+            Chats.save(prefs, id, txt)
+        } catch (e: Exception) { }
+    }
+
     private fun chat(s: String) {
         log.append(s)
+        full.append(s)
         if (log.length > 8000) log.delete(0, log.length - 6000)
+        if (full.length > 300000) full.delete(0, full.length - 250000)
+        if (s.startsWith("\nAI: ")) persist()
         for (l in listeners) l.onChat(s)
     }
 
@@ -784,6 +800,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
         if (busy || lastQ.isBlank()) return
         val i = log.lastIndexOf("\nAI: ")
         if (i >= 0) log.setLength(i)
+        val fi = full.lastIndexOf("\nAI: ")
+        if (fi >= 0) full.setLength(fi)
         if (history.isNotEmpty()) history.removeAt(history.size - 1)
         val q = lastQ
         silent = true
@@ -807,6 +825,9 @@ The user is an adult. Answer questions about the human body, sex education, repr
     fun loadChat(text: String) {
         log.setLength(0)
         log.append(text)
+        if (log.length > 8000) log.delete(0, log.length - 6000)
+        full.setLength(0)
+        full.append(text)
         history.clear()
         val parts = text.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.filter { it.isNotEmpty() }
         var q = ""

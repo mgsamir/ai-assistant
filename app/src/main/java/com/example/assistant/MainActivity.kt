@@ -523,18 +523,12 @@ class MainActivity : Activity() {
     }
 
     // ---- purani baat-cheet ka sangrah: Branch in new chat aur Chat history ----
-    private fun archiveChat(text: String) {
-        try {
-            val parts = text.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.filter { it.isNotEmpty() }
-            if (parts.none { it.startsWith("AI:") }) return
-            val title = parts.firstOrNull { it.startsWith("Tum:") }?.removePrefix("Tum:")?.trim()?.take(40) ?: "Chat"
-            val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
-            val arr = org.json.JSONArray(sp.getString("chats", "[]"))
-            val out = org.json.JSONArray()
-            out.put(org.json.JSONObject().put("t", title).put("time", System.currentTimeMillis()).put("log", text))
-            for (i in 0 until minOf(arr.length(), 29)) out.put(arr.getJSONObject(i))
-            sp.edit().putString("chats", out.toString()).apply()
-        } catch (e: Exception) { }
+    // naya chat shuru: purana chat history mein pehle se save hai
+    private fun newChat() {
+        val eng = AssistantService.engine ?: return
+        Chats.setCur(getSharedPreferences("p", Context.MODE_PRIVATE), "")
+        eng.loadChat("")
+        rebuildChat("")
     }
 
     private fun branchFrom(idx: Int) {
@@ -547,9 +541,10 @@ class MainActivity : Activity() {
             keep.add(p)
             if (p.startsWith("AI:")) { n++; if (n == idx) break }
         }
-        archiveChat(full)
         val sub = keep.joinToString("") { "\n$it\n" }
+        Chats.setCur(getSharedPreferences("p", Context.MODE_PRIVATE), Chats.newId())
         e.loadChat(sub)
+        e.persist()
         rebuildChat(sub)
         Toast.makeText(this, "New chat started from this message", Toast.LENGTH_SHORT).show()
     }
@@ -575,7 +570,7 @@ class MainActivity : Activity() {
 
     private fun showChatHistory() {
         val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
-        val arr = try { org.json.JSONArray(sp.getString("chats", "[]")) } catch (e: Exception) { org.json.JSONArray() }
+        val arr = Chats.all(sp)
         val dlg = fullDlg()
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
         val top = FrameLayout(this)
@@ -585,18 +580,17 @@ class MainActivity : Activity() {
         top.addView(TextView(this).apply { text = "Chat history"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        if (arr.length() == 0) list.addView(TextView(this).apply { text = "No saved chats yet. A chat is saved when you branch it."; textSize = 15f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(dp(4), dp(20), dp(4), 0) })
-        for (i in 0 until arr.length()) {
-            val o = arr.getJSONObject(i)
+        if (arr.isEmpty()) list.addView(TextView(this).apply { text = "Abhi koi chat nahi."; textSize = 15f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(dp(4), dp(20), dp(4), 0) })
+        for (o in arr) {
             val row = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(14), dp(14), dp(8), dp(14))
                 background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#1E1E1E")) }
             }
             val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            tx.addView(TextView(this).apply { text = o.optString("t"); textSize = 16f; setTextColor(Color.WHITE); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+            tx.addView(TextView(this).apply { text = o.title; textSize = 16f; setTextColor(Color.WHITE); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
             tx.addView(TextView(this).apply {
-                text = java.text.SimpleDateFormat("d MMM, h:mm a", java.util.Locale.ENGLISH).format(java.util.Date(o.optLong("time")))
+                text = java.text.SimpleDateFormat("d MMM, h:mm a", java.util.Locale.ENGLISH).format(java.util.Date(o.time))
                 textSize = 13f; setTextColor(Color.parseColor("#9AA3B5"))
             })
             row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f))
@@ -605,9 +599,9 @@ class MainActivity : Activity() {
                 setOnClickListener {
                     android.app.AlertDialog.Builder(this@MainActivity).setTitle("Delete this chat?")
                         .setPositiveButton("Delete") { _, _ ->
-                            val keepArr = org.json.JSONArray()
-                            for (k in 0 until arr.length()) if (k != i) keepArr.put(arr.getJSONObject(k))
-                            sp.edit().putString("chats", keepArr.toString()).apply()
+                            val wasCur = Chats.cur(sp) == o.id
+                            Chats.delete(sp, o.id)
+                            if (wasCur) newChat()
                             dlg.dismiss(); showChatHistory()
                         }.setNegativeButton("Cancel", null).show()
                 }
@@ -615,10 +609,9 @@ class MainActivity : Activity() {
             row.setOnClickListener {
                 val e = AssistantService.engine
                 if (e != null) {
-                    archiveChat(e.log.toString())
-                    val lg = o.optString("log")
-                    e.loadChat(lg)
-                    rebuildChat(lg)
+                    Chats.setCur(sp, o.id)
+                    e.loadChat(o.log)
+                    rebuildChat(o.log)
                 }
                 dlg.dismiss()
             }
@@ -1155,6 +1148,14 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(70), dp(20), dp(20))
             setBackgroundColor(Color.parseColor("#212121"))
         }
+        val rn = LinearLayout(this)
+        rn.gravity = Gravity.CENTER_VERTICAL
+        rn.setPadding(0, dp(14), 0, dp(14))
+        rn.addView(IconView(this).apply { kind = 1 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        rn.addView(TextView(this).apply { text = "New chat"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        rn.setOnClickListener { dlg.dismiss(); newChat() }
+        col.addView(rn)
         val r = LinearLayout(this)
         r.gravity = Gravity.CENTER_VERTICAL
         r.setPadding(0, dp(14), 0, dp(14))
