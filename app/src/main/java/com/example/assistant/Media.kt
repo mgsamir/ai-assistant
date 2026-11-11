@@ -80,7 +80,7 @@ object Media {
     fun image(key: String, prompt: String, attach: Pair<String, String>?, sel: Models.M? = null): Out? {
         lastErr = ""
         val ps = sel
-        val gem = listOf("gemini-2.5-flash-image", "gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview", "gemini-3.1-flash-lite-image")
+        val gem = listOf("gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image", "gemini-3.1-flash-lite-image")
         if (ps != null && ps.prov == "openrouter") {
             try {
                 val body = JSONObject().put("model", ps.id)
@@ -113,7 +113,8 @@ object Media {
                     JSONObject().put("mimeType", attach.first).put("data", attach.second)))
                 val body = JSONObject()
                     .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", parts)))
-                    .put("generationConfig", JSONObject().put("responseModalities", JSONArray().put("TEXT").put("IMAGE")))
+                    .put("generationConfig", JSONObject().put("responseModalities", JSONArray().put("TEXT").put("IMAGE"))
+                        .also { g -> if (m.contains("pro-image")) g.put("imageConfig", JSONObject().put("imageSize", "2K")) })
                     .put("safetySettings", WebSearch.safety())
                 val (code, resp) = post("https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent", key, body, 90000)
                 if (code !in 200..299) { lastErr = "$m: " + why(code, resp); continue }
