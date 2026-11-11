@@ -136,23 +136,48 @@ object Media {
         // Google se na bane to OpenAI se
                 // Google se na bane to free Pollinations se (photo badalna isme nahi hota)
         if (attach == null) {
-            val pr = URLEncoder.encode(prompt.take(600) + ", highly detailed, sharp focus, professional photo quality", "UTF-8")
+            val low = prompt.lowercase()
+            val tall = listOf("9:16", "portrait", "wallpaper", "phone", "story", "vertical", "poster", "reel").any { low.contains(it) }
+            val wide = listOf("16:9", "landscape", "banner", "widescreen", "horizontal", "desktop", "youtube", "thumbnail").any { low.contains(it) }
+            val clean = prompt.take(700)
+            // Pollinations key ho to behtar models (zimage / flux), bina logo, badi photo
+            if (Extra.polli.isNotEmpty()) {
+                val (w, h) = if (tall) 864 to 1536 else if (wide) 1536 to 864 else 1024 to 1024
+                for (model in listOf("zimage", "flux")) {
+                    try {
+                        val pr = URLEncoder.encode(clean + ", ultra detailed, sharp focus, natural colors, professional photography", "UTF-8")
+                        val u = "https://gen.pollinations.ai/image/$pr?model=$model&width=$w&height=$h&seed=-1&enhance=true"
+                        val c = URL(u).openConnection() as HttpURLConnection
+                        c.connectTimeout = 10000
+                        c.readTimeout = 150000
+                        c.setRequestProperty("Authorization", "Bearer " + Extra.polli)
+                        if (c.responseCode == 200) {
+                            val b = c.inputStream.readBytes()
+                            if (b.size > 2000) return Out(b, c.contentType ?: "image/jpeg")
+                        } else lastErr = "Pollinations $model: HTTP ${c.responseCode}"
+                    } catch (e: Exception) { }
+                }
+            }
+            // bina key: free classic (chhoti photo, kone mein logo, wo kaat dete hain)
+            val (w, h) = if (tall) 576 to 1024 else if (wide) 1024 to 576 else 768 to 768
+            val pr = URLEncoder.encode(clean + ", ultra detailed, sharp focus, natural colors, professional photography", "UTF-8")
             for (model in listOf("flux", "turbo")) {
                 try {
-                    val u = "https://image.pollinations.ai/prompt/$pr?model=$model&width=1280&height=1280&nologo=true&enhance=true&seed=" + (System.currentTimeMillis() % 100000)
+                    val u = "https://image.pollinations.ai/prompt/$pr?model=$model&width=$w&height=$h&nologo=true&enhance=true&seed=" + (System.currentTimeMillis() % 100000)
                     val c = URL(u).openConnection() as HttpURLConnection
                     c.connectTimeout = 10000
                     c.readTimeout = 120000
                     if (c.responseCode == 200) {
                         val b = c.inputStream.readBytes()
                         if (b.size > 2000) {
-                            // neeche ke kone ka watermark kaat do
                             val bm = android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size)
                             if (bm != null) {
                                 val cut = (bm.height * 0.075f).toInt()
                                 val cropped = android.graphics.Bitmap.createBitmap(bm, 0, 0, bm.width, bm.height - cut)
+                                // 2x bada karke thoda sharp
+                                val up = android.graphics.Bitmap.createScaledBitmap(cropped, cropped.width * 2, cropped.height * 2, true)
                                 val o = java.io.ByteArrayOutputStream()
-                                cropped.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, o)
+                                up.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, o)
                                 return Out(o.toByteArray(), "image/jpeg")
                             }
                             return Out(b, c.contentType ?: "image/jpeg")
