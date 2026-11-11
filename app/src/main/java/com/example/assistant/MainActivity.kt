@@ -72,6 +72,13 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawLine(18f, 3.5f, 21f, 6f, p); c.drawLine(21f, 6f, 18f, 8.5f, p)
                 c.drawLine(18f, 15.5f, 21f, 18f, p); c.drawLine(21f, 18f, 18f, 20.5f, p)
             }
+            31 -> { c.drawCircle(11f, 11f, 7f, p); c.drawLine(16f, 16f, 21f, 21f, p); c.drawLine(11f, 8f, 11f, 14f, p); c.drawLine(8f, 11f, 14f, 11f, p) }
+            32 -> { c.drawLine(4f, 20f, 8f, 19f, p); c.drawLine(8f, 19f, 19f, 8f, p); c.drawLine(16f, 5f, 19f, 8f, p); c.drawLine(16f, 5f, 18f, 3f, p); c.drawLine(18f, 3f, 21f, 6f, p); c.drawLine(21f, 6f, 19f, 8f, p); c.drawLine(4f, 20f, 5f, 16f, p); c.drawLine(5f, 16f, 8f, 19f, p) }
+            33 -> { c.drawRoundRect(RectF(4f, 9f, 15f, 20f), 2f, 2f, p); c.drawRoundRect(RectF(9f, 4f, 20f, 15f), 2f, 2f, p) }
+            34 -> { c.save(); c.rotate(-45f, 12f, 12f); c.drawRoundRect(RectF(4f, 7f, 20f, 17f), 3f, 3f, p); c.drawLine(12f, 7f, 12f, 17f, p); c.restore() }
+            35 -> { c.drawLine(12f, 4f, 12f, 16f, p); c.drawLine(7f, 11f, 12f, 16f, p); c.drawLine(12f, 16f, 17f, 11f, p); c.drawLine(5f, 20f, 19f, 20f, p) }
+            36 -> { c.drawArc(RectF(5f, 7f, 20f, 20f), 180f, 220f, false, p); c.drawLine(5f, 13f, 5f, 7f, p); c.drawLine(5f, 13f, 11f, 13f, p) }
+            37 -> { c.drawPath(Path().apply { moveTo(8f, 3f); lineTo(13f, 11f); lineTo(3f, 11f); close() }, p); c.drawRoundRect(RectF(3f, 14f, 10f, 21f), 1f, 1f, p); c.drawCircle(17f, 17f, 4f, p) }
             29 -> { c.drawRoundRect(RectF(3f, 6f, 21f, 19f), 2f, 2f, p); c.drawLine(3f, 9f, 10f, 9f, p); c.drawLine(10f, 9f, 12f, 6f, p) }
             30 -> { c.drawRoundRect(RectF(6f, 3f, 18f, 21f), 2f, 2f, p); c.drawLine(9f, 9f, 15f, 9f, p); c.drawLine(9f, 13f, 15f, 13f, p); c.drawLine(9f, 17f, 13f, 17f, p) }
             27, 28 -> {
@@ -1794,26 +1801,58 @@ class MainActivity : Activity() {
             } catch (e: Exception) { }
         }
 
-        fun viewer(f: java.io.File) {
+        fun galleryUri(f: java.io.File): android.net.Uri? {
+            val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
+            sp.getString("gal_" + f.name, null)?.let { u ->
+                val uri = android.net.Uri.parse(u)
+                try { contentResolver.openInputStream(uri)?.close(); return uri } catch (e: Exception) { }
+            }
+            return try {
+                val cv = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, f.name)
+                    put(android.provider.MediaStore.Images.Media.MIME_TYPE, if (f.name.endsWith("png")) "image/png" else "image/jpeg")
+                    if (Build.VERSION.SDK_INT >= 29) put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/AI Assistant")
+                }
+                val u = contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)
+                if (u != null) { contentResolver.openOutputStream(u)?.use { it.write(f.readBytes()) }; sp.edit().putString("gal_" + f.name, u.toString()).apply() }
+                u
+            } catch (e: Exception) { null }
+        }
+
+        fun saveToGallery(f: java.io.File) {
+            Toast.makeText(this, if (galleryUri(f) != null) "Saved to gallery" else "Could not save", Toast.LENGTH_SHORT).show()
+        }
+
+        fun viewer(f0: java.io.File) {
+            var f = f0
             val v = fullDlg()
             val iv = android.widget.ImageView(this)
             iv.setBackgroundColor(Color.BLACK)
             iv.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-            iv.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.path))
-            iv.setOnClickListener { v.dismiss() }
+            iv.setImageBitmap(Studio.load(f, 2400))
             val frame = FrameLayout(this)
             frame.setBackgroundColor(Color.BLACK)
-            frame.addView(iv, FrameLayout.LayoutParams(-1, -1))
-            val back2 = icon(23, 40) { v.dismiss() }
-            back2.background = oval("#303030")
-            frame.addView(back2, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.TOP).apply { leftMargin = dp(16); topMargin = dp(44) })
-            val more = icon(9, 40) { }
+            frame.addView(iv, FrameLayout.LayoutParams(-1, -1).apply { topMargin = dp(100); bottomMargin = dp(120) })
+            val show = { nf: java.io.File -> f = nf; iv.setImageBitmap(Studio.load(nf, 2400)); render() }
+            val favs = { getSharedPreferences("p", Context.MODE_PRIVATE).getStringSet("img_fav", emptySet()) ?: emptySet() }
+            // upar: X, menu, download, Share
+            val topRow = LinearLayout(this)
+            topRow.gravity = Gravity.CENTER_VERTICAL
+            val close = TextView(this).apply { text = "\u2715"; textSize = 20f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; background = oval("#303030"); setOnClickListener { v.dismiss() } }
+            topRow.addView(close, LinearLayout.LayoutParams(dp(44), dp(44)))
+            topRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+            val more = icon(9, 44) { }
             more.background = oval("#303030")
             more.setOnClickListener {
                 val pm = android.widget.PopupMenu(this, more)
+                val isFav = f.name in favs()
+                pm.menu.add(if (isFav) "Remove from Favorites" else "Add to Favorites")
                 pm.menu.add("Delete")
-                pm.setOnMenuItemClickListener {
-                    android.app.AlertDialog.Builder(this)
+                pm.setOnMenuItemClickListener { mi ->
+                    if (mi.title.toString().endsWith("Favorites")) {
+                        val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
+                        sp.edit().putStringSet("img_fav", if (isFav) favs() - f.name else favs() + f.name).apply(); render()
+                    } else android.app.AlertDialog.Builder(this)
                         .setTitle("Delete this image?")
                         .setPositiveButton("Delete") { _, _ -> f.delete(); v.dismiss(); Toast.makeText(this, "Deleted", Toast.LENGTH_SHORT).show(); render() }
                         .setNegativeButton("Cancel", null)
@@ -1822,22 +1861,52 @@ class MainActivity : Activity() {
                 }
                 pm.show()
             }
-            frame.addView(more, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.END or Gravity.TOP).apply { rightMargin = dp(16); topMargin = dp(44) })
+            topRow.addView(more, LinearLayout.LayoutParams(dp(44), dp(44)).apply { rightMargin = dp(8) })
+            val dl = icon(35, 44) { saveToGallery(f) }
+            dl.background = oval("#303030")
+            topRow.addView(dl, LinearLayout.LayoutParams(dp(44), dp(44)).apply { rightMargin = dp(8) })
+            topRow.addView(TextView(this).apply {
+                text = "Share"; textSize = 16f; setTextColor(Color.BLACK); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+                setPadding(dp(22), 0, dp(22), 0)
+                background = GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(Color.WHITE) }
+                setOnClickListener {
+                    val u = galleryUri(f)
+                    if (u != null) try { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("image/*").putExtra(Intent.EXTRA_STREAM, u).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Share")) } catch (e: Exception) { }
+                    else Toast.makeText(this@MainActivity, "Share nahi ho paya", Toast.LENGTH_SHORT).show()
+                }
+            }, LinearLayout.LayoutParams(-2, dp(44)))
+            frame.addView(topRow, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply { topMargin = dp(40); leftMargin = dp(16); rightMargin = dp(16) })
+            // neeche: Edit, Markup, Resize, Remove
+            val bottomRow = LinearLayout(this)
+            bottomRow.gravity = Gravity.CENTER
+            fun tool(kind: Int, name: String, onC: () -> Unit) {
+                val c1 = LinearLayout(this); c1.orientation = LinearLayout.VERTICAL; c1.gravity = Gravity.CENTER_HORIZONTAL
+                val ic = IconView(this).apply { this.kind = kind; background = oval("#303030"); setOnClickListener { onC() } }
+                c1.addView(ic, LinearLayout.LayoutParams(dp(60), dp(60)))
+                c1.addView(TextView(this).apply { text = name; textSize = 16f; setTextColor(Color.WHITE); setPadding(0, dp(8), 0, 0); setOnClickListener { onC() } })
+                bottomRow.addView(c1, LinearLayout.LayoutParams(0, -2, 1f))
+            }
+            tool(31, "Edit") { Studio.edit(this, f, genDir) { nf -> show(nf) } }
+            tool(32, "Markup") { Studio.markup(this, f, genDir) { nf -> show(nf) } }
+            tool(33, "Resize") {
+                val pm = android.widget.PopupMenu(this, bottomRow)
+                val opts = listOf("Square 1:1" to 1f, "Portrait 3:4" to 0.75f, "Story 9:16" to 0.5625f, "Landscape 4:3" to 1.3333f, "Widescreen 16:9" to 1.7778f)
+                opts.forEach { pm.menu.add(it.first) }
+                pm.setOnMenuItemClickListener { mi ->
+                    val r = opts.first { it.first == mi.title.toString() }.second
+                    Toast.makeText(this, "Resize ho raha hai...", Toast.LENGTH_SHORT).show()
+                    kotlin.concurrent.thread {
+                        val nf = try { Studio.resize(f, r, genDir) } catch (e: Throwable) { null }
+                        runOnUiThread { if (nf != null) show(nf) else Toast.makeText(this, "Resize nahi hua", Toast.LENGTH_SHORT).show() }
+                    }
+                    true
+                }
+                pm.show()
+            }
+            tool(34, "Remove") { Studio.remove(this, f, genDir) { nf -> show(nf) } }
+            frame.addView(bottomRow, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { bottomMargin = dp(28) })
             v.setContentView(frame)
             v.show()
-        }
-
-        fun saveToGallery(f: java.io.File) {
-            try {
-                val cv = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, f.name)
-                    put(android.provider.MediaStore.Images.Media.MIME_TYPE, if (f.name.endsWith("png")) "image/png" else "image/jpeg")
-                    if (Build.VERSION.SDK_INT >= 29) put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/AI Assistant")
-                }
-                val u = contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv)
-                if (u != null) contentResolver.openOutputStream(u)?.use { it.write(f.readBytes()) }
-                Toast.makeText(this, "Saved to gallery", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) { Toast.makeText(this, "Could not save", Toast.LENGTH_SHORT).show() }
         }
 
         fun roundOutline(iv: View, r: Int) {
@@ -1943,7 +2012,11 @@ class MainActivity : Activity() {
                                 iv.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }))
                                 roundOutline(iv, 14)
                                 iv.setOnClickListener { viewer(f) }
-                                row.addView(iv, LinearLayout.LayoutParams(side, side).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
+                                val cell = FrameLayout(this)
+                                cell.addView(iv, FrameLayout.LayoutParams(-1, -1))
+                                if (f.name in (getSharedPreferences("p", Context.MODE_PRIVATE).getStringSet("img_fav", emptySet()) ?: emptySet()))
+                                    cell.addView(TextView(this).apply { text = "\u2665"; textSize = 16f; setTextColor(Color.parseColor("#FF5C7A")) }, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.BOTTOM).apply { rightMargin = dp(8); bottomMargin = dp(4) })
+                                row.addView(cell, LinearLayout.LayoutParams(side, side).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
                             }
                         }
                         content.addView(row)
