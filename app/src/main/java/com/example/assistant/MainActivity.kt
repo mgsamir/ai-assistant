@@ -1189,13 +1189,30 @@ class MainActivity : Activity() {
         dlg.show()
     }
 
+    // "Loading" ke aage dot ek ek karke jalte hain, jab tak result na aaye
+    private fun loadingDots(tv: TextView): () -> Unit {
+        var on = true
+        var n = 0
+        val r = object : Runnable {
+            override fun run() {
+                if (!on) return
+                n = n % 3 + 1
+                tv.text = "Loading" + ".".repeat(n)
+                tv.postDelayed(this, 450)
+            }
+        }
+        tv.text = "Loading."
+        tv.postDelayed(r, 450)
+        return { on = false }
+    }
+
     // app ka poora report: copy / share karke kisi ko bhejne ke liye
     private fun showAppReport(pkg: String, label: String) {
         val dlg = fullDlg()
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
         val tv = TextView(this).apply {
-            text = "Report ban raha hai, thoda ruko..."; textSize = 11.5f; setTextColor(Color.parseColor("#D0D0D6"))
+            text = "Loading"; textSize = 11.5f; setTextColor(Color.parseColor("#D0D0D6"))
             typeface = Typeface.MONOSPACE; setTextIsSelectable(true); setPadding(dp(16), dp(8), dp(16), dp(24))
         }
         val sv = ScrollView(this)
@@ -1234,9 +1251,10 @@ class MainActivity : Activity() {
         root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
         dlg.setContentView(root)
         dlg.show()
+        val stopDots = loadingDots(tv)
         Thread {
             val r = try { AppReport.build(applicationContext, pkg) } catch (e: Throwable) { "Report nahi ban paya: ${e.message}" }
-            runOnUiThread { tv.text = r }
+            runOnUiThread { stopDots(); tv.text = r }
         }.start()
     }
 
@@ -1333,12 +1351,13 @@ class MainActivity : Activity() {
             val v = viewing
             title.text = label + (if (cur.isNotEmpty()) " / $cur" else "") + (if (v != null) " / " + v.substringAfterLast("/") else "")
             if (s == null) {
-                body.addView(TextView(this).apply { text = "Khul raha hai..."; setTextColor(Color.parseColor("#8B949E")); textSize = 14f })
+                body.addView(TextView(this).apply { text = "Loading"; setTextColor(Color.parseColor("#8B949E")); textSize = 14f; loadingDots(this) })
             } else if (v != null) {
                 var full = ""
                 val tv = TextView(this).apply {
-                    text = "Padh raha hu..."; textSize = 11.5f; setTextColor(Color.parseColor("#D0D0D6")); typeface = Typeface.MONOSPACE; setTextIsSelectable(true)
+                    text = "Loading"; textSize = 11.5f; setTextColor(Color.parseColor("#D0D0D6")); typeface = Typeface.MONOSPACE; setTextIsSelectable(true)
                 }
+                val stopV = loadingDots(tv)
                 val bar = LinearLayout(this)
                 bar.addView(pill("Copy") {
                     val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -1354,14 +1373,16 @@ class MainActivity : Activity() {
                     var r = try { s.read(v) } catch (e: Throwable) { "Padh nahi paya: ${e.message}" }
                     full = r
                     if (r.length > 200_000) r = r.take(200_000) + "\n...(aage ka chhota kiya, Save mein poora milega)"
-                    runOnUiThread { tv.text = r }
+                    runOnUiThread { stopV(); tv.text = r }
                 }.start()
             } else {
-                val ph = TextView(this).apply { text = "Khul raha hai..."; setTextColor(Color.parseColor("#8B949E")); textSize = 14f }
+                val ph = TextView(this).apply { text = "Loading"; setTextColor(Color.parseColor("#8B949E")); textSize = 14f }
                 body.addView(ph)
+                val stopP = loadingDots(ph)
                 Thread {
                     val items = try { s.list(cur) } catch (e: Throwable) { emptyList() }
                     runOnUiThread {
+                        stopP()
                         body.removeAllViews()
                         val c = card()
                         val head = LinearLayout(this)
@@ -1484,6 +1505,7 @@ class MainActivity : Activity() {
                 text = e.text.substringAfter(" \u2014 "); textSize = 14f; setTextColor(Color.parseColor("#D0D0D6")); setPadding(0, dp(6), 0, 0)
             })
             card.addView(tv, LinearLayout.LayoutParams(0, -2, 1f))
+            card.setOnClickListener { showAppReport(e.pkg, e.label) }
             content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
         dlg.setContentView(root)
