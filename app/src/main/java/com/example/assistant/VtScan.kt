@@ -57,6 +57,7 @@ object VtScan {
                         if (f != null) {
                             Security.notify(app, f)
                             Security.addLog(app.getSharedPreferences("p", Context.MODE_PRIVATE), listOf(f), emptySet())
+                            Security.addPending(app.getSharedPreferences("p", Context.MODE_PRIVATE), f)
                         }
                     }
                     try { Thread.sleep(16000) } catch (x: InterruptedException) { break }

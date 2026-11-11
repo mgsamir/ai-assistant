@@ -217,6 +217,37 @@ object Security {
         return show.take(6)
     }
 
+    // popup ke liye intezaar mein: naya app / baad mein mila virus (ek app ka popup bas ek baar)
+    fun addPending(p: android.content.SharedPreferences, f: Finding) {
+        try {
+            synchronized(this) {
+                val seen = p.getStringSet("sec_seen", emptySet()) ?: emptySet()
+                if (f.pkg in seen) return
+                val a = org.json.JSONArray(p.getString("sec_pending", "[]"))
+                for (i in 0 until a.length()) if (a.getJSONObject(i).getString("pkg") == f.pkg) return
+                a.put(org.json.JSONObject().put("pkg", f.pkg).put("label", f.label).put("score", f.score).put("why", org.json.JSONArray(f.reasons)))
+                p.edit().putString("sec_pending", a.toString()).apply()
+            }
+        } catch (e: Exception) { }
+    }
+
+    fun takePending(p: android.content.SharedPreferences): List<Finding> {
+        val out = ArrayList<Finding>()
+        try {
+            synchronized(this) {
+                val a = org.json.JSONArray(p.getString("sec_pending", "[]"))
+                for (i in 0 until a.length()) {
+                    val o = a.getJSONObject(i)
+                    val w = o.getJSONArray("why")
+                    out.add(Finding(o.optInt("score"), o.getString("label"), o.getString("pkg"), (0 until w.length()).map { w.getString(it) }))
+                }
+                val seen = p.getStringSet("sec_seen", emptySet()) ?: emptySet()
+                p.edit().remove("sec_pending").putStringSet("sec_seen", seen + out.map { it.pkg }).apply()
+            }
+        } catch (e: Exception) { }
+        return out
+    }
+
     // naya app install hua: turant jaanch, shak ho to notification
     @Suppress("DEPRECATION")
     fun checkNew(c: Context, pkg: String): Finding? {

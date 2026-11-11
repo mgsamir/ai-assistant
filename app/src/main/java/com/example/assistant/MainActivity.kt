@@ -1176,7 +1176,7 @@ class MainActivity : Activity() {
         r4.gravity = Gravity.CENTER_VERTICAL
         r4.setPadding(0, dp(14), 0, dp(14))
         r4.addView(IconView(this).apply { kind = 30 }, LinearLayout.LayoutParams(dp(48), dp(40)))
-        r4.addView(TextView(this).apply { text = "App code"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+        r4.addView(TextView(this).apply { text = "Smali"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r4.setOnClickListener { dlg.dismiss(); showAppPicker() }
         col.addView(r4)
@@ -1210,17 +1210,17 @@ class MainActivity : Activity() {
             background = GradientDrawable().apply { setColor(Color.parseColor("#2B3A67")); cornerRadius = dp(14).toFloat() }
             setOnClickListener { onC() }
         }
+        btns.addView(btn("Code") { showCodeBrowser(pkg, label) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { rightMargin = dp(4) })
         btns.addView(btn("Copy") {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("report", tv.text))
             Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
-        }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { rightMargin = dp(6) })
+        }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(4); rightMargin = dp(4) })
         btns.addView(btn("Share") {
             try {
                 startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, tv.text.toString()), "Report bhejo"))
             } catch (e: Exception) { }
-        }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(6) })
-        btns.addView(btn("Code") { showCodeBrowser(pkg, label) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(6) })
+        }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(4) })
         col.addView(btns, LinearLayout.LayoutParams(-1, -2))
         col.addView(sv, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(col, FrameLayout.LayoutParams(-1, -1))
@@ -1258,12 +1258,13 @@ class MainActivity : Activity() {
         val back = icon(23, 40) { dlg.dismiss() }
         back.background = oval("#303030")
         topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
-        topBar.addView(TextView(this).apply { text = "App code"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+        topBar.addView(TextView(this).apply { text = "Smali"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
         root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
         val pm = packageManager
         val apps = try {
             pm.getInstalledApplications(0).filter { it.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0 || it.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0 }
+                .filter { ai -> listOf("com.miui.", "com.xiaomi.", "com.mi.", "com.android.", "com.qualcomm.", "com.google.android.").none { ai.packageName.startsWith(it) } || ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0 }
                 .map { it.loadLabel(pm).toString() to it.packageName }.sortedBy { it.first.lowercase() }
         } catch (e: Exception) { emptyList() }
         for ((lab, pk) in apps) {
@@ -1483,8 +1484,6 @@ class MainActivity : Activity() {
                 text = e.text.substringAfter(" \u2014 "); textSize = 14f; setTextColor(Color.parseColor("#D0D0D6")); setPadding(0, dp(6), 0, 0)
             })
             card.addView(tv, LinearLayout.LayoutParams(0, -2, 1f))
-            card.addView(icon(10, 44) { AssistantService.engine?.replay(e.text) },
-                LinearLayout.LayoutParams(dp(44), dp(44)).apply { leftMargin = dp(6) })
             content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
         dlg.setContentView(root)
@@ -1828,67 +1827,6 @@ class MainActivity : Activity() {
 
         render = {
             content.removeAllViews()
-            if (tab != 3) {
-                val tabs = LinearLayout(this)
-                fun tabV(i: Int, name: String): TextView = TextView(this).apply {
-                    text = name
-                    textSize = 16f
-                    setTextColor(if (tab == i) Color.WHITE else Color.parseColor("#9AA3B5"))
-                    setPadding(dp(16), dp(10), dp(16), dp(10))
-                    background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setColor(if (tab == i) Color.parseColor("#3A3A3A") else Color.TRANSPARENT) }
-                    setOnClickListener { tab = i; render() }
-                }
-                tabs.addView(tabV(0, "Trending"))
-                tabs.addView(tabV(1, "Templates"), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
-                tabs.addView(tabV(2, "My images"), LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
-                content.addView(tabs, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(16) })
-            }
-
-            if (tab == 0 || tab == 1) {
-                val list = if (tab == 0) trending else templates
-                var i = 0
-                while (i < list.size) {
-                    val row = LinearLayout(this)
-                    for (j in 0..1) {
-                        val idx = i + j
-                        if (idx < list.size) {
-                            val tpl = list[idx]
-                            val (c1, c2) = palette[idx % palette.size]
-                            val card = FrameLayout(this)
-                            card.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor(c1), Color.parseColor(c2))).apply { cornerRadius = dp(24).toFloat() }
-                            roundOutline(card, 24)
-                            val pic = android.widget.ImageView(this)
-                            pic.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                            card.addView(pic, FrameLayout.LayoutParams(-1, -1))
-                            loadThumb(tpl.thumb, pic)
-                            card.addView(View(this).apply {
-                                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.TRANSPARENT, Color.parseColor("#B3000000")))
-                            }, FrameLayout.LayoutParams(-1, dp(70), Gravity.BOTTOM))
-                            card.addView(TextView(this).apply {
-                                text = tpl.name
-                                textSize = 17f
-                                setTextColor(Color.WHITE)
-                                typeface = Typeface.DEFAULT_BOLD
-                                setPadding(dp(16), dp(14), dp(16), dp(14))
-                            }, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
-                            card.setOnClickListener {
-                                if (tpl.photo) askPhoto(tpl)
-                                else {
-                                    imgAtt = null
-                                    refreshAtt()
-                                    et.setText(tpl.prompt)
-                                    et.setSelection(et.text.length)
-                                    et.requestFocus()
-                                }
-                            }
-                            row.addView(card, LinearLayout.LayoutParams(0, dp(205), 1f).apply { setMargins(dp(5), dp(5), dp(5), dp(5)) })
-                        } else row.addView(View(this), LinearLayout.LayoutParams(0, dp(205), 1f))
-                    }
-                    content.addView(row)
-                    i += 2
-                }
-            }
-
             if (tab == 3) {
                 val sw = resources.displayMetrics.widthPixels - dp(32)
                 for (t in turns) {
@@ -1953,47 +1891,42 @@ class MainActivity : Activity() {
                 }
             }
 
-            if (tab == 2) {
-                val files = (genDir.listFiles() ?: emptyArray()).filter { it.isFile }.sortedByDescending { it.lastModified() }.take(60)
+            if (tab == 0) {
+                val files = (genDir.listFiles() ?: emptyArray()).filter { it.isFile }.sortedByDescending { it.lastModified() }.take(400)
                 if (files.isEmpty()) {
                     content.addView(TextView(this).apply {
-                        text = "No images yet. Describe one below."
+                        text = "Abhi koi image nahi. Chat mein jo image banegi wo yahan aayegi."
                         textSize = 15f
                         setTextColor(Color.parseColor("#9AA3B5"))
                     })
                 }
                 val side = (resources.displayMetrics.widthPixels - dp(32) - dp(12)) / 3
-                var k = 0
-                while (k < files.size) {
-                    val row = LinearLayout(this)
-                    for (j in 0..2) {
-                        val idx = k + j
-                        if (idx < files.size) {
-                            val f = files[idx]
-                            val iv = android.widget.ImageView(this)
-                            iv.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                            iv.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }))
-                            roundOutline(iv, 14)
-                            iv.setOnClickListener { viewer(f) }
-                            row.addView(iv, LinearLayout.LayoutParams(side, side).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
+                val dayF = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.ENGLISH)
+                val groups = LinkedHashMap<String, MutableList<java.io.File>>()
+                for (f in files) groups.getOrPut(dayF.format(java.util.Date(f.lastModified()))) { ArrayList() }.add(f)
+                for ((day, list) in groups) {
+                    content.addView(TextView(this).apply {
+                        text = day; textSize = 15f; setTextColor(Color.parseColor("#8D8D95")); typeface = Typeface.DEFAULT_BOLD
+                        setPadding(dp(2), dp(14), 0, dp(8))
+                    })
+                    var k = 0
+                    while (k < list.size) {
+                        val row = LinearLayout(this)
+                        for (j in 0..2) {
+                            val idx = k + j
+                            if (idx < list.size) {
+                                val f = list[idx]
+                                val iv = android.widget.ImageView(this)
+                                iv.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                                iv.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }))
+                                roundOutline(iv, 14)
+                                iv.setOnClickListener { viewer(f) }
+                                row.addView(iv, LinearLayout.LayoutParams(side, side).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) })
+                            }
                         }
+                        content.addView(row)
+                        k += 3
                     }
-                    content.addView(row)
-                    k += 3
-                }
-            }
-        }
-        // Gemini se roz apne aap nayi Trending / Templates (naya mile to yahin badal jaata hai)
-        val tsp = getSharedPreferences("p", Context.MODE_PRIVATE)
-        Trends.load(tsp)?.let { trending = it.first; templates = it.second }
-        if (Trends.due(tsp)) {
-            val tkey = Keys.get(tsp)
-            if (tkey.isNotEmpty()) kotlin.concurrent.thread {
-                val r = Trends.refresh(tkey, tsp)
-                if (r != null) runOnUiThread {
-                    trending = r.first
-                    templates = r.second
-                    if (dlg.isShowing && (tab == 0 || tab == 1)) render()
                 }
             }
         }
@@ -2419,12 +2352,19 @@ class MainActivity : Activity() {
     // App khulte hi phone ki jaanch (peeche chalti hai), shak wala kuch mile tabhi dikhata hai
     private fun autoSecurity() {
         val p = getSharedPreferences("p", Context.MODE_PRIVATE)
-        if (System.currentTimeMillis() - p.getLong("sec_last", 0L) < 5 * 60 * 1000L) return
+        val own = try { packageManager.getPackageInfo(packageName, 0).lastUpdateTime } catch (e: Exception) { 0L }
         Thread {
-            val list = try { Security.autoCheck(applicationContext, p) } catch (e: Exception) { null }
-            if (!list.isNullOrEmpty()) runOnUiThread {
+            val all = ArrayList<Security.Finding>()
+            // assistant naya install / update hone par sirf ek baar poora phone
+            if (p.getLong("sec_stamp", -1L) != own) {
+                p.edit().putLong("sec_stamp", own).apply()
+                try { Security.autoCheck(applicationContext, p)?.let { all.addAll(it) } } catch (e: Exception) { }
+            }
+            // naye aaye / baad mein pakde gaye app (ek hi baar)
+            try { for (f in Security.takePending(p)) if (all.none { it.pkg == f.pkg }) all.add(f) } catch (e: Exception) { }
+            if (all.isNotEmpty()) runOnUiThread {
                 if (isFinishing) return@runOnUiThread
-                showWarnings(list, 0)
+                showWarnings(all, 0)
             }
         }.start()
     }
@@ -2454,7 +2394,7 @@ class MainActivity : Activity() {
             card.addView(TextView(this).apply {
                 text = "\u2715"; textSize = 22f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
                 setOnClickListener { d.dismiss(); showWarnings(list, i + 1) }
-            }, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP or Gravity.START).apply { leftMargin = dp(6); topMargin = dp(6) })
+            }, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP or Gravity.END).apply { rightMargin = dp(6); topMargin = dp(6) })
             root.addView(card, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER).apply { leftMargin = dp(22); rightMargin = dp(22) })
             d.setContentView(root)
             d.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
