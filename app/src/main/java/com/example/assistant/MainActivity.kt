@@ -2115,11 +2115,16 @@ class MainActivity : Activity() {
         if (c != null && Usage.paidOnly(c)) { Models.setSel(p, "chat", null); c = null }
         val lk = Models.lock(p)
         if (c != null && lk.isNotEmpty() && c.prov != lk) { Models.setSel(p, "chat", null); c = null }
-        val pre = if (lk.isEmpty()) "AI" else Models.provName(lk)
-        val base = pre + " " + (if (c == null) "Auto" else c.name)
-        val s = SpannableString(base)
-        s.setSpan(ForegroundColorSpan(Color.parseColor("#B0B0B8")), pre.length + 1, base.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        titleV.text = s
+        // jo model chalega usi ka naam: Auto ho to "Gemini Auto", ek model chuna ho to uska naam
+        val prov = if (lk.isNotEmpty()) lk else "gemini"
+        if (c == null) {
+            val pre = Models.provName(prov)
+            val base = "$pre Auto"
+            val s = SpannableString(base)
+            s.setSpan(ForegroundColorSpan(Color.parseColor("#B0B0B8")), pre.length + 1, base.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            titleV.text = s
+        } else titleV.text = c.name
+        titleV.maxWidth = (resources.displayMetrics.widthPixels * 0.62f).toInt()
     }
 
     // provider ka logo (gol, user ki di hui image); na ho to None
