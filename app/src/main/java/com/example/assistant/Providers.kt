@@ -83,18 +83,29 @@ object Providers {
     // Gemini na chale to pehle Groq, phir OpenAI, phir OpenRouter
     @Volatile var lastModel = ""
 
-    fun fallback(system: String, hist: List<Pair<String, String>>, q: String): String? {
-        chat("https://api.groq.com/openai/v1/chat/completions", Extra.groq,
-            "llama-3.3-70b-versatile", system, hist, q)?.let { if (it.isNotBlank()) return it }
-        // OpenRouter: pehle free models (paisa kharch nahi), tabhi auto jab free na chalein
-        val sp = Usage.p
-        val frees = if (sp != null) Models.list(sp).filter { it.prov == "openrouter" && it.free && it.cat == "chat" }.take(3) else emptyList()
-        for (m in frees) {
-            chat("https://openrouter.ai/api/v1/chat/completions", Extra.openrouter,
-                m.id, system, hist, q)?.let { if (it.isNotBlank()) return it }
+    // only = "" (sab, pehle jaisa) ya "groq" / "openrouter" (sirf wahi provider)
+    fun fallback(system: String, hist: List<Pair<String, String>>, q: String, only: String = ""): String? {
+        if (only.isEmpty() || only == "groq") {
+            chat("https://api.groq.com/openai/v1/chat/completions", Extra.groq,
+                "llama-3.3-70b-versatile", system, hist, q)?.let { if (it.isNotBlank()) return it }
+            if (only == "groq") {
+                val sp0 = Usage.p
+                val more = if (sp0 != null) Models.list(sp0).filter { it.prov == "groq" && it.cat == "chat" && it.id != "llama-3.3-70b-versatile" }.take(3) else emptyList()
+                for (m in more) chat("https://api.groq.com/openai/v1/chat/completions", Extra.groq,
+                    m.id, system, hist, q)?.let { if (it.isNotBlank()) return it }
+            }
         }
-        chat("https://openrouter.ai/api/v1/chat/completions", Extra.openrouter,
-            "openrouter/auto", system, hist, q)?.let { if (it.isNotBlank()) return it }
+        if (only.isEmpty() || only == "openrouter") {
+            // OpenRouter: pehle free models (paisa kharch nahi), tabhi auto jab free na chalein
+            val sp = Usage.p
+            val frees = if (sp != null) Models.list(sp).filter { it.prov == "openrouter" && it.free && it.cat == "chat" }.take(3) else emptyList()
+            for (m in frees) {
+                chat("https://openrouter.ai/api/v1/chat/completions", Extra.openrouter,
+                    m.id, system, hist, q)?.let { if (it.isNotBlank()) return it }
+            }
+            chat("https://openrouter.ai/api/v1/chat/completions", Extra.openrouter,
+                "openrouter/auto", system, hist, q)?.let { if (it.isNotBlank()) return it }
+        }
         return null
     }
 

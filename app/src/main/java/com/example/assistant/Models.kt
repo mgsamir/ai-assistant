@@ -85,6 +85,16 @@ object Models {
         p.edit().apply { if (m == null) remove("sel_$cat") else putString("sel_$cat", m.key) }.apply()
     }
 
+    // left menu se chuna hua provider: "" = sab, warna gemini / groq / openrouter. Auto aur single model dono isi tak.
+    fun lock(p: SharedPreferences): String = p.getString("prov_lock", "") ?: ""
+
+    fun setLock(p: SharedPreferences, prov: String) {
+        p.edit().putString("prov_lock", prov).apply()
+        if (prov.isNotEmpty()) for ((k, _) in CATS) sel(p, k)?.let { if (it.prov != prov) setSel(p, k, null) }
+    }
+
+    fun provName(x: String) = when (x) { "gemini" -> "Gemini"; "openai" -> "ChatGPT (OpenAI)"; "groq" -> "Groq"; "openrouter" -> "OpenRouter"; else -> x }
+
     fun think(p: SharedPreferences) = p.getString("think", "medium") ?: "medium"
 
     private fun get(url: String, hdr: Map<String, String>): String? = try {

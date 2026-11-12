@@ -74,6 +74,7 @@ class IconView(ctx: Context) : View(ctx) {
             }
             31 -> { c.drawCircle(11f, 11f, 7f, p); c.drawLine(16f, 16f, 21f, 21f, p); c.drawLine(11f, 8f, 11f, 14f, p); c.drawLine(8f, 11f, 14f, 11f, p) }
             32 -> { c.drawLine(4f, 20f, 8f, 19f, p); c.drawLine(8f, 19f, 19f, 8f, p); c.drawLine(16f, 5f, 19f, 8f, p); c.drawLine(16f, 5f, 18f, 3f, p); c.drawLine(18f, 3f, 21f, 6f, p); c.drawLine(21f, 6f, 19f, 8f, p); c.drawLine(4f, 20f, 5f, 16f, p); c.drawLine(5f, 16f, 8f, 19f, p) }
+            40 -> { c.drawRoundRect(RectF(4f, 4f, 10.5f, 10.5f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(13.5f, 4f, 20f, 10.5f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(4f, 13.5f, 10.5f, 20f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(13.5f, 13.5f, 20f, 20f), 1.5f, 1.5f, p) }
             33 -> { c.drawRoundRect(RectF(4f, 9f, 15f, 20f), 2f, 2f, p); c.drawRoundRect(RectF(9f, 4f, 20f, 15f), 2f, 2f, p) }
             34 -> { c.save(); c.rotate(-45f, 12f, 12f); c.drawRoundRect(RectF(4f, 7f, 20f, 17f), 3f, 3f, p); c.drawLine(12f, 7f, 12f, 17f, p); c.restore() }
             35 -> { c.drawLine(12f, 4f, 12f, 16f, p); c.drawLine(7f, 11f, 12f, 16f, p); c.drawLine(12f, 16f, 17f, 11f, p); c.drawLine(5f, 20f, 19f, 20f, p) }
@@ -1187,6 +1188,14 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r4.setOnClickListener { dlg.dismiss(); showAppPicker() }
         col.addView(r4)
+        val r5 = LinearLayout(this)
+        r5.gravity = Gravity.CENTER_VERTICAL
+        r5.setPadding(0, dp(14), 0, dp(14))
+        r5.addView(IconView(this).apply { kind = 40 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        r5.addView(TextView(this).apply { text = "Models"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        r5.setOnClickListener { dlg.dismiss(); showProviders() }
+        col.addView(r5, 1)
         dlg.setContentView(col)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -2059,10 +2068,62 @@ class MainActivity : Activity() {
         val p = getSharedPreferences("p", Context.MODE_PRIVATE)
         var c = Models.sel(p, "chat")
         if (c != null && Usage.paidOnly(c)) { Models.setSel(p, "chat", null); c = null }
-        val base = if (c == null) "AI Auto" else "AI " + c.name
+        val lk = Models.lock(p)
+        if (c != null && lk.isNotEmpty() && c.prov != lk) { Models.setSel(p, "chat", null); c = null }
+        val pre = if (lk.isEmpty()) "AI" else Models.provName(lk)
+        val base = pre + " " + (if (c == null) "Auto" else c.name)
         val s = SpannableString(base)
-        s.setSpan(ForegroundColorSpan(Color.parseColor("#B0B0B8")), 3, base.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        s.setSpan(ForegroundColorSpan(Color.parseColor("#B0B0B8")), pre.length + 1, base.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         titleV.text = s
+    }
+
+    // left menu ka "Models" page: provider chuno. Auto aur model list sirf usi ki.
+    private fun showProviders() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val dlg = fullDlg()
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
+        val top = FrameLayout(this)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#1A1A1A")
+        top.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.CENTER_VERTICAL))
+        top.addView(TextView(this).apply { text = "Models"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val free = Models.list(p).filter { it.free && !Usage.paidOnly(it) && it.cat == "chat" }
+        val cur = Models.lock(p)
+        fun colorOf(x: String) = when (x) { "gemini" -> "#4F8BFF"; "groq" -> "#F55036"; "openrouter" -> "#7C5CFF"; else -> "#6B7280" }
+        fun letterOf(x: String) = when (x) { "gemini" -> "G"; "groq" -> "Gq"; "openrouter" -> "OR"; else -> "A" }
+        fun item(prov: String, title: String, sub: String) {
+            val row = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(14), dp(16), dp(14))
+                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")); setStroke(dp(1), Color.parseColor(if (cur == prov) "#4F8BFF" else "#1F1F24")) }
+            }
+            row.addView(TextView(this).apply {
+                text = letterOf(prov); textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor(if (prov.isEmpty()) "#2A2A2A" else colorOf(prov))) }
+            }, LinearLayout.LayoutParams(dp(40), dp(40)))
+            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+            tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
+            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
+            row.addView(TextView(this).apply { text = if (cur == prov) "\u2713" else ""; textSize = 22f; setTextColor(Color.WHITE) })
+            row.setOnClickListener {
+                Models.setLock(p, prov)
+                refreshTitle()
+                Toast.makeText(this, if (prov.isEmpty()) "Auto: sab providers" else Models.provName(prov) + " select hua. Auto aur model list ab sirf isi ki.", Toast.LENGTH_SHORT).show()
+                dlg.dismiss()
+            }
+            list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        }
+        item("", "All providers", "Auto: Gemini, Groq aur OpenRouter teeno")
+        for (prov in listOf("gemini", "groq", "openrouter")) {
+            val n = free.count { it.prov == prov }
+            item(prov, Models.provName(prov), if (n > 0) "$n free models" else "Auto: free models")
+        }
+        root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        dlg.setContentView(root)
+        dlg.show()
     }
 
     private fun showModels() {
@@ -2162,7 +2223,9 @@ class MainActivity : Activity() {
             // sirf free models dikhte hain, paid sab hata diye
             for ((k, _) in Models.CATS) Models.sel(p, k)?.let { if (!it.free || Usage.paidOnly(it)) Models.setSel(p, k, null) }
             val all = Models.list(p).filter { it.free && !Usage.paidOnly(it) }
+            val lockP = Models.lock(p)
             for (prov in listOf("gemini", "openai", "groq", "openrouter")) {
+                if (lockP.isNotEmpty() && prov != lockP) continue
                 val mine = all.filter { it.prov == prov }
                 if (mine.isEmpty()) continue
                 col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(14), dp(6), dp(14), dp(2)) })

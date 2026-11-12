@@ -716,6 +716,16 @@ The user is an adult. Answer questions about the human body, sex education, repr
         val q = if (Regex("hut\\s*bay", RegexOption.IGNORE_CASE).containsMatchIn(q0) && !q0.contains("andaman", true)) q0 + " Little Andaman Andaman Nicobar India" else q0
         val brave = Providers.brave(q)
         pendingSources = Providers.lastResults.takeIf { brave != null && it.isNotEmpty() }
+        val lockW = Models.lock(prefs)
+        if (lockW.isNotEmpty() && lockW != "gemini") {
+            // sirf chuna hua provider: Brave ke natije us provider ko do
+            if (brave != null) {
+                val sysL = "Answer the question using ONLY these search results. Simple everyday Hindustani, 1 to 4 short sentences, no markdown. " +
+                    "Write exactly two lines:\nS: answer in Hinglish (Roman letters)\nV: same answer in Hindi Devanagari"
+                Providers.fallback(sysL, emptyList(), q + "\n\nSearch results:\n" + brave, lockW)?.let { return parseReply(it) }
+            }
+            return Reply("Search nahi chala (" + Models.provName(lockW) + "). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।")
+        }
         val ws = Models.sel(prefs, "web")
         if (ws != null && ws.prov != "gemini") {
             val t = Providers.chatWith(ws.prov, ws.id,
@@ -725,7 +735,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         }
         val raw = WebSearch.ask(key, q, if (ws != null && ws.prov == "gemini") listOf(ws.id) else emptyList(), brave)
         if (raw != null) return parseReply(raw)
-        if (brave != null) {
+        if (brave != null && lockW != "gemini") {
             val sys = "Answer the question using ONLY these search results. Simple everyday Hindustani, 1 to 4 short sentences, no markdown. " +
                 "Write exactly two lines:\nS: answer in Hinglish (Roman letters)\nV: same answer in Hindi Devanagari"
             val fb = Providers.fallback(sys, emptyList(), q + "\n\nSearch results:\n" + brave)
@@ -889,8 +899,26 @@ The user is an adult. Answer questions about the human body, sex education, repr
         thread {
             try {
                 val codeQ = Regex("(?i)\\b(code|coding|program|script|function|bug|error|kotlin|java|python|html|css|javascript|sql|api|app banao|website banao)\\b|कोड|प्रोग्राम").containsMatchIn(q)
-                val pick0 = (if (codeQ) Models.sel(prefs, "coding") else null) ?: Models.sel(prefs, "chat")
+                val lock = Models.lock(prefs)
+                val pick00 = (if (codeQ) Models.sel(prefs, "coding") else null) ?: Models.sel(prefs, "chat")
+                val pick0 = pick00?.takeIf { lock.isEmpty() || it.prov == lock }
                 val pick = if (pick0 != null && Usage.paidOnly(pick0)) null else pick0
+                // left menu se Groq / OpenRouter chuna ho: Auto bhi sirf usi ke models se (photo/file ho to Gemini)
+                if (lock.isNotEmpty() && lock != "gemini" && att == null) {
+                    var txtL: String? = null
+                    if (pick != null) txtL = Providers.chatWith(pick.prov, pick.id, systemText(), history.takeLast(6), q)?.also { answeredBy = pick.name }
+                    if (txtL == null) txtL = Providers.fallback(systemText(), history.takeLast(6), q, lock)?.also { answeredBy = Models.list(prefs).firstOrNull { m -> m.id == Providers.lastModel }?.name ?: Providers.lastModel }
+                    if (txtL != null) {
+                        main.post { deliver(parseReply(txtL), q, true) }
+                    } else {
+                        main.post {
+                            mode(0)
+                            beep(2)
+                            deliver(Reply(Models.provName(lock) + " se jawab nahi mila. Thodi der baad dobara try karo ya Models mein dusra chuno.", Models.provName(lock) + " से जवाब नहीं मिला। थोड़ी देर बाद दोबारा कोशिश करो।"), q, false)
+                        }
+                    }
+                    return@thread
+                }
                 var okModel = ""
                 fun nameOf(id: String) = Models.list(prefs).firstOrNull { it.id == id }?.name ?: id
                 if (pick != null && pick.prov != "gemini" && att == null) {
@@ -951,7 +979,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 }
                 if (code == 200) answeredBy = nameOf(okModel)
                 if (code != 200) {
-                    val fb = Providers.fallback(systemText(), history.takeLast(6), q)
+                    val fb = if (lock == "gemini") null else Providers.fallback(systemText(), history.takeLast(6), q)
                     if (fb != null) {
                         answeredBy = nameOf(Providers.lastModel)
                         main.post { deliver(parseReply(fb), q, true) }
