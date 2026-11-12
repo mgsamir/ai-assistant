@@ -30,7 +30,7 @@ object Chats {
     @Synchronized fun all(p: SharedPreferences): List<C> {
         var l = read(p)
         // ek baar: ek hi naam ki dohri entries mein se sabse poori rakho
-        if (!p.getBoolean("chats_v2", false)) {
+        if (!p.getBoolean("chats_v3", false)) {
             val best = LinkedHashMap<String, C>()
             for (c in l.sortedByDescending { it.time }) {
                 val k = c.title.trim().lowercase()
@@ -39,7 +39,7 @@ object Chats {
             }
             l = ArrayList(best.values)
             write(p, l)
-            p.edit().putBoolean("chats_v2", true).apply()
+            p.edit().putBoolean("chats_v3", true).apply()
         }
         return l.sortedByDescending { it.time }
     }
@@ -47,10 +47,14 @@ object Chats {
     @Synchronized fun save(p: SharedPreferences, id: String, log: String) {
         val title = log.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.firstOrNull { it.startsWith("Tum:") }
             ?.removePrefix("Tum:")?.trim()?.take(40)?.ifBlank { null } ?: "Chat"
-        val l = read(p).filter { it.id != id }.toMutableList()
+        // isi chat ki file badlo; bilkul ek jaisi dusri entry ho to hata do
+        val l = read(p).filter { it.id != id && !(it.title == title && it.log == log) }.toMutableList()
         l.add(C(id, title, System.currentTimeMillis(), log))
         write(p, l)
     }
+
+    // ek chat ki poori file (nahi mili to null)
+    @Synchronized fun get(p: SharedPreferences, id: String): C? = if (id.isEmpty()) null else read(p).firstOrNull { it.id == id }
 
     @Synchronized fun delete(p: SharedPreferences, id: String) { write(p, read(p).filter { it.id != id }) }
 
