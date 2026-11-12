@@ -2151,8 +2151,8 @@ class MainActivity : Activity() {
                 setPadding(dp(14), dp(14), dp(16), dp(14))
                 background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")); setStroke(dp(1), Color.parseColor(if (cur == prov) "#4F8BFF" else "#1F1F24")) }
             }
-            val lg = provLogo(prov, 44)
-            if (lg != null) row.addView(lg, LinearLayout.LayoutParams(dp(44), dp(44)))
+            val lg = provLogo(prov, 48)
+            if (lg != null) row.addView(lg, LinearLayout.LayoutParams(dp(48), dp(48)))
             else row.addView(TextView(this).apply {
                 text = letterOf(prov); textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
                 background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor(if (prov.isEmpty()) "#2A2A2A" else colorOf(prov))) }
@@ -2211,14 +2211,15 @@ class MainActivity : Activity() {
         fun row(title: String, sub: String?, prov: String?, checked: Boolean, usage: Usage.Info? = null, hold: (() -> Unit)? = null, go: () -> Unit): View {
             val r = LinearLayout(this)
             r.gravity = Gravity.CENTER_VERTICAL
-            r.setPadding(dp(14), dp(11), dp(16), dp(11))
-            r.addView(TextView(this).apply {
+            // logo wali lines: logo sabka ek hi seedh mein (provider ke logo ke neeche), tick daayen taraf
+            r.setPadding(dp(if (prov != null) 18 else 14), dp(11), dp(if (prov != null) 18 else 16), dp(11))
+            if (prov == null) r.addView(TextView(this).apply {
                 text = if (checked) "\u2713" else ""
                 textSize = 20f
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
             }, LinearLayout.LayoutParams(dp(34), -2))
-            if (prov != null) r.addView(badge(prov, 30), LinearLayout.LayoutParams(dp(30), dp(30)).apply { leftMargin = dp(4) })
+            if (prov != null) r.addView(badge(prov, 36), LinearLayout.LayoutParams(dp(36), dp(36)))
             val tx = LinearLayout(this)
             tx.orientation = LinearLayout.VERTICAL
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
@@ -2239,7 +2240,13 @@ class MainActivity : Activity() {
                 }
                 tx.addView(TextView(this).apply { text = usage.text; textSize = 12f; setTextColor(Color.parseColor("#9A9AA2")); setPadding(0, dp(3), 0, 0) })
             }
-            r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(6) })
+            r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(if (prov != null) 14 else 6) })
+            if (prov != null) r.addView(TextView(this).apply {
+                text = if (checked) "\u2713" else ""
+                textSize = 20f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+            }, LinearLayout.LayoutParams(dp(28), -2).apply { leftMargin = dp(8) })
             r.setOnClickListener { go() }
             if (hold != null) r.setOnLongClickListener { hold(); true }
             return r
@@ -2249,7 +2256,7 @@ class MainActivity : Activity() {
             textSize = 14f
             setTextColor(Color.parseColor("#B0B0B8"))
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(dp(20), dp(14), dp(16), dp(4))
+            setPadding(dp(18), dp(14), dp(16), dp(6))
         }
         fun line(): View = View(this).apply { setBackgroundColor(Color.parseColor("#262626")) }
 
@@ -2286,17 +2293,20 @@ class MainActivity : Activity() {
                 val ph = LinearLayout(this)
                 ph.gravity = Gravity.CENTER_VERTICAL
                 ph.setPadding(dp(18), dp(10), dp(20), dp(10))
-                ph.addView(badge(prov, 30), LinearLayout.LayoutParams(dp(30), dp(30)))
-                ph.addView(TextView(this).apply { text = provName(prov); textSize = 17f; setTextColor(Color.WHITE) },
+                ph.addView(badge(prov, 36), LinearLayout.LayoutParams(dp(36), dp(36)))
+                ph.addView(TextView(this).apply { text = provName(prov); textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
                     LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
                 ph.addView(TextView(this).apply { text = if (open) "\u2303" else "\u2304"; textSize = 20f; setTextColor(Color.WHITE) })
                 ph.setOnClickListener { if (open) openProv.remove(prov) else openProv.add(prov); render() }
                 col.addView(ph)
                 if (!open) continue
+                var firstCat = true
                 for ((cat, label) in Models.CATS) {
                     val items = mine.filter { it.cat == cat }.sortedByDescending { it.free }
                     if (items.isEmpty()) continue
-                    col.addView(head(label))
+                    if (!firstCat) col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(18), dp(10), dp(18), dp(0)) })
+                    firstCat = false
+                    col.addView(head(label.uppercase() + "  \u00b7  " + items.size))
                     val cur = Models.sel(p, cat)
                     for (mm in items) {
                         val on = cur != null && cur.key == mm.key
