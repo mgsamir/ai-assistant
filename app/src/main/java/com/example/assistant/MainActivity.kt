@@ -75,6 +75,9 @@ class IconView(ctx: Context) : View(ctx) {
             31 -> { c.drawCircle(11f, 11f, 7f, p); c.drawLine(16f, 16f, 21f, 21f, p); c.drawLine(11f, 8f, 11f, 14f, p); c.drawLine(8f, 11f, 14f, 11f, p) }
             32 -> { c.drawLine(4f, 20f, 8f, 19f, p); c.drawLine(8f, 19f, 19f, 8f, p); c.drawLine(16f, 5f, 19f, 8f, p); c.drawLine(16f, 5f, 18f, 3f, p); c.drawLine(18f, 3f, 21f, 6f, p); c.drawLine(21f, 6f, 19f, 8f, p); c.drawLine(4f, 20f, 5f, 16f, p); c.drawLine(5f, 16f, 8f, 19f, p) }
             40 -> { c.drawRoundRect(RectF(4f, 4f, 10.5f, 10.5f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(13.5f, 4f, 20f, 10.5f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(4f, 13.5f, 10.5f, 20f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(13.5f, 13.5f, 20f, 20f), 1.5f, 1.5f, p) }
+            42 -> { c.drawLine(5f, 12.5f, 10f, 17.5f, p); c.drawLine(10f, 17.5f, 19f, 7f, p) }
+            43 -> { c.drawLine(6f, 9f, 12f, 15f, p); c.drawLine(12f, 15f, 18f, 9f, p) }
+            44 -> { c.drawLine(6f, 15f, 12f, 9f, p); c.drawLine(12f, 9f, 18f, 15f, p) }
             41 -> { c.drawLine(5f, 6f, 19f, 6f, p); c.drawLine(12f, 6f, 12f, 19f, p); c.drawLine(9f, 19f, 15f, 19f, p) }
             33 -> { c.drawRoundRect(RectF(4f, 9f, 15f, 20f), 2f, 2f, p); c.drawRoundRect(RectF(9f, 4f, 20f, 15f), 2f, 2f, p) }
             34 -> { c.save(); c.rotate(-45f, 12f, 12f); c.drawRoundRect(RectF(4f, 7f, 20f, 17f), 3f, 3f, p); c.drawLine(12f, 7f, 12f, 17f, p); c.restore() }
@@ -2161,7 +2164,7 @@ class MainActivity : Activity() {
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
             tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
             row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
-            row.addView(TextView(this).apply { text = if (cur == prov) "\u2713" else ""; textSize = 22f; setTextColor(Color.WHITE) })
+            row.addView(IconView(this).apply { kind = if (cur == prov) 42 else -1 }, LinearLayout.LayoutParams(dp(36), dp(36)))
             row.setOnClickListener {
                 Models.setLock(p, prov)
                 refreshTitle()
@@ -2208,17 +2211,13 @@ class MainActivity : Activity() {
         }
 
         lateinit var render: () -> Unit
+        fun tick(on: Boolean): View = IconView(this).apply { kind = if (on) 42 else -1 }
         fun row(title: String, sub: String?, prov: String?, checked: Boolean, usage: Usage.Info? = null, hold: (() -> Unit)? = null, go: () -> Unit): View {
             val r = LinearLayout(this)
             r.gravity = Gravity.CENTER_VERTICAL
             // logo wali lines: logo sabka ek hi seedh mein (provider ke logo ke neeche), tick daayen taraf
             r.setPadding(dp(if (prov != null) 18 else 14), dp(11), dp(if (prov != null) 18 else 16), dp(11))
-            if (prov == null) r.addView(TextView(this).apply {
-                text = if (checked) "\u2713" else ""
-                textSize = 20f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-            }, LinearLayout.LayoutParams(dp(34), -2))
+            if (prov == null) r.addView(tick(checked), LinearLayout.LayoutParams(dp(38), dp(38)))
             if (prov != null) r.addView(badge(prov, 36), LinearLayout.LayoutParams(dp(36), dp(36)))
             val tx = LinearLayout(this)
             tx.orientation = LinearLayout.VERTICAL
@@ -2241,12 +2240,7 @@ class MainActivity : Activity() {
                 tx.addView(TextView(this).apply { text = usage.text; textSize = 12f; setTextColor(Color.parseColor("#9A9AA2")); setPadding(0, dp(3), 0, 0) })
             }
             r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(if (prov != null) 14 else 6) })
-            if (prov != null) r.addView(TextView(this).apply {
-                text = if (checked) "\u2713" else ""
-                textSize = 20f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-            }, LinearLayout.LayoutParams(dp(28), -2).apply { leftMargin = dp(8) })
+            if (prov != null) r.addView(tick(checked), LinearLayout.LayoutParams(dp(34), dp(34)).apply { leftMargin = dp(6) })
             r.setOnClickListener { go() }
             if (hold != null) r.setOnLongClickListener { hold(); true }
             return r
@@ -2263,16 +2257,19 @@ class MainActivity : Activity() {
         render = {
             col.removeAllViews()
             val none = Models.CATS.all { Models.sel(p, it.first) == null }
-            col.addView(row("Auto", null, null, none) {
+            col.addView(row("Auto", "Adapts to your needs", null, none) {
                 for ((k, _) in Models.CATS) Models.setSel(p, k, null)
                 refreshTitle(); render()
             })
             col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(14), dp(6), dp(14), dp(6)) })
             val th = LinearLayout(this)
             th.gravity = Gravity.CENTER_VERTICAL
-            th.setPadding(dp(54), dp(10), dp(20), dp(10))
-            th.addView(TextView(this).apply { text = "Thinking level"; textSize = 17f; setTextColor(Color.WHITE) }, LinearLayout.LayoutParams(0, -2, 1f))
-            th.addView(TextView(this).apply { text = if (thinkOpen) "\u2303" else "\u2304"; textSize = 20f; setTextColor(Color.WHITE) })
+            th.setPadding(dp(52), dp(10), dp(14), dp(10))
+            val thTx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            thTx.addView(TextView(this).apply { text = "Thinking level"; textSize = 17f; setTextColor(Color.WHITE) })
+            thTx.addView(TextView(this).apply { text = if (Models.think(p) == "high") "High" else "Medium"; textSize = 13.5f; setTextColor(Color.parseColor("#B0B0B8")) })
+            th.addView(thTx, LinearLayout.LayoutParams(0, -2, 1f))
+            th.addView(IconView(this).apply { kind = if (thinkOpen) 44 else 43 }, LinearLayout.LayoutParams(dp(36), dp(36)))
             th.setOnClickListener { thinkOpen = !thinkOpen; render() }
             col.addView(th)
             if (thinkOpen) {
@@ -2296,7 +2293,7 @@ class MainActivity : Activity() {
                 ph.addView(badge(prov, 36), LinearLayout.LayoutParams(dp(36), dp(36)))
                 ph.addView(TextView(this).apply { text = provName(prov); textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
                     LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
-                ph.addView(TextView(this).apply { text = if (open) "\u2303" else "\u2304"; textSize = 20f; setTextColor(Color.WHITE) })
+                ph.addView(IconView(this).apply { kind = if (open) 44 else 43 }, LinearLayout.LayoutParams(dp(36), dp(36)))
                 ph.setOnClickListener { if (open) openProv.remove(prov) else openProv.add(prov); render() }
                 col.addView(ph)
                 if (!open) continue
@@ -2405,7 +2402,9 @@ class MainActivity : Activity() {
         }
         titleV = title
         refreshTitle()
-        header.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = dp(12) })
+        header.addView(title, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(12) })
+        header.addView(IconView(this).apply { kind = 43; tint = Color.parseColor("#B0B0B8"); setOnClickListener { showModels() } }, LinearLayout.LayoutParams(dp(30), dp(30)))
+        header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         val avatar = TextView(this).apply {
             text = "S"
             textSize = 15f
