@@ -75,6 +75,7 @@ class IconView(ctx: Context) : View(ctx) {
             31 -> { c.drawCircle(11f, 11f, 7f, p); c.drawLine(16f, 16f, 21f, 21f, p); c.drawLine(11f, 8f, 11f, 14f, p); c.drawLine(8f, 11f, 14f, 11f, p) }
             32 -> { c.drawLine(4f, 20f, 8f, 19f, p); c.drawLine(8f, 19f, 19f, 8f, p); c.drawLine(16f, 5f, 19f, 8f, p); c.drawLine(16f, 5f, 18f, 3f, p); c.drawLine(18f, 3f, 21f, 6f, p); c.drawLine(21f, 6f, 19f, 8f, p); c.drawLine(4f, 20f, 5f, 16f, p); c.drawLine(5f, 16f, 8f, 19f, p) }
             40 -> { c.drawRoundRect(RectF(4f, 4f, 10.5f, 10.5f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(13.5f, 4f, 20f, 10.5f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(4f, 13.5f, 10.5f, 20f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(13.5f, 13.5f, 20f, 20f), 1.5f, 1.5f, p) }
+            41 -> { c.drawLine(5f, 6f, 19f, 6f, p); c.drawLine(12f, 6f, 12f, 19f, p); c.drawLine(9f, 19f, 15f, 19f, p) }
             33 -> { c.drawRoundRect(RectF(4f, 9f, 15f, 20f), 2f, 2f, p); c.drawRoundRect(RectF(9f, 4f, 20f, 15f), 2f, 2f, p) }
             34 -> { c.save(); c.rotate(-45f, 12f, 12f); c.drawRoundRect(RectF(4f, 7f, 20f, 17f), 3f, 3f, p); c.drawLine(12f, 7f, 12f, 17f, p); c.restore() }
             35 -> { c.drawLine(12f, 4f, 12f, 16f, p); c.drawLine(7f, 11f, 12f, 16f, p); c.drawLine(12f, 16f, 17f, 11f, p); c.drawLine(5f, 20f, 19f, 20f, p) }
@@ -290,7 +291,6 @@ class MainActivity : Activity() {
             acts.addView(icon(8, 40) {
                 val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cm.setPrimaryClip(ClipData.newPlainText("AI", text))
-                Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
             })
             acts.addView(icon(7, 40) {
                 val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
@@ -390,7 +390,6 @@ class MainActivity : Activity() {
         acts.addView(icon(8, 44) {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("AI", text))
-            Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
         })
         val regen = icon(25, 44) {
             if (lastUserText.isNotEmpty()) {
@@ -547,7 +546,6 @@ class MainActivity : Activity() {
         e.loadChat(sub)
         e.persist()
         rebuildChat(sub)
-        Toast.makeText(this, "New chat started from this message", Toast.LENGTH_SHORT).show()
     }
 
     // poori screen wala pannaa: peechhe ka header jhalakna band
@@ -665,6 +663,7 @@ class MainActivity : Activity() {
     // ---------- "+" menu: photo, camera, file, map, image/video/music banana ----------
     private var pendAtt: Pair<String, String>? = null
     private var pendName = ""
+    private var pendBmp: android.graphics.Bitmap? = null
     private var pendMode = ""
     private var camUri: android.net.Uri? = null
     private var player: android.media.MediaPlayer? = null
@@ -677,21 +676,67 @@ class MainActivity : Activity() {
     private lateinit var chipRow: LinearLayout
     private lateinit var pillRow: LinearLayout
 
+    // jodi hui photo / file ka chhota preview (X se hatao, photo par dabao to editor khule)
+    private fun attView(): View {
+        val box = FrameLayout(this)
+        val bmp = pendBmp
+        val tile: View
+        if (bmp != null) {
+            tile = android.widget.ImageView(this).apply {
+                setImageBitmap(bmp)
+                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(v: View, o: android.graphics.Outline) { o.setRoundRect(0, 0, v.width, v.height, dp(14).toFloat()) }
+                }
+                clipToOutline = true
+                setOnClickListener { editAtt() }
+            }
+            box.addView(tile, FrameLayout.LayoutParams(dp(80), dp(80)).apply { topMargin = dp(8); rightMargin = dp(8) })
+            box.addView(IconView(this).apply {
+                kind = 32
+                background = oval("#CC000000")
+                setOnClickListener { editAtt() }
+            }, FrameLayout.LayoutParams(dp(30), dp(30), Gravity.BOTTOM or Gravity.START).apply { leftMargin = dp(4); bottomMargin = dp(4) })
+        } else {
+            tile = TextView(this).apply {
+                text = pendName; textSize = 14f; setTextColor(Color.WHITE); maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+                background = GradientDrawable().apply { cornerRadius = dp(14).toFloat(); setColor(Color.parseColor("#161616")) }
+            }
+            box.addView(tile, FrameLayout.LayoutParams(dp(150), dp(56)).apply { topMargin = dp(8); rightMargin = dp(8) })
+        }
+        box.addView(TextView(this).apply {
+            text = "\u2715"; textSize = 13f; gravity = Gravity.CENTER
+            setTextColor(Color.BLACK)
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) }
+            setOnClickListener { pendAtt = null; pendBmp = null; refreshHints() }
+        }, FrameLayout.LayoutParams(dp(26), dp(26), Gravity.TOP or Gravity.END))
+        return box
+    }
+
+    private fun editAtt() {
+        val bmp = pendBmp ?: return
+        Studio.markupBmp(this, bmp, "Done") { nb -> kotlin.concurrent.thread { setAtt(nb, pendName) } }
+    }
+
     private fun refreshHints() {
         val t = when {
             pendMode == "image" -> "Describe the image"
             pendMode == "research" -> "What do you want to research?"
             pendMode == "learn" -> "What do you want to learn?"
             pendMode == "agent" -> "What should the agent do?"
-            pendAtt != null -> "\uD83D\uDCCE " + pendName + " - ask a question"
+            pendAtt != null -> "Ask a question"
             else -> "Ask AI"
         }
         input.hint = t
         if (::orbInput.isInitialized) orbInput.hint = t
         if (!::chipRow.isInitialized) return
+        if (pendAtt == null) pendBmp = null
         chipRow.removeAllViews()
         val label = when (pendMode) { "research" -> "Research"; "learn" -> "Learn"; "agent" -> "Agent"; "image" -> "Create image"; else -> "" }
-        chipRow.visibility = if (label.isEmpty()) View.GONE else View.VISIBLE
+        chipRow.visibility = if (label.isEmpty() && pendAtt == null) View.GONE else View.VISIBLE
         if (label.isNotEmpty()) {
             val c = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -707,6 +752,7 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(dp(24), dp(24)).apply { leftMargin = dp(8) })
             chipRow.addView(c)
         }
+        if (pendAtt != null) chipRow.addView(attView(), LinearLayout.LayoutParams(-2, -2).apply { if (label.isNotEmpty()) leftMargin = dp(10) })
         pillRow.removeAllViews()
         pillRow.visibility = if (pendMode == "research") View.VISIBLE else View.GONE
         if (pendMode == "research") {
@@ -787,7 +833,6 @@ class MainActivity : Activity() {
             val e = AssistantService.engine
             if (e != null) {
                 e.personal = !e.personal
-                Toast.makeText(this, if (e.personal) "Personal Intelligence on" else "Personal Intelligence off", Toast.LENGTH_SHORT).show()
             }
         })
         if (pendAtt != null || pendMode.isNotEmpty()) {
@@ -890,10 +935,10 @@ class MainActivity : Activity() {
         if (icb != null) { runOnUiThread { icb(Pair("image/jpeg", b64)) }; return }
         pendAtt = Pair("image/jpeg", b64)
         pendName = name
+        pendBmp = b
         runOnUiThread {
             refreshHints()
             if (orbScreen.visibility == View.VISIBLE) closeOrb()
-            Toast.makeText(this, "Photo jud gayi, ab sawal likho", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -928,7 +973,6 @@ class MainActivity : Activity() {
         runOnUiThread {
             refreshHints()
             if (orbScreen.visibility == View.VISIBLE) closeOrb()
-            Toast.makeText(this, "File jud gayi, ab sawal likho", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -967,7 +1011,6 @@ class MainActivity : Activity() {
             refreshHints()
             if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
             showChat("Tum: $t")
-            Toast.makeText(this, "Agent ko kaam mein kuch minute lag sakte hain", Toast.LENGTH_LONG).show()
             val e = AssistantService.engine
             if (e == null) { removePending(); return true }
             e.agent(t) { rep ->
@@ -984,7 +1027,6 @@ class MainActivity : Activity() {
             refreshHints()
             if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
             showChat("Tum: $t")
-            Toast.makeText(this, "Report banne mein 1-2 minute lagte hain", Toast.LENGTH_LONG).show()
             val e = AssistantService.engine
             if (e == null) { removePending(); return true }
             e.research(t) { rep ->
@@ -1004,7 +1046,6 @@ class MainActivity : Activity() {
         if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
         showChat("Tum: $t")
         if (key.isEmpty()) { finishMedia(null, mode, "API key nahi mili"); return true }
-        Toast.makeText(this, if (mode == "image") "Ban rahi hai..." else "Ban raha hai, 1-2 minute lag sakte hain", Toast.LENGTH_LONG).show()
         kotlin.concurrent.thread {
             val out = when (mode) {
                 "image" -> Media.image(key, t, att, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "photo"))
@@ -1257,7 +1298,6 @@ class MainActivity : Activity() {
         btns.addView(btn("Copy") {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("report", tv.text))
-            Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
         }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(4); rightMargin = dp(4) })
         btns.addView(btn("Share") {
             try {
@@ -1842,7 +1882,7 @@ class MainActivity : Activity() {
         }
 
         fun saveToGallery(f: java.io.File) {
-            Toast.makeText(this, if (galleryUri(f) != null) "Saved to gallery" else "Could not save", Toast.LENGTH_SHORT).show()
+            if (galleryUri(f) == null) Toast.makeText(this, "Could not save", Toast.LENGTH_SHORT).show()
         }
 
         fun viewer(f0: java.io.File) {
@@ -1876,7 +1916,7 @@ class MainActivity : Activity() {
                         sp.edit().putStringSet("img_fav", if (isFav) favs() - f.name else favs() + f.name).apply(); render()
                     } else android.app.AlertDialog.Builder(this)
                         .setTitle("Delete this image?")
-                        .setPositiveButton("Delete") { _, _ -> f.delete(); v.dismiss(); Toast.makeText(this, "Deleted", Toast.LENGTH_SHORT).show(); render() }
+                        .setPositiveButton("Delete") { _, _ -> f.delete(); v.dismiss(); render() }
                         .setNegativeButton("Cancel", null)
                         .show()
                     true
@@ -1916,7 +1956,6 @@ class MainActivity : Activity() {
                 opts.forEach { pm.menu.add(it.first) }
                 pm.setOnMenuItemClickListener { mi ->
                     val r = opts.first { it.first == mi.title.toString() }.second
-                    Toast.makeText(this, "Resize ho raha hai...", Toast.LENGTH_SHORT).show()
                     kotlin.concurrent.thread {
                         val nf = try { Studio.resize(f, r, genDir) } catch (e: Throwable) { null }
                         runOnUiThread { if (nf != null) show(nf) else Toast.makeText(this, "Resize nahi hua", Toast.LENGTH_SHORT).show() }
@@ -2123,7 +2162,6 @@ class MainActivity : Activity() {
             row.setOnClickListener {
                 Models.setLock(p, prov)
                 refreshTitle()
-                Toast.makeText(this, if (prov.isEmpty()) "Auto: sab providers" else Models.provName(prov) + " select hua. Auto aur model list ab sirf isi ki.", Toast.LENGTH_SHORT).show()
                 dlg.dismiss()
             }
             list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
@@ -2300,7 +2338,6 @@ class MainActivity : Activity() {
     }
 
     private fun soon() {
-        Toast.makeText(this, "Ye jald aayega", Toast.LENGTH_SHORT).show()
     }
 
     private fun icon(kind: Int, sizeDp: Int, onClick: () -> Unit): IconView = IconView(this).apply {
@@ -2490,7 +2527,6 @@ class MainActivity : Activity() {
         if (runSpecial(t)) { input.text?.clear(); return }
         val e = AssistantService.engine
         if (e == null) {
-            Toast.makeText(this, "Thoda ruko, assistant shuru ho raha hai", Toast.LENGTH_SHORT).show()
             return
         }
         val att = pendAtt
@@ -2756,7 +2792,7 @@ class MainActivity : Activity() {
 
         val menuBtn = icon(0, 40) { showDrawer() }
         menuBtn.background = oval("#1A1A1A")
-        val setBtn = icon(11, 40) { Toast.makeText(this, "Jaldi aayega", Toast.LENGTH_SHORT).show() }
+        val setBtn = icon(11, 40) { }
         setBtn.background = oval("#1A1A1A")
         val topRow = FrameLayout(this).apply {
             addView(menuBtn, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START))

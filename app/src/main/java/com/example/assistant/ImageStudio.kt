@@ -222,6 +222,11 @@ object Studio {
     // ---------- Markup: pen, shapes, eraser, rang, undo, save ----------
     fun markup(act: Activity, f: File, dir: File, done: (File) -> Unit) {
         val bmp = load(f, 2000) ?: return
+        markupBmp(act, bmp, "Save") { nb -> done(write(dir, nb)) }
+    }
+
+    // koi bhi bitmap par pen / shapes / text; Done par naya bitmap lautata hai
+    fun markupBmp(act: Activity, bmp: Bitmap, doneLabel: String, done: (Bitmap) -> Unit) {
         val d = dlg(act)
         val root = FrameLayout(act)
         val dv = DrawView(act, bmp, false)
@@ -232,10 +237,19 @@ object Studio {
         val tools = LinearLayout(act); tools.gravity = Gravity.CENTER
         tools.background = GradientDrawable().apply { cornerRadius = dp(act, 30).toFloat(); setColor(Color.parseColor("#1A1A1A")) }
         fun tb(kind: Int, tool: String): IconView = IconView(act).apply { this.kind = kind }
-        val pen = tb(32, "pen"); val shp = tb(37, "shape"); val ers = tb(34, "eraser")
-        fun sel(v: IconView?) { for (x in listOf(pen, shp, ers)) x.background = if (x === v) oval(Color.parseColor("#4A4A4A")) else null }
+        val pen = tb(32, "pen"); val shp = tb(37, "shape"); val ers = tb(34, "eraser"); val txt = tb(41, "text")
+        fun sel(v: IconView?) { for (x in listOf(pen, shp, txt, ers)) x.background = if (x === v) oval(Color.parseColor("#4A4A4A")) else null }
         sel(pen)
         pen.setOnClickListener { dv.tool = "pen"; sel(pen) }
+        txt.setOnClickListener { dv.tool = "text"; sel(txt) }
+        dv.onTextTap = { x, y ->
+            val et = android.widget.EditText(act)
+            et.hint = "Text likho"
+            et.setTextColor(Color.WHITE); et.setHintTextColor(Color.parseColor("#9A9AA2"))
+            android.app.AlertDialog.Builder(act).setView(et)
+                .setPositiveButton("OK") { _, _ -> val tx = et.text.toString().trim(); if (tx.isNotEmpty()) dv.addText(tx, x, y) }
+                .setNegativeButton("Cancel", null).show()
+        }
         ers.setOnClickListener { dv.tool = "eraser"; sel(ers) }
         shp.setOnClickListener {
             val names = listOf("line", "arrow", "rect", "circle", "triangle", "diamond", "star", "heart")
@@ -253,11 +267,11 @@ object Studio {
             pw.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
             pw.showAsDropDown(tools, 0, dp(act, 8))
         }
-        for (x in listOf(pen, shp, ers)) tools.addView(x, LinearLayout.LayoutParams(dp(act, 52), dp(act, 48)))
+        for (x in listOf(pen, shp, txt, ers)) tools.addView(x, LinearLayout.LayoutParams(dp(act, 52), dp(act, 48)))
         top.addView(tools, FrameLayout.LayoutParams(-2, dp(act, 48), Gravity.CENTER))
-        top.addView(pill(act, "Save") {
-            if (dv.strokes.isEmpty()) { Toast.makeText(act, "Kuch draw nahi kiya", Toast.LENGTH_SHORT).show(); return@pill }
-            val nf = write(dir, dv.render()); d.dismiss(); done(nf)
+        top.addView(pill(act, doneLabel) {
+            if (dv.strokes.isEmpty()) { d.dismiss(); return@pill }
+            val nb = dv.render(); d.dismiss(); done(nb)
         }, FrameLayout.LayoutParams(-2, dp(act, 44), Gravity.END))
         col.addView(top, LinearLayout.LayoutParams(-1, dp(act, 50)))
         col.addView(dv, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(act, 10); bottomMargin = dp(act, 10) })
@@ -292,9 +306,20 @@ object Studio {
 
 class DrawView(ctx: Context, val bmp: Bitmap, val mask: Boolean) : View(ctx) {
     class S(val kind: String, val color: Int, val w: Float) {
-        val pts = ArrayList<PointF>(); var x1 = 0f; var y1 = 0f; var x2 = 0f; var y2 = 0f
+        val pts = ArrayList<PointF>(); var x1 = 0f; var y1 = 0f; var x2 = 0f; var y2 = 0f; var text = ""
     }
     val strokes = ArrayList<S>()
+    var onTextTap: ((Float, Float) -> Unit)? = null
+    private val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; typeface = Typeface.DEFAULT_BOLD }
+    private fun textSize() = max(bmp.width, bmp.height) * 0.045f
+
+    fun addText(text: String, x: Float, y: Float) {
+        tp.textSize = textSize()
+        val st = S("text", color, 0f)
+        st.text = text
+        st.x1 = x; st.y1 = y - textSize(); st.x2 = x + tp.measureText(text); st.y2 = y
+        strokes.add(st); invalidate()
+    }
     var tool = "pen"
     var color = Color.RED
     private var cur: S? = null
@@ -311,6 +336,7 @@ class DrawView(ctx: Context, val bmp: Bitmap, val mask: Boolean) : View(ctx) {
     private fun base() = max(bmp.width, bmp.height) * (if (mask) 0.05f else 0.008f)
 
     private fun drawS(c: Canvas, s: S) {
+        if (s.kind == "text") { tp.color = s.color; tp.textSize = textSize(); c.drawText(s.text, s.x1, s.y2, tp); return }
         p.color = s.color; p.strokeWidth = s.w
         if (s.kind == "pen") {
             if (s.pts.size == 1) { c.drawPoint(s.pts[0].x, s.pts[0].y, p); return }
@@ -375,6 +401,10 @@ class DrawView(ctx: Context, val bmp: Bitmap, val mask: Boolean) : View(ctx) {
                 if (tool == "eraser" && !mask) {
                     val i = strokes.indexOfLast { hit(it, x, y, base() * 3) }
                     if (i >= 0) { strokes.removeAt(i); invalidate() }
+                    return true
+                }
+                if (tool == "text" && !mask) {
+                    if (e.action == MotionEvent.ACTION_DOWN) onTextTap?.invoke(x, y)
                     return true
                 }
                 if (e.action == MotionEvent.ACTION_DOWN) {
