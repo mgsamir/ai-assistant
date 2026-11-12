@@ -291,7 +291,7 @@ class MainActivity : Activity() {
             acts.addView(icon(8, 40) {
                 val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cm.setPrimaryClip(ClipData.newPlainText("AI", text))
-                Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Copy", Toast.LENGTH_SHORT).show()
             })
             acts.addView(icon(7, 40) {
                 val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
@@ -391,7 +391,7 @@ class MainActivity : Activity() {
         acts.addView(icon(8, 44) {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("AI", text))
-                Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Copy", Toast.LENGTH_SHORT).show()
         })
         val regen = icon(25, 44) {
             if (lastUserText.isNotEmpty()) {
@@ -1300,7 +1300,7 @@ class MainActivity : Activity() {
         btns.addView(btn("Copy") {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("report", tv.text))
-            Toast.makeText(this, "Copy ho gaya", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Copy", Toast.LENGTH_SHORT).show()
         }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(4); rightMargin = dp(4) })
         btns.addView(btn("Share") {
             try {
@@ -1430,7 +1430,7 @@ class MainActivity : Activity() {
                 val bar = LinearLayout(this)
                 bar.addView(pill("Copy") {
                     val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("code", full.ifEmpty { tv.text.toString() })); toast("Copy ho gaya")
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("code", full.ifEmpty { tv.text.toString() })); toast("Copy")
                 }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(8) })
                 bar.addView(pill("Save") {
                     val txt = full.ifEmpty { tv.text.toString() }; val nm = v.replace('/', '_') + ".txt"
