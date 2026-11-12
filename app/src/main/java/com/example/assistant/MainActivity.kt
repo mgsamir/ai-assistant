@@ -1144,7 +1144,7 @@ class MainActivity : Activity() {
         dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(70), dp(20), dp(20))
+            setPadding(dp(20), dp(96), dp(20), dp(40))
             setBackgroundColor(Color.parseColor("#212121"))
         }
         val rn = LinearLayout(this)
@@ -1191,7 +1191,17 @@ class MainActivity : Activity() {
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
             setLayout((resources.displayMetrics.widthPixels * 0.78f).toInt(), ViewGroup.LayoutParams.MATCH_PARENT)
-            setGravity(Gravity.START)
+            setGravity(Gravity.TOP or Gravity.START)
+            // upar status bar se neeche navigation bar tak poora bhare
+            addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+            val lp = attributes
+            lp.x = 0; lp.y = 0
+            if (Build.VERSION.SDK_INT >= 28) lp.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            attributes = lp
+            if (Build.VERSION.SDK_INT >= 30) setDecorFitsSystemWindows(false)
+            statusBarColor = Color.TRANSPARENT
+            navigationBarColor = Color.TRANSPARENT
+            if (Build.VERSION.SDK_INT >= 29) { isNavigationBarContrastEnforced = false; isStatusBarContrastEnforced = false }
         }
         dlg.show()
     }
