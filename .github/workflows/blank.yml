@@ -33,11 +33,10 @@ jobs:
           GROQ_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPENROUTER }}
           ELEVEN_KEY: ${{ secrets.ELEVENLABS_API_KEY || secrets.ELEVENLABS_KEY || secrets.ELEVENLABS }}
-          OPENAI_KEY: ${{ secrets.OPENAI_API_KEY || secrets.OPENAI_API_KEY_1 || secrets.OPENAI_KEY }}
           VT_KEY: ${{ secrets.VIRUSTOTAL_API_KEY || secrets.VIRUSTOTAL_KEY || secrets.VT_API_KEY }}
           POLLI_KEY: ${{ secrets.POLLINATIONS_API_KEY || secrets.POLLINATIONS_KEY || secrets.POLLINATIONS }}
         run: |
-          for n in BRAVE_KEY GROQ_KEY OPENROUTER_KEY ELEVEN_KEY OPENAI_KEY VT_KEY POLLI_KEY; do
+          for n in BRAVE_KEY GROQ_KEY OPENROUTER_KEY ELEVEN_KEY VT_KEY POLLI_KEY; do
             if [ -z "${!n}" ]; then echo "::warning::$n khaali hai"; else echo "$n mil gayi"; fi
           done
       - run: gradle assembleDebug --no-daemon
@@ -47,7 +46,6 @@ jobs:
           GROQ_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.OPENROUTER }}
           ELEVEN_KEY: ${{ secrets.ELEVENLABS_API_KEY || secrets.ELEVENLABS_KEY || secrets.ELEVENLABS }}
-          OPENAI_KEY: ${{ secrets.OPENAI_API_KEY || secrets.OPENAI_API_KEY_1 || secrets.OPENAI_KEY }}
           VT_KEY: ${{ secrets.VIRUSTOTAL_API_KEY || secrets.VIRUSTOTAL_KEY || secrets.VT_API_KEY }}
           POLLI_KEY: ${{ secrets.POLLINATIONS_API_KEY || secrets.POLLINATIONS_KEY || secrets.POLLINATIONS }}
       - uses: actions/upload-artifact@v4

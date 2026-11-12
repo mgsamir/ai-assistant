@@ -27,7 +27,7 @@ android {
         buildConfigField "String", "GROQ_KEY", "\"${System.getenv('GROQ_KEY') ?: ''}\""
         buildConfigField "String", "OPENROUTER_KEY", "\"${System.getenv('OPENROUTER_KEY') ?: ''}\""
         buildConfigField "String", "ELEVEN_KEY", "\"${System.getenv('ELEVEN_KEY') ?: ''}\""
-        buildConfigField "String", "OPENAI_KEY", "\"${System.getenv('OPENAI_KEY') ?: ''}\""
+        buildConfigField "String", "OPENAI_KEY", "\"\""
         buildConfigField "String", "VT_KEY", "\"${System.getenv('VT_KEY') ?: ''}\""
         buildConfigField "String", "POLLI_KEY", "\"${System.getenv('POLLI_KEY') ?: ''}\""
     }
