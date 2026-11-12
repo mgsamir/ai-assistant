@@ -580,7 +580,6 @@ class MainActivity : Activity() {
         top.addView(TextView(this).apply { text = "Chat history"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        if (arr.isEmpty()) list.addView(TextView(this).apply { text = "Abhi koi chat nahi."; textSize = 15f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(dp(4), dp(20), dp(4), 0) })
         for (o in arr) {
             val row = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -1989,13 +1988,6 @@ class MainActivity : Activity() {
 
             if (tab == 0) {
                 val files = (genDir.listFiles() ?: emptyArray()).filter { it.isFile }.sortedByDescending { it.lastModified() }.take(400)
-                if (files.isEmpty()) {
-                    content.addView(TextView(this).apply {
-                        text = "Abhi koi image nahi. Chat mein jo image banegi wo yahan aayegi."
-                        textSize = 15f
-                        setTextColor(Color.parseColor("#9AA3B5"))
-                    })
-                }
                 val side = (resources.displayMetrics.widthPixels - dp(32) - dp(12)) / 3
                 val dayF = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.ENGLISH)
                 val groups = LinkedHashMap<String, MutableList<java.io.File>>()
