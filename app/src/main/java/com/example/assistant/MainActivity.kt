@@ -44,7 +44,7 @@ import android.widget.Toast
 class IconView(ctx: Context) : View(ctx) {
     var kind = 0
         set(v) { field = v; invalidate() }
-    var tint = Color.parseColor("#E8EAF0")
+    var tint = Color.parseColor("#F2F2F2")
         set(v) { field = v; invalidate() }
     private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -317,13 +317,13 @@ class MainActivity : Activity() {
         val tv = TextView(this).apply {
             this.text = text
             textSize = 16f
-            setTextColor(Color.parseColor("#E8EAF0"))
+            setTextColor(Color.parseColor("#F2F2F2"))
             setPadding(dp(20), dp(14), dp(20), dp(14))
             maxWidth = (resources.displayMetrics.widthPixels * 0.78f).toInt()
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dp(28).toFloat()
-                setColor(Color.parseColor("#171717"))
+                setColor(Color.parseColor("#0F0F0F"))
             }
         }
         row.addView(tv)
@@ -338,7 +338,7 @@ class MainActivity : Activity() {
         val tv = TextView(this).apply {
             text = "..."
             textSize = 22f
-            setTextColor(Color.parseColor("#9AA3B5"))
+            setTextColor(Color.parseColor("#B0B0B8"))
         }
         pending = tv
         chatList.addView(tv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -359,7 +359,7 @@ class MainActivity : Activity() {
         val tv = TextView(this).apply {
             this.text = styled(text)
             textSize = 16.5f
-            setTextColor(Color.parseColor("#E8EAF0"))
+            setTextColor(Color.parseColor("#F2F2F2"))
             setLineSpacing(0f, 1.3f)
             setTextIsSelectable(true)
             isFocusable = false
@@ -372,13 +372,13 @@ class MainActivity : Activity() {
         val dis = icon(6, 44) { }
         like.setOnClickListener {
             val on = like.tint != Color.parseColor("#4F8BFF")
-            like.tint = if (on) Color.parseColor("#4F8BFF") else Color.parseColor("#E8EAF0")
-            dis.tint = Color.parseColor("#E8EAF0")
+            like.tint = if (on) Color.parseColor("#4F8BFF") else Color.parseColor("#F2F2F2")
+            dis.tint = Color.parseColor("#F2F2F2")
         }
         dis.setOnClickListener {
             val on = dis.tint != Color.parseColor("#4F8BFF")
-            dis.tint = if (on) Color.parseColor("#4F8BFF") else Color.parseColor("#E8EAF0")
-            like.tint = Color.parseColor("#E8EAF0")
+            dis.tint = if (on) Color.parseColor("#4F8BFF") else Color.parseColor("#F2F2F2")
+            like.tint = Color.parseColor("#F2F2F2")
         }
         acts.addView(like)
         acts.addView(dis)
@@ -406,11 +406,11 @@ class MainActivity : Activity() {
             val pill = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(10), dp(6), dp(12), dp(6))
-                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#161616")) }
                 setOnClickListener { showSources(srcs) }
             }
-            pill.addView(IconView(this).apply { kind = 27; tint = Color.parseColor("#E8EAF0") }, LinearLayout.LayoutParams(dp(30), dp(24)))
-            pill.addView(TextView(this).apply { this.text = "Sources"; textSize = 13.5f; setTextColor(Color.parseColor("#E8EAF0")) })
+            pill.addView(IconView(this).apply { kind = 27; tint = Color.parseColor("#F2F2F2") }, LinearLayout.LayoutParams(dp(30), dp(24)))
+            pill.addView(TextView(this).apply { this.text = "Sources"; textSize = 13.5f; setTextColor(Color.parseColor("#F2F2F2")) })
             acts.addView(pill, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(6) })
         }
         acts.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
@@ -423,7 +423,7 @@ class MainActivity : Activity() {
         val foot = TextView(this).apply {
             this.text = if (who.isNotEmpty()) "$who \u00B7 AI can make mistakes." else "AI can make mistakes."
             textSize = 12.5f
-            setTextColor(Color.parseColor("#8A93A6"))
+            setTextColor(Color.parseColor("#A8A8B0"))
         }
         box.addView(foot, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(2); bottomMargin = dp(2) })
         // sirf sabse nayi baat par: dobara jawab ka button aur neeche model ka naam
@@ -454,18 +454,18 @@ class MainActivity : Activity() {
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(10), dp(14), dp(8))
-            background = GradientDrawable().apply { cornerRadius = dp(26).toFloat(); setColor(Color.parseColor("#2B2B2B")) }
+            background = GradientDrawable().apply { cornerRadius = dp(26).toFloat(); setColor(Color.parseColor("#161616")) }
         }
         val pw = android.widget.PopupWindow(col, dp(290), ViewGroup.LayoutParams.WRAP_CONTENT, true)
         pw.elevation = dp(8).toFloat()
         pw.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
         col.addView(TextView(this).apply {
             this.text = "Today, " + java.text.SimpleDateFormat("h:mm a", java.util.Locale.ENGLISH).format(java.util.Date()).lowercase()
-            textSize = 15f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(dp(8), dp(8), 0, dp(6))
+            textSize = 15f; setTextColor(Color.parseColor("#B0B0B8")); setPadding(dp(8), dp(8), 0, dp(6))
         })
         col.addView(menuRow(26, "Branch in new chat") { pw.dismiss(); branchFrom(idx) })
         if (latest && e != null) {
-            col.addView(View(this).apply { setBackgroundColor(Color.parseColor("#444444")) }, LinearLayout.LayoutParams(-1, dp(1)).apply { leftMargin = dp(8); rightMargin = dp(8) })
+            col.addView(View(this).apply { setBackgroundColor(Color.parseColor("#2A2A2A")) }, LinearLayout.LayoutParams(-1, dp(1)).apply { leftMargin = dp(8); rightMargin = dp(8) })
             col.addView(menuRow(25, "Retry") { pw.dismiss(); retryLast(null) })
             if (hasWeb) col.addView(menuRow(28, "Remove web results") { pw.dismiss(); retryLast(false) })
             else col.addView(menuRow(27, "Search the web") { pw.dismiss(); retryLast(true) })
@@ -492,12 +492,12 @@ class MainActivity : Activity() {
             background = GradientDrawable().apply {
                 val r = dp(26).toFloat()
                 cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
-                setColor(Color.parseColor("#2B2B2B"))
+                setColor(Color.parseColor("#161616"))
             }
         }
         col.addView(View(this).apply { background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(Color.parseColor("#666666")) } },
             LinearLayout.LayoutParams(dp(40), dp(5)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(12) })
-        col.addView(TextView(this).apply { text = "Sources"; textSize = 14f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(0, 0, 0, dp(8)) })
+        col.addView(TextView(this).apply { text = "Sources"; textSize = 14f; setTextColor(Color.parseColor("#B0B0B8")); setPadding(0, 0, 0, dp(8)) })
         val inner = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         for ((title, url, desc) in list) {
             val host = try { android.net.Uri.parse(url).host?.removePrefix("www.") ?: "" } catch (e: Exception) { "" }
@@ -506,11 +506,11 @@ class MainActivity : Activity() {
                 setPadding(0, dp(12), 0, dp(12))
                 setOnClickListener { try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) } catch (e: Exception) { } }
             }
-            row.addView(TextView(this).apply { text = host; textSize = 14f; setTextColor(Color.parseColor("#C8CCD6")) })
+            row.addView(TextView(this).apply { text = host; textSize = 14f; setTextColor(Color.parseColor("#D0D0D0")) })
             row.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
-            row.addView(TextView(this).apply { text = desc; textSize = 14.5f; setTextColor(Color.parseColor("#9AA3B5")); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
+            row.addView(TextView(this).apply { text = desc; textSize = 14.5f; setTextColor(Color.parseColor("#B0B0B8")); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
             inner.addView(row)
-            inner.addView(View(this).apply { setBackgroundColor(Color.parseColor("#3A3A3A")) }, LinearLayout.LayoutParams(-1, dp(1)))
+            inner.addView(View(this).apply { setBackgroundColor(Color.parseColor("#262626")) }, LinearLayout.LayoutParams(-1, dp(1)))
         }
         col.addView(ScrollView(this).apply { addView(inner) }, LinearLayout.LayoutParams(-1, (resources.displayMetrics.heightPixels * 0.6f).toInt()))
         dlg.setContentView(col)
@@ -575,7 +575,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
         val top = FrameLayout(this)
         val back = icon(23, 40) { dlg.dismiss() }
-        back.background = oval("#303030")
+        back.background = oval("#1A1A1A")
         top.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.CENTER_VERTICAL))
         top.addView(TextView(this).apply { text = "Chat history"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
@@ -584,13 +584,13 @@ class MainActivity : Activity() {
             val row = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(14), dp(14), dp(8), dp(14))
-                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#1E1E1E")) }
+                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")) }
             }
             val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             tx.addView(TextView(this).apply { text = o.title; textSize = 16f; setTextColor(Color.WHITE); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
             tx.addView(TextView(this).apply {
                 text = java.text.SimpleDateFormat("d MMM, h:mm a", java.util.Locale.ENGLISH).format(java.util.Date(o.time))
-                textSize = 13f; setTextColor(Color.parseColor("#9AA3B5"))
+                textSize = 13f; setTextColor(Color.parseColor("#B0B0B8"))
             })
             row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f))
             row.addView(TextView(this).apply {
@@ -695,7 +695,7 @@ class MainActivity : Activity() {
             val c = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(12), dp(6), dp(8), dp(6))
-                background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+                background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#161616")) }
             }
             c.addView(TextView(this).apply { text = label; textSize = 15f; setTextColor(Color.WHITE) })
             c.addView(TextView(this).apply {
@@ -713,7 +713,7 @@ class MainActivity : Activity() {
                 text = "\u2B06  Files"; textSize = 15f; gravity = Gravity.CENTER
                 setTextColor(Color.WHITE)
                 setPadding(dp(18), dp(10), dp(18), dp(10))
-                background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setStroke(dp(1), Color.parseColor("#444444")); setColor(Color.TRANSPARENT) }
+                background = GradientDrawable().apply { cornerRadius = dp(22).toFloat(); setStroke(dp(1), Color.parseColor("#2A2A2A")); setColor(Color.TRANSPARENT) }
                 setOnClickListener { pick(103) }
             }
             pillRow.addView(p)
@@ -730,7 +730,7 @@ class MainActivity : Activity() {
                 shape = GradientDrawable.RECTANGLE
                 val r = dp(28).toFloat()
                 cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
-                setColor(Color.parseColor("#1E1E1E"))
+                setColor(Color.parseColor("#101010"))
             }
         }
         col.addView(View(this).apply {
@@ -741,10 +741,10 @@ class MainActivity : Activity() {
             val b = LinearLayout(this)
             b.orientation = LinearLayout.VERTICAL
             b.gravity = Gravity.CENTER
-            b.background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+            b.background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#161616")) }
             val ic = IconView(this).apply { this.kind = kind }
             b.addView(ic, LinearLayout.LayoutParams(dp(56), dp(44)))
-            b.addView(TextView(this).apply { text = label; textSize = 14f; setTextColor(Color.parseColor("#E8EAF0")); gravity = Gravity.CENTER })
+            b.addView(TextView(this).apply { text = label; textSize = 14f; setTextColor(Color.parseColor("#F2F2F2")); gravity = Gravity.CENTER })
             b.setOnClickListener { dlg.dismiss(); go() }
             return b
         }
@@ -765,14 +765,14 @@ class MainActivity : Activity() {
             val tx = LinearLayout(this)
             tx.orientation = LinearLayout.VERTICAL
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
-            tx.addView(TextView(this).apply { text = sub; textSize = 14f; setTextColor(Color.parseColor("#9AA3B5")) })
+            tx.addView(TextView(this).apply { text = sub; textSize = 14f; setTextColor(Color.parseColor("#B0B0B8")) })
             r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
             if (state != null) r.addView(TextView(this).apply {
                 text = state
                 textSize = 13f
-                setTextColor(if (state == "ON") Color.WHITE else Color.parseColor("#9AA3B5"))
+                setTextColor(if (state == "ON") Color.WHITE else Color.parseColor("#B0B0B8"))
                 setPadding(dp(14), dp(6), dp(14), dp(6))
-                background = GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(Color.parseColor(if (state == "ON") "#2F6BFF" else "#2A2A2A")) }
+                background = GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(Color.parseColor(if (state == "ON") "#2F6BFF" else "#161616")) }
             })
             r.setOnClickListener { dlg.dismiss(); go() }
             return r
@@ -1070,7 +1070,7 @@ class MainActivity : Activity() {
             textSize = 16f
             setTextColor(Color.WHITE)
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+            background = GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(Color.parseColor("#161616")) }
         }
         when (kind) {
             "image" -> {
@@ -1145,7 +1145,7 @@ class MainActivity : Activity() {
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(96), dp(20), dp(40))
-            setBackgroundColor(Color.parseColor("#212121"))
+            setBackgroundColor(Color.parseColor("#0A0A0A"))
         }
         val rn = LinearLayout(this)
         rn.gravity = Gravity.CENTER_VERTICAL
@@ -1229,7 +1229,7 @@ class MainActivity : Activity() {
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
         val tv = TextView(this).apply {
-            text = "Loading"; textSize = 11.5f; setTextColor(Color.parseColor("#D0D0D6"))
+            text = "Loading"; textSize = 11.5f; setTextColor(Color.parseColor("#E0E0E0"))
             typeface = Typeface.MONOSPACE; setTextIsSelectable(true); setPadding(dp(16), dp(8), dp(16), dp(24))
         }
         val sv = ScrollView(this)
@@ -1261,7 +1261,7 @@ class MainActivity : Activity() {
         val topBar = FrameLayout(this)
         topBar.setBackgroundColor(Color.BLACK)
         val back = icon(23, 40) { dlg.dismiss() }
-        back.background = oval("#303030")
+        back.background = oval("#1A1A1A")
         topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
         topBar.addView(TextView(this).apply { text = label; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
@@ -1291,7 +1291,7 @@ class MainActivity : Activity() {
         val topBar = FrameLayout(this)
         topBar.setBackgroundColor(Color.BLACK)
         val back = icon(23, 40) { dlg.dismiss() }
-        back.background = oval("#303030")
+        back.background = oval("#1A1A1A")
         topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
         topBar.addView(TextView(this).apply { text = "Smali"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
@@ -1306,9 +1306,9 @@ class MainActivity : Activity() {
             val r = LinearLayout(this)
             r.orientation = LinearLayout.VERTICAL
             r.setPadding(dp(14), dp(12), dp(14), dp(12))
-            r.background = GradientDrawable().apply { setColor(Color.parseColor("#161B22")); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.parseColor("#30363D")) }
+            r.background = GradientDrawable().apply { setColor(Color.parseColor("#0F0F0F")); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.parseColor("#26262B")) }
             r.addView(TextView(this).apply { text = lab; textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-            r.addView(TextView(this).apply { text = pk; textSize = 12f; setTextColor(Color.parseColor("#8B949E")) })
+            r.addView(TextView(this).apply { text = pk; textSize = 12f; setTextColor(Color.parseColor("#A8A8B0")) })
             r.setOnClickListener { showCodeBrowser(pk, lab) }
             content.addView(r, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
         }
@@ -1343,7 +1343,7 @@ class MainActivity : Activity() {
             else { cur = cur.substringBeforeLast("/", ""); render() }
         }
         val back = icon(23, 40) { goBack() }
-        back.background = oval("#303030")
+        back.background = oval("#1A1A1A")
         topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
         topBar.addView(title, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { leftMargin = dp(68); rightMargin = dp(16); bottomMargin = dp(20) })
         root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
@@ -1358,7 +1358,7 @@ class MainActivity : Activity() {
         fun toast(m: String) = runOnUiThread { Toast.makeText(this, m, Toast.LENGTH_LONG).show() }
         fun card() = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply { setColor(Color.parseColor("#0D1117")); cornerRadius = dp(10).toFloat(); setStroke(dp(1), Color.parseColor("#30363D")) }
+            background = GradientDrawable().apply { setColor(Color.parseColor("#000000")); cornerRadius = dp(10).toFloat(); setStroke(dp(1), Color.parseColor("#26262B")) }
         }
 
         render = {
@@ -1368,11 +1368,11 @@ class MainActivity : Activity() {
             val v = viewing
             title.text = label + (if (cur.isNotEmpty()) " / $cur" else "") + (if (v != null) " / " + v.substringAfterLast("/") else "")
             if (s == null) {
-                body.addView(TextView(this).apply { text = "Loading"; setTextColor(Color.parseColor("#8B949E")); textSize = 14f; loadingDots(this) })
+                body.addView(TextView(this).apply { text = "Loading"; setTextColor(Color.parseColor("#A8A8B0")); textSize = 14f; loadingDots(this) })
             } else if (v != null) {
                 var full = ""
                 val tv = TextView(this).apply {
-                    text = "Loading"; textSize = 11.5f; setTextColor(Color.parseColor("#D0D0D6")); typeface = Typeface.MONOSPACE; setTextIsSelectable(true)
+                    text = "Loading"; textSize = 11.5f; setTextColor(Color.parseColor("#E0E0E0")); typeface = Typeface.MONOSPACE; setTextIsSelectable(true)
                 }
                 val stopV = loadingDots(tv)
                 val bar = LinearLayout(this)
@@ -1393,7 +1393,7 @@ class MainActivity : Activity() {
                     runOnUiThread { stopV(); tv.text = r }
                 }.start()
             } else {
-                val ph = TextView(this).apply { text = "Loading"; setTextColor(Color.parseColor("#8B949E")); textSize = 14f }
+                val ph = TextView(this).apply { text = "Loading"; setTextColor(Color.parseColor("#A8A8B0")); textSize = 14f }
                 body.addView(ph)
                 val stopP = loadingDots(ph)
                 Thread {
@@ -1405,10 +1405,10 @@ class MainActivity : Activity() {
                         val head = LinearLayout(this)
                         head.gravity = Gravity.CENTER_VERTICAL
                         head.setPadding(dp(14), dp(12), dp(10), dp(12))
-                        head.setBackgroundColor(Color.parseColor("#161B22"))
+                        head.setBackgroundColor(Color.parseColor("#0F0F0F"))
                         val hv = LinearLayout(this); hv.orientation = LinearLayout.VERTICAL
                         hv.addView(TextView(this).apply { text = label; textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-                        hv.addView(TextView(this).apply { text = pkg; textSize = 11f; setTextColor(Color.parseColor("#8B949E")) })
+                        hv.addView(TextView(this).apply { text = pkg; textSize = 11f; setTextColor(Color.parseColor("#A8A8B0")) })
                         head.addView(hv, LinearLayout.LayoutParams(0, -2, 1f))
                         head.addView(pill("Save all") {
                             toast("Zip ban rahi hai, thoda ruko...")
@@ -1420,16 +1420,16 @@ class MainActivity : Activity() {
                             }.start()
                         })
                         c.addView(head)
-                        if (items.isEmpty()) c.addView(TextView(this).apply { text = "Khali"; setTextColor(Color.parseColor("#8B949E")); setPadding(dp(14), dp(14), dp(14), dp(14)) })
+                        if (items.isEmpty()) c.addView(TextView(this).apply { text = "Khali"; setTextColor(Color.parseColor("#A8A8B0")); setPadding(dp(14), dp(14), dp(14), dp(14)) })
                         for (n in items) {
-                            val line = View(this); line.setBackgroundColor(Color.parseColor("#30363D"))
+                            val line = View(this); line.setBackgroundColor(Color.parseColor("#26262B"))
                             c.addView(line, LinearLayout.LayoutParams(-1, dp(1)))
                             val r = LinearLayout(this)
                             r.gravity = Gravity.CENTER_VERTICAL
                             r.setPadding(dp(14), dp(14), dp(14), dp(14))
-                            r.addView(IconView(this).apply { kind = if (n.dir) 29 else 30; tint = Color.parseColor(if (n.dir) "#8B98A9" else "#B8C0CC") }, LinearLayout.LayoutParams(dp(34), dp(24)))
+                            r.addView(IconView(this).apply { kind = if (n.dir) 29 else 30; tint = Color.parseColor(if (n.dir) "#A8A8B0" else "#B8C0CC") }, LinearLayout.LayoutParams(dp(34), dp(24)))
                             r.addView(TextView(this).apply { text = n.name; textSize = 15.5f; setTextColor(Color.WHITE) }, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
-                            if (!n.dir && n.size > 0) r.addView(TextView(this).apply { text = if (n.size > 1024) "${n.size / 1024} KB" else "${n.size} B"; textSize = 12f; setTextColor(Color.parseColor("#8B949E")) })
+                            if (!n.dir && n.size > 0) r.addView(TextView(this).apply { text = if (n.size > 1024) "${n.size / 1024} KB" else "${n.size} B"; textSize = 12f; setTextColor(Color.parseColor("#A8A8B0")) })
                             val full = if (cur.isEmpty()) n.name else cur + "/" + n.name
                             r.setOnClickListener { if (n.dir) { cur = full; render() } else { viewing = full; render() } }
                             c.addView(r)
@@ -1466,7 +1466,7 @@ class MainActivity : Activity() {
         val topBar = FrameLayout(this)
         topBar.setBackgroundColor(Color.BLACK)
         val back = icon(23, 40) { dlg.dismiss() }
-        back.background = oval("#303030")
+        back.background = oval("#1A1A1A")
         topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
         topBar.addView(TextView(this).apply { text = "Security log"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
@@ -1490,7 +1490,7 @@ class MainActivity : Activity() {
                 last = d
                 val head = nice.format(java.util.Date(e.t))
                 content.addView(TextView(this).apply {
-                    text = head; textSize = 15f; setTextColor(Color.parseColor("#8D8D95")); typeface = Typeface.DEFAULT_BOLD
+                    text = head; textSize = 15f; setTextColor(Color.parseColor("#A8A8B0")); typeface = Typeface.DEFAULT_BOLD
                     setPadding(0, dp(18), 0, dp(8))
                 })
             }
@@ -1499,7 +1499,7 @@ class MainActivity : Activity() {
             card.orientation = LinearLayout.HORIZONTAL
             card.setPadding(dp(14), dp(12), dp(8), dp(12))
             card.background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.parseColor("#1E1E22")); cornerRadius = dp(14).toFloat()
+                setColor(Color.parseColor("#101010")); cornerRadius = dp(14).toFloat()
                 setStroke(dp(1), Color.parseColor(if (high) "#7A2E2E" else "#6B5A2A"))
             }
             val tv = LinearLayout(this)
@@ -1519,7 +1519,7 @@ class MainActivity : Activity() {
                 text = e.pkg; textSize = 12f; setTextColor(Color.parseColor(if (high) "#FF8A8A" else "#E5C06A"))
             })
             tv.addView(TextView(this).apply {
-                text = e.text.substringAfter(" \u2014 "); textSize = 14f; setTextColor(Color.parseColor("#D0D0D6")); setPadding(0, dp(6), 0, 0)
+                text = e.text.substringAfter(" \u2014 "); textSize = 14f; setTextColor(Color.parseColor("#E0E0E0")); setPadding(0, dp(6), 0, 0)
             })
             card.addView(tv, LinearLayout.LayoutParams(0, -2, 1f))
             card.setOnClickListener { showAppReport(e.pkg, e.label) }
@@ -1646,7 +1646,7 @@ class MainActivity : Activity() {
         val topBar = FrameLayout(this)
         topBar.setBackgroundColor(Color.BLACK)
         val back = icon(23, 40) { if (tab == 3) { tab = 0; render() } else dlg.dismiss() }
-        back.background = oval("#303030")
+        back.background = oval("#1A1A1A")
         topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
         topBar.addView(TextView(this).apply { text = "Images"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
@@ -1657,7 +1657,7 @@ class MainActivity : Activity() {
 
         val et = EditText(this).apply {
             hint = "Describe an image"
-            setHintTextColor(Color.parseColor("#8D8D95"))
+            setHintTextColor(Color.parseColor("#A8A8B0"))
             setTextColor(Color.WHITE)
             textSize = 16f
             background = null
@@ -1712,7 +1712,7 @@ class MainActivity : Activity() {
         val bar = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14), dp(6), dp(8), dp(6))
-            background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#303030")); setStroke(dp(1), Color.parseColor("#3C3C3C")) }
+            background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#1A1A1A")); setStroke(dp(1), Color.parseColor("#262626")) }
             addView(IconView(this@MainActivity).apply { kind = 13 }, LinearLayout.LayoutParams(dp(34), dp(34)))
             addView(et, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
             addView(sendB, LinearLayout.LayoutParams(dp(38), dp(38)))
@@ -1749,10 +1749,10 @@ class MainActivity : Activity() {
             val col = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(26), dp(26), dp(26), dp(18))
-                background = GradientDrawable().apply { cornerRadius = dp(30).toFloat(); setColor(Color.parseColor("#1E1E1E")) }
+                background = GradientDrawable().apply { cornerRadius = dp(30).toFloat(); setColor(Color.parseColor("#101010")) }
             }
             col.addView(TextView(this).apply { text = tpl.name; textSize = 25f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-            col.addView(TextView(this).apply { text = "Choose how you’d like to add a photo."; textSize = 17f; setTextColor(Color.parseColor("#C8CCD6")); setPadding(0, dp(8), 0, dp(18)) })
+            col.addView(TextView(this).apply { text = "Choose how you’d like to add a photo."; textSize = 17f; setTextColor(Color.parseColor("#D0D0D0")); setPadding(0, dp(8), 0, dp(18)) })
             fun pill(label: String, go: () -> Unit) {
                 col.addView(TextView(this).apply {
                     text = label; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
@@ -1851,11 +1851,11 @@ class MainActivity : Activity() {
             // upar: X, menu, download, Share
             val topRow = LinearLayout(this)
             topRow.gravity = Gravity.CENTER_VERTICAL
-            val close = TextView(this).apply { text = "\u2715"; textSize = 20f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; background = oval("#303030"); setOnClickListener { v.dismiss() } }
+            val close = TextView(this).apply { text = "\u2715"; textSize = 20f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; background = oval("#1A1A1A"); setOnClickListener { v.dismiss() } }
             topRow.addView(close, LinearLayout.LayoutParams(dp(44), dp(44)))
             topRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
             val more = icon(9, 44) { }
-            more.background = oval("#303030")
+            more.background = oval("#1A1A1A")
             more.setOnClickListener {
                 val pm = android.widget.PopupMenu(this, more)
                 val isFav = f.name in favs()
@@ -1876,7 +1876,7 @@ class MainActivity : Activity() {
             }
             topRow.addView(more, LinearLayout.LayoutParams(dp(44), dp(44)).apply { rightMargin = dp(8) })
             val dl = icon(35, 44) { saveToGallery(f) }
-            dl.background = oval("#303030")
+            dl.background = oval("#1A1A1A")
             topRow.addView(dl, LinearLayout.LayoutParams(dp(44), dp(44)).apply { rightMargin = dp(8) })
             topRow.addView(TextView(this).apply {
                 text = "Share"; textSize = 16f; setTextColor(Color.BLACK); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
@@ -1894,7 +1894,7 @@ class MainActivity : Activity() {
             bottomRow.gravity = Gravity.CENTER
             fun tool(kind: Int, name: String, onC: () -> Unit) {
                 val c1 = LinearLayout(this); c1.orientation = LinearLayout.VERTICAL; c1.gravity = Gravity.CENTER_HORIZONTAL
-                val ic = IconView(this).apply { this.kind = kind; background = oval("#303030"); setOnClickListener { onC() } }
+                val ic = IconView(this).apply { this.kind = kind; background = oval("#1A1A1A"); setOnClickListener { onC() } }
                 c1.addView(ic, LinearLayout.LayoutParams(dp(60), dp(60)))
                 c1.addView(TextView(this).apply { text = name; textSize = 16f; setTextColor(Color.WHITE); setPadding(0, dp(8), 0, 0); setOnClickListener { onC() } })
                 bottomRow.addView(c1, LinearLayout.LayoutParams(0, -2, 1f))
@@ -1949,7 +1949,7 @@ class MainActivity : Activity() {
                     }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.END; leftMargin = dp(48); bottomMargin = dp(18) })
                     val f = t.file
                     if (t.busy) {
-                        content.addView(TextView(this).apply { text = "Creating image..."; textSize = 16f; setTextColor(Color.parseColor("#9AA3B5")); setPadding(dp(4), dp(8), 0, dp(24)) })
+                        content.addView(TextView(this).apply { text = "Creating image..."; textSize = 16f; setTextColor(Color.parseColor("#B0B0B8")); setPadding(dp(4), dp(8), 0, dp(24)) })
                     } else if (f != null) {
                         val iv = android.widget.ImageView(this)
                         iv.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
@@ -1989,7 +1989,7 @@ class MainActivity : Activity() {
                         content.addView(TextView(this).apply {
                             text = "Retry"; textSize = 15f; setTextColor(Color.WHITE)
                             setPadding(dp(18), dp(8), dp(18), dp(8))
-                            background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#2A2A2A")) }
+                            background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#161616")) }
                             setOnClickListener { if (!busyImg) run(t) }
                         }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8); bottomMargin = dp(20) })
                     }
@@ -2004,7 +2004,7 @@ class MainActivity : Activity() {
                 for (f in files) groups.getOrPut(dayF.format(java.util.Date(f.lastModified()))) { ArrayList() }.add(f)
                 for ((day, list) in groups) {
                     content.addView(TextView(this).apply {
-                        text = day; textSize = 15f; setTextColor(Color.parseColor("#8D8D95")); typeface = Typeface.DEFAULT_BOLD
+                        text = day; textSize = 15f; setTextColor(Color.parseColor("#A8A8B0")); typeface = Typeface.DEFAULT_BOLD
                         setPadding(dp(2), dp(14), 0, dp(8))
                     })
                     var k = 0
@@ -2061,7 +2061,7 @@ class MainActivity : Activity() {
         if (c != null && Usage.paidOnly(c)) { Models.setSel(p, "chat", null); c = null }
         val base = if (c == null) "AI Auto" else "AI " + c.name
         val s = SpannableString(base)
-        s.setSpan(ForegroundColorSpan(Color.parseColor("#9AA3B5")), 3, base.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        s.setSpan(ForegroundColorSpan(Color.parseColor("#B0B0B8")), 3, base.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         titleV.text = s
     }
 
@@ -2075,7 +2075,7 @@ class MainActivity : Activity() {
         val sv = ScrollView(this)
         sv.isVerticalScrollBarEnabled = false
         sv.addView(col)
-        sv.background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#1E1E1E")) }
+        sv.background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#101010")) }
         var thinkOpen = true
         val openProv = mutableSetOf<String>()
         Models.CATS.mapNotNull { Models.sel(p, it.first) }.forEach { openProv.add(it.prov) }
@@ -2108,11 +2108,11 @@ class MainActivity : Activity() {
             val tx = LinearLayout(this)
             tx.orientation = LinearLayout.VERTICAL
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
-            if (sub != null) tx.addView(TextView(this).apply { text = sub; textSize = 13.5f; setTextColor(Color.parseColor("#9AA3B5")) })
+            if (sub != null) tx.addView(TextView(this).apply { text = sub; textSize = 13.5f; setTextColor(Color.parseColor("#B0B0B8")) })
             if (usage != null) {
                 if (usage.frac != null) {
                     val bar = LinearLayout(this)
-                    bar.background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(Color.parseColor("#333333")) }
+                    bar.background = GradientDrawable().apply { cornerRadius = dp(3).toFloat(); setColor(Color.parseColor("#262626")) }
                     val left = (1f - usage.frac).coerceIn(0f, 1f)
                     val fill = View(this)
                     fill.background = GradientDrawable().apply {
@@ -2123,7 +2123,7 @@ class MainActivity : Activity() {
                     bar.addView(View(this), LinearLayout.LayoutParams(0, dp(5), 1f - left))
                     tx.addView(bar, LinearLayout.LayoutParams(-1, dp(5)).apply { topMargin = dp(5) })
                 }
-                tx.addView(TextView(this).apply { text = usage.text; textSize = 12f; setTextColor(Color.parseColor("#7C8499")); setPadding(0, dp(3), 0, 0) })
+                tx.addView(TextView(this).apply { text = usage.text; textSize = 12f; setTextColor(Color.parseColor("#9A9AA2")); setPadding(0, dp(3), 0, 0) })
             }
             r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(6) })
             r.setOnClickListener { go() }
@@ -2133,11 +2133,11 @@ class MainActivity : Activity() {
         fun head(t: String): View = TextView(this).apply {
             text = t
             textSize = 14f
-            setTextColor(Color.parseColor("#9AA3B5"))
+            setTextColor(Color.parseColor("#B0B0B8"))
             typeface = Typeface.DEFAULT_BOLD
             setPadding(dp(20), dp(14), dp(16), dp(4))
         }
-        fun line(): View = View(this).apply { setBackgroundColor(Color.parseColor("#333333")) }
+        fun line(): View = View(this).apply { setBackgroundColor(Color.parseColor("#262626")) }
 
         render = {
             col.removeAllViews()
@@ -2197,7 +2197,7 @@ class MainActivity : Activity() {
                 if (prov != "gemini") col.addView(TextView(this).apply {
                     text = "Only gives answers, no phone actions."
                     textSize = 12.5f
-                    setTextColor(Color.parseColor("#7C8499"))
+                    setTextColor(Color.parseColor("#9A9AA2"))
                     setPadding(dp(20), dp(2), dp(16), dp(6))
                 })
             }
@@ -2259,10 +2259,10 @@ class MainActivity : Activity() {
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(
                     Color.parseColor("#000000"),
-                    Color.parseColor("#02051A"),
-                    Color.parseColor("#02051A"),
-                    Color.parseColor("#0A1F8F"),
-                    Color.parseColor("#1D3FD6")))
+                    Color.parseColor("#000000"),
+                    Color.parseColor("#000000"),
+                    Color.parseColor("#030624"),
+                    Color.parseColor("#0A1650")))
         }
 
         // ---------- upar ki patti ----------
@@ -2273,7 +2273,7 @@ class MainActivity : Activity() {
         header.addView(icon(0, 44) { showDrawer() })
         val title = TextView(this).apply {
             textSize = 19f
-            setTextColor(Color.parseColor("#E8EAF0"))
+            setTextColor(Color.parseColor("#F2F2F2"))
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
             setOnClickListener { showModels() }
@@ -2318,8 +2318,8 @@ class MainActivity : Activity() {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dp(30).toFloat()
-                setColor(Color.parseColor("#15181F"))
-                setStroke(dp(1), Color.parseColor("#1F2633"))
+                setColor(Color.parseColor("#0F0F0F"))
+                setStroke(dp(1), Color.parseColor("#1F1F24"))
             }
             addView(chipRow, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(4); topMargin = dp(4) })
             addView(bar, LinearLayout.LayoutParams(-1, -2))
@@ -2328,8 +2328,8 @@ class MainActivity : Activity() {
         bar.addView(icon(1, 44) { showPlus() })
         input = EditText(this).apply {
             hint = "Ask AI"
-            setHintTextColor(Color.parseColor("#7D8597"))
-            setTextColor(Color.parseColor("#E8EAF0"))
+            setHintTextColor(Color.parseColor("#9A9AA2"))
+            setTextColor(Color.parseColor("#F2F2F2"))
             textSize = 16f
             background = null
             maxLines = 4
@@ -2616,14 +2616,14 @@ class MainActivity : Activity() {
         orb = OrbView(this)
         orbStatus = TextView(this).apply {
             text = orbLabel(0)
-            setTextColor(Color.parseColor("#9AA3B5"))
+            setTextColor(Color.parseColor("#B0B0B8"))
             textSize = 14f
             visibility = View.GONE
             gravity = Gravity.CENTER
         }
         micBtn = icon(12, 43) { toggleMute() }
         micBtn.tint = Color.WHITE
-        micBtn.background = oval("#303030")
+        micBtn.background = oval("#1A1A1A")
         val close = icon(1, 43) { closeOrb() }
         closeBtn = close
         close.rotation = 45f
@@ -2633,7 +2633,7 @@ class MainActivity : Activity() {
 
         orbInput = EditText(this).apply {
             hint = "Ask AI"
-            setHintTextColor(Color.parseColor("#8D8D95"))
+            setHintTextColor(Color.parseColor("#A8A8B0"))
             setTextColor(Color.WHITE)
             textSize = 16f
             background = null
@@ -2663,8 +2663,8 @@ class MainActivity : Activity() {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dp(22).toFloat()
-                setColor(Color.parseColor("#303030"))
-                setStroke(dp(1), Color.parseColor("#3C3C3C"))
+                setColor(Color.parseColor("#1A1A1A"))
+                setStroke(dp(1), Color.parseColor("#262626"))
             }
             setPadding(dp(8), 0, dp(9), 0)
             addView(plus, LinearLayout.LayoutParams(dp(30), dp(30)))
@@ -2680,9 +2680,9 @@ class MainActivity : Activity() {
         }
 
         val menuBtn = icon(0, 40) { showDrawer() }
-        menuBtn.background = oval("#303030")
+        menuBtn.background = oval("#1A1A1A")
         val setBtn = icon(11, 40) { Toast.makeText(this, "Jaldi aayega", Toast.LENGTH_SHORT).show() }
-        setBtn.background = oval("#303030")
+        setBtn.background = oval("#1A1A1A")
         val topRow = FrameLayout(this).apply {
             addView(menuBtn, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START))
             addView(setBtn, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.END))
@@ -2838,7 +2838,7 @@ class MainActivity : Activity() {
         micBtn.tint = Color.WHITE
         micBtn.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(Color.parseColor(if (micMuted) "#D32F2F" else "#303030"))
+            setColor(Color.parseColor(if (micMuted) "#D32F2F" else "#1A1A1A"))
         }
         micBtn.invalidate()
     }

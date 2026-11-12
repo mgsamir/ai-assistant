@@ -52,13 +52,13 @@ object Studio {
     }
 
     private fun oval(c: Int) = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(c) }
-    private fun pill(c: Context, t: String, bg: String = "#303030", onC: () -> Unit) = TextView(c).apply {
+    private fun pill(c: Context, t: String, bg: String = "#1A1A1A", onC: () -> Unit) = TextView(c).apply {
         text = t; textSize = 16f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
         setPadding(dp(c, 20), dp(c, 10), dp(c, 20), dp(c, 10))
         background = GradientDrawable().apply { cornerRadius = dp(c, 24).toFloat(); setColor(Color.parseColor(bg)) }
         setOnClickListener { onC() }
     }
-    private fun backBtn(c: Context, onC: () -> Unit) = IconView(c).apply { kind = 23; background = oval(Color.parseColor("#303030")); setOnClickListener { onC() } }
+    private fun backBtn(c: Context, onC: () -> Unit) = IconView(c).apply { kind = 23; background = oval(Color.parseColor("#1A1A1A")); setOnClickListener { onC() } }
 
     // AI se photo badalna: photo + likha hua kaam bhejta hai
     private fun ai(act: Activity, bmp: Bitmap, prompt: String, dir: File, done: (File?, String) -> Unit) {
@@ -129,7 +129,7 @@ object Studio {
         val pins = FrameLayout(act)
         box.addView(iv, FrameLayout.LayoutParams(-1, -1)); box.addView(pins, FrameLayout.LayoutParams(-1, -1))
         col.addView(box, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(act, 10) })
-        col.addView(TextView(act).apply { text = "Photo par chhoo kar khaas edit note likho"; textSize = 14f; setTextColor(Color.parseColor("#9AA3B5")); gravity = Gravity.CENTER; setPadding(0, dp(act, 8), 0, dp(act, 8)) })
+        col.addView(TextView(act).apply { text = "Photo par chhoo kar khaas edit note likho"; textSize = 14f; setTextColor(Color.parseColor("#B0B0B8")); gravity = Gravity.CENTER; setPadding(0, dp(act, 8), 0, dp(act, 8)) })
         val notes = ArrayList<Triple<Float, Float, String>>()
         fun redraw() {
             pins.removeAllViews()
@@ -158,7 +158,7 @@ object Studio {
             true
         }
         val et = EditText(act).apply {
-            hint = "Describe general edits"; setHintTextColor(Color.parseColor("#8D8D95")); setTextColor(Color.WHITE); textSize = 17f; background = null; maxLines = 4
+            hint = "Describe general edits"; setHintTextColor(Color.parseColor("#A8A8B0")); setTextColor(Color.WHITE); textSize = 17f; background = null; maxLines = 4
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         }
         val busy = busyOverlay(act, root)
@@ -180,7 +180,7 @@ object Studio {
         }
         val bar = LinearLayout(act).apply {
             gravity = Gravity.CENTER_VERTICAL; setPadding(dp(act, 18), dp(act, 6), dp(act, 8), dp(act, 6))
-            background = GradientDrawable().apply { cornerRadius = dp(act, 30).toFloat(); setColor(Color.parseColor("#303030")); setStroke(dp(act, 1), Color.parseColor("#3C3C3C")) }
+            background = GradientDrawable().apply { cornerRadius = dp(act, 30).toFloat(); setColor(Color.parseColor("#1A1A1A")); setStroke(dp(act, 1), Color.parseColor("#262626")) }
             addView(et, LinearLayout.LayoutParams(0, -2, 1f)); addView(send, LinearLayout.LayoutParams(dp(act, 42), dp(act, 42)))
         }
         col.addView(bar, LinearLayout.LayoutParams(-1, -2))
@@ -201,10 +201,10 @@ object Studio {
         top.addView(TextView(act).apply { text = "Remove"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         col.addView(top, LinearLayout.LayoutParams(-1, dp(act, 48)))
         col.addView(dv, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(act, 10) })
-        col.addView(TextView(act).apply { text = "Jo cheez mitani hai uske upar ungli phero"; textSize = 14f; setTextColor(Color.parseColor("#9AA3B5")); gravity = Gravity.CENTER; setPadding(0, dp(act, 8), 0, dp(act, 8)) })
+        col.addView(TextView(act).apply { text = "Jo cheez mitani hai uske upar ungli phero"; textSize = 14f; setTextColor(Color.parseColor("#B0B0B8")); gravity = Gravity.CENTER; setPadding(0, dp(act, 8), 0, dp(act, 8)) })
         val busy = busyOverlay(act, root)
         val row = LinearLayout(act); row.gravity = Gravity.CENTER_VERTICAL
-        row.addView(IconView(act).apply { kind = 36; background = oval(Color.parseColor("#303030")); setOnClickListener { dv.undo() } }, LinearLayout.LayoutParams(dp(act, 48), dp(act, 48)))
+        row.addView(IconView(act).apply { kind = 36; background = oval(Color.parseColor("#1A1A1A")); setOnClickListener { dv.undo() } }, LinearLayout.LayoutParams(dp(act, 48), dp(act, 48)))
         row.addView(View(act), LinearLayout.LayoutParams(0, 1, 1f))
         row.addView(pill(act, "Remove", "#2F6BFF") {
             if (dv.strokes.isEmpty()) { Toast.makeText(act, "Pehle mitane wali cheez par brush phero", Toast.LENGTH_SHORT).show(); return@pill }
@@ -230,7 +230,7 @@ object Studio {
         val top = FrameLayout(act)
         top.addView(backBtn(act) { d.dismiss() }, FrameLayout.LayoutParams(dp(act, 44), dp(act, 44), Gravity.START))
         val tools = LinearLayout(act); tools.gravity = Gravity.CENTER
-        tools.background = GradientDrawable().apply { cornerRadius = dp(act, 30).toFloat(); setColor(Color.parseColor("#303030")) }
+        tools.background = GradientDrawable().apply { cornerRadius = dp(act, 30).toFloat(); setColor(Color.parseColor("#1A1A1A")) }
         fun tb(kind: Int, tool: String): IconView = IconView(act).apply { this.kind = kind }
         val pen = tb(32, "pen"); val shp = tb(37, "shape"); val ers = tb(34, "eraser")
         fun sel(v: IconView?) { for (x in listOf(pen, shp, ers)) x.background = if (x === v) oval(Color.parseColor("#4A4A4A")) else null }
@@ -241,7 +241,7 @@ object Studio {
             val names = listOf("line", "arrow", "rect", "circle", "triangle", "diamond", "star", "heart")
             val glyph = listOf("╱", "↗", "▭", "◯", "△", "◇", "☆", "♡")
             val grid = GridLayout(act); grid.columnCount = 4
-            grid.background = GradientDrawable().apply { cornerRadius = dp(act, 20).toFloat(); setColor(Color.parseColor("#2E2E2E")) }
+            grid.background = GradientDrawable().apply { cornerRadius = dp(act, 20).toFloat(); setColor(Color.parseColor("#1A1A1A")) }
             grid.setPadding(dp(act, 8), dp(act, 8), dp(act, 8), dp(act, 8))
             val pw = PopupWindow(grid, dp(act, 300), -2, true)
             names.forEachIndexed { i, n ->
@@ -282,7 +282,7 @@ object Studio {
             row.addView(v, LinearLayout.LayoutParams(dp(act, 44), dp(act, 44)).apply { rightMargin = dp(act, 10) })
         }
         row.addView(View(act), LinearLayout.LayoutParams(0, 1, 1f))
-        row.addView(IconView(act).apply { kind = 36; background = oval(Color.parseColor("#303030")); setOnClickListener { dv.undo() } }, LinearLayout.LayoutParams(dp(act, 48), dp(act, 48)))
+        row.addView(IconView(act).apply { kind = 36; background = oval(Color.parseColor("#1A1A1A")); setOnClickListener { dv.undo() } }, LinearLayout.LayoutParams(dp(act, 48), dp(act, 48)))
         dv.color = Color.parseColor("#FF3B30"); mark()
         col.addView(row, LinearLayout.LayoutParams(-1, -2))
         root.addView(col, FrameLayout.LayoutParams(-1, -1))
