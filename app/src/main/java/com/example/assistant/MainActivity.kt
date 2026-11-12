@@ -2077,6 +2077,16 @@ class MainActivity : Activity() {
         titleV.text = s
     }
 
+    // provider ka logo (gol, user ki di hui image); na ho to None
+    private fun provLogo(prov: String, sizeDp: Int): View? {
+        val res = when (prov) { "gemini" -> R.drawable.logo_gemini; "groq" -> R.drawable.logo_groq; "openrouter" -> R.drawable.logo_openrouter; else -> return null }
+        return android.widget.ImageView(this).apply {
+            setImageResource(res)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            layoutParams = LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp))
+        }
+    }
+
     // left menu ka "Models" page: provider chuno. Auto aur model list sirf usi ki.
     private fun showProviders() {
         val p = getSharedPreferences("p", Context.MODE_PRIVATE)
@@ -2099,10 +2109,12 @@ class MainActivity : Activity() {
                 setPadding(dp(14), dp(14), dp(16), dp(14))
                 background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")); setStroke(dp(1), Color.parseColor(if (cur == prov) "#4F8BFF" else "#1F1F24")) }
             }
-            row.addView(TextView(this).apply {
+            val lg = provLogo(prov, 44)
+            if (lg != null) row.addView(lg, LinearLayout.LayoutParams(dp(44), dp(44)))
+            else row.addView(TextView(this).apply {
                 text = letterOf(prov); textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
                 background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor(if (prov.isEmpty()) "#2A2A2A" else colorOf(prov))) }
-            }, LinearLayout.LayoutParams(dp(40), dp(40)))
+            }, LinearLayout.LayoutParams(dp(44), dp(44)))
             val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
             tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
@@ -2144,7 +2156,7 @@ class MainActivity : Activity() {
         fun provName(x: String) = when (x) { "gemini" -> "Gemini"; "openai" -> "ChatGPT (OpenAI)"; "groq" -> "Groq"; "openrouter" -> "OpenRouter"; else -> x }
         fun provColor(x: String) = when (x) { "gemini" -> "#4F8BFF"; "openai" -> "#10A37F"; "groq" -> "#F55036"; "openrouter" -> "#7C5CFF"; else -> "#6B7280" }
         fun provLetter(x: String) = when (x) { "gemini" -> "G"; "openai" -> "O"; "groq" -> "Gq"; "openrouter" -> "OR"; else -> x.take(1).uppercase() }
-        fun badge(x: String, size: Int): View = TextView(this).apply {
+        fun badge(x: String, size: Int): View = provLogo(x, size) ?: TextView(this).apply {
             text = provLetter(x)
             textSize = if (size >= 30) 13f else 11f
             typeface = Typeface.DEFAULT_BOLD
