@@ -620,6 +620,31 @@ class MainActivity : Activity() {
             }
             list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
+        // Services: ye chat ke model nahi, assistant ke kaam ke tools hain (sirf dikhane ke liye)
+        list.addView(TextView(this).apply {
+            text = "SERVICES"; textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#B0B0B8")); setPadding(dp(4), dp(14), 0, dp(8))
+        })
+        fun svc(logo: String, title: String, sub: String, on: Boolean) {
+            val row = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(12), dp(16), dp(12))
+                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")); setStroke(dp(1), Color.parseColor("#1F1F24")) }
+            }
+            provLogo(logo, 48)?.let { row.addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
+            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+            tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
+            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
+            row.addView(TextView(this).apply {
+                text = if (on) "On" else "Off"; textSize = 13f
+                setTextColor(Color.parseColor(if (on) "#34D399" else "#8A8A92"))
+            })
+            list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        }
+        svc("brave", "Brave Search", "Web search aur sources", Extra.brave.isNotBlank())
+        svc("elevenlabs", "ElevenLabs", "Natural awaaz (voice)", Extra.eleven.isNotBlank())
+        svc("virustotal", "VirusTotal", "App security scan", Extra.vt.isNotBlank())
         root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
         dlg.setContentView(root)
         dlg.show()
@@ -2129,7 +2154,11 @@ class MainActivity : Activity() {
 
     // provider ka logo (gol, user ki di hui image); na ho to None
     private fun provLogo(prov: String, sizeDp: Int): View? {
-        val res = when (prov) { "gemini" -> R.drawable.logo_gemini; "groq" -> R.drawable.logo_groq; "openrouter" -> R.drawable.logo_openrouter; else -> return null }
+        val res = when (prov) {
+            "gemini" -> R.drawable.logo_gemini; "groq" -> R.drawable.logo_groq; "openrouter" -> R.drawable.logo_openrouter
+            "brave" -> R.drawable.logo_brave; "elevenlabs" -> R.drawable.logo_elevenlabs; "virustotal" -> R.drawable.logo_virustotal
+            else -> return null
+        }
         return android.widget.ImageView(this).apply {
             setImageResource(res)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
