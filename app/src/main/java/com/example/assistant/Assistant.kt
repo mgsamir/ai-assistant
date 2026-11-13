@@ -212,12 +212,21 @@ The user is an adult. Answer questions about the human body, sex education, repr
         speak("Namaste, main aapka assistant hoon. Boliye, main kya madad karoon?")
     }
 
+    // phone ki apni awaaz mein bhi ladka/ladki: Hindi awaazon mein se jis naam se gender pata chale wahi
+    private fun deviceVoice(girl: Boolean) {
+        try {
+            val want = if (girl) listOf("hia", "hie", "female") else listOf("hic", "hid", "-male")
+            val vs = tts.voices?.filter { it.locale.language == "hi" } ?: return
+            val pick = vs.firstOrNull { x -> want.any { x.name.contains(it, true) } && !(!girl && x.name.contains("female", true)) }
+            if (pick != null) tts.voice = pick
+        } catch (e: Exception) { }
+    }
+
     private fun speak(v: String): Boolean {
-        try { tts.setPitch(Voice.cur(Usage.p).pitch) } catch (e: Exception) { }
-        if (Extra.eleven.isEmpty()) return tts.speak(v, TextToSpeech.QUEUE_FLUSH, null, "r") == TextToSpeech.SUCCESS
+        try { val cv = Voice.cur(Usage.p); deviceVoice(cv.girl); tts.setPitch(cv.pitch) } catch (e: Exception) { }
         val gen = ++speakGen
         thread {
-            val bytes = Providers.eleven(v)
+            val bytes = Providers.geminiTts(Keys.get(prefs), v, Voice.cur(Usage.p).gemini) ?: Providers.eleven(v)
             main.post {
                 if (gen != speakGen) return@post
                 if (bytes == null) {
@@ -225,7 +234,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     return@post
                 }
                 try {
-                    val f = java.io.File(app.cacheDir, "say.mp3")
+                    val f = java.io.File(app.cacheDir, if (bytes.size > 4 && String(bytes, 0, 4) == "RIFF") "say.wav" else "say.mp3")
                     f.writeBytes(bytes)
                     try { mp?.release() } catch (e: Exception) { }
                     val m = android.media.MediaPlayer()

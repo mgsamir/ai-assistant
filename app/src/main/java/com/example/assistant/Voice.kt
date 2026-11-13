@@ -1,6 +1,7 @@
 package com.example.assistant
 
 import android.content.SharedPreferences
+import org.json.JSONArray
 
 // Awaaz chunne ka system: ladka / ladki ki alag alag awaazein.
 // Har awaaz ke saath: Gemini Live ka naam, ElevenLabs ki awaaz, aur phone ki apni awaaz ke liye pitch.
@@ -29,4 +30,15 @@ object Voice {
     }
 
     fun set(p: SharedPreferences, id: String) { p.edit().putString("voice_id", id).apply() }
+
+    // ElevenLabs: is account ki asli awaazon mein se wahi jinka gender mile; gender ke andar apni jagah ke hisaab se alag awaaz
+    fun elevenFor(p: SharedPreferences?, v: V): String {
+        try {
+            val a = JSONArray(p?.getString("el_voices", "[]") ?: "[]")
+            val ids = (0 until a.length()).map { a.getJSONObject(it) }
+                .filter { (it.optString("g") == "female") == v.girl }.map { it.getString("id") }
+            if (ids.isNotEmpty()) return ids[ALL.filter { it.girl == v.girl }.indexOf(v) % ids.size]
+        } catch (e: Exception) { }
+        return v.eleven
+    }
 }

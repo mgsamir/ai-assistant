@@ -109,12 +109,74 @@ object Providers {
         return null
     }
 
+    // ElevenLabs ki apni awaazon ki list (ek baar), gender ke saath
+    private fun elevenVoices() {
+        val sp = Usage.p ?: return
+        if (sp.getString("el_voices", "[]") != "[]") return
+        try {
+            val c = URL("https://api.elevenlabs.io/v1/voices").openConnection() as HttpURLConnection
+            c.connectTimeout = 8000; c.readTimeout = 10000
+            c.setRequestProperty("xi-api-key", Extra.eleven)
+            if (c.responseCode != 200) return
+            val arr = JSONObject(c.inputStream.bufferedReader().readText()).optJSONArray("voices") ?: return
+            val all = ArrayList<JSONObject>()
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val g = o.optJSONObject("labels")?.optString("gender") ?: ""
+                if (g == "male" || g == "female") all.add(JSONObject().put("id", o.optString("voice_id")).put("g", g).put("pre", o.optString("category") == "premade"))
+            }
+            val pre = all.filter { it.optBoolean("pre") }
+            val use = org.json.JSONArray()
+            (if (pre.isNotEmpty()) pre else all).forEach { use.put(it) }
+            if (use.length() > 0) sp.edit().putString("el_voices", use.toString()).apply()
+        } catch (e: Exception) { }
+    }
+
+    private fun wav(pcm: ByteArray, rate: Int): ByteArray {
+        val h = java.nio.ByteBuffer.allocate(44).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        h.put("RIFF".toByteArray()).putInt(36 + pcm.size).put("WAVE".toByteArray()).put("fmt ".toByteArray())
+            .putInt(16).putShort(1).putShort(1).putInt(rate).putInt(rate * 2).putShort(2).putShort(16)
+            .put("data".toByteArray()).putInt(pcm.size)
+        return h.array() + pcm
+    }
+
+    // Gemini ki apni awaaz (Kore, Puck ...): chuni hui awaaz ka naam seedha jaata hai, isliye ladka/ladki sach mein alag
+    fun geminiTts(key: String, text: String, voice: String): ByteArray? {
+        if (key.isBlank() || text.isBlank()) return null
+        val body = JSONObject()
+            .put("contents", org.json.JSONArray().put(JSONObject().put("role", "user")
+                .put("parts", org.json.JSONArray().put(JSONObject().put("text", text.take(1800))))))
+            .put("generationConfig", JSONObject()
+                .put("responseModalities", org.json.JSONArray().put("AUDIO"))
+                .put("speechConfig", JSONObject().put("voiceConfig", JSONObject()
+                    .put("prebuiltVoiceConfig", JSONObject().put("voiceName", voice)))))
+        for (m in listOf("gemini-3.8-flash-lite-tts", "gemini-3.1-flash-tts-preview", "gemini-3.8-flash-tts")) {
+            try {
+                val c = URL("https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent").openConnection() as HttpURLConnection
+                c.requestMethod = "POST"
+                c.connectTimeout = 8000; c.readTimeout = 25000
+                c.setRequestProperty("Content-Type", "application/json")
+                c.setRequestProperty("x-goog-api-key", key)
+                c.doOutput = true
+                c.outputStream.use { it.write(body.toString().toByteArray()) }
+                if (c.responseCode != 200) continue
+                val inl = JSONObject(c.inputStream.bufferedReader().readText()).optJSONArray("candidates")?.optJSONObject(0)
+                    ?.optJSONObject("content")?.optJSONArray("parts")?.optJSONObject(0)?.optJSONObject("inlineData") ?: continue
+                val raw = android.util.Base64.decode(inl.optString("data"), android.util.Base64.DEFAULT)
+                if (raw.size < 100) continue
+                return if (raw.size > 4 && String(raw, 0, 4) == "RIFF") raw else wav(raw, 24000)
+            } catch (e: Exception) { }
+        }
+        return null
+    }
+
     // ElevenLabs: text se natural awaaz (mp3)
     fun eleven(text: String): ByteArray? {
         val key = Extra.eleven
         if (key.isEmpty() || text.isBlank()) return null
+        elevenVoices()
         return try {
-            val c = URL("https://api.elevenlabs.io/v1/text-to-speech/${Voice.cur(Usage.p).eleven}?output_format=mp3_44100_64")
+            val c = URL("https://api.elevenlabs.io/v1/text-to-speech/${Voice.elevenFor(Usage.p, Voice.cur(Usage.p))}?output_format=mp3_44100_64")
                 .openConnection() as HttpURLConnection
             c.requestMethod = "POST"
             c.connectTimeout = 8000
