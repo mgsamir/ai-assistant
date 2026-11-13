@@ -1262,7 +1262,26 @@ class MainActivity : Activity() {
     }
 
     private fun showDrawer() {
-        val dlg = android.app.Dialog(this)
+        if (drawerShown) return
+        drawerShown = true
+        var dref: android.app.Dialog? = null
+        // daayen se baayen ungli ghumao to panel wapas andar chala jaaye
+        val swipeD = android.view.GestureDetector(this, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
+                if (e1 == null) return false
+                val dx = e2.x - e1.x; val dy = e2.y - e1.y
+                if (dx < -dp(70) && kotlin.math.abs(dx) > 1.5f * kotlin.math.abs(dy) && kotlin.math.abs(vx) > 500f) { dref?.dismiss(); return true }
+                return false
+            }
+        })
+        val dlg = object : android.app.Dialog(this@MainActivity) {
+            override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+                try { swipeD.onTouchEvent(ev) } catch (e: Exception) { }
+                return super.dispatchTouchEvent(ev)
+            }
+        }
+        dref = dlg
+        dlg.setOnDismissListener { drawerShown = false }
         dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -2531,6 +2550,49 @@ class MainActivity : Activity() {
     }
 
     @Suppress("DEPRECATION")
+    // ---- ungli se swipe: baayen se daayen = panel kholo, neeche se upar = keyboard, upar se neeche = keyboard band ----
+    private var drawerShown = false
+    private val swipeMain by lazy {
+        android.view.GestureDetector(this, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
+                if (e1 == null) return false
+                val dx = e2.x - e1.x; val dy = e2.y - e1.y
+                val orbOn = ::orbScreen.isInitialized && orbScreen.visibility == View.VISIBLE
+                if (kotlin.math.abs(dx) > dp(90) && kotlin.math.abs(dx) > 1.8f * kotlin.math.abs(dy) && kotlin.math.abs(vx) > 700f) {
+                    if (dx > 0 && !drawerShown && !orbOn) showDrawer()
+                    return true
+                }
+                if (kotlin.math.abs(dy) > dp(90) && kotlin.math.abs(dy) > 1.8f * kotlin.math.abs(dx) && kotlin.math.abs(vy) > 900f) {
+                    if (dy < 0) { if (!orbOn && !kbShown() && e1.y > resources.displayMetrics.heightPixels * 0.5f) showKb() }
+                    else if (kbShown()) hideKb()
+                    return true
+                }
+                return false
+            }
+        })
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        try { swipeMain.onTouchEvent(ev) } catch (e: Exception) { }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun kbShown(): Boolean {
+        val r = android.graphics.Rect()
+        val d = window.decorView
+        d.getWindowVisibleDisplayFrame(r)
+        return d.rootView.height - r.bottom > d.rootView.height * 0.15f
+    }
+
+    private fun showKb() {
+        input.requestFocus()
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(input, 0)
+    }
+
+    private fun hideKb() {
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(window.decorView.windowToken, 0)
+    }
+
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         Usage.p = getSharedPreferences("p", Context.MODE_PRIVATE)
