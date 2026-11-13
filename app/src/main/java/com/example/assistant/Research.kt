@@ -58,10 +58,10 @@ object Research {
         ts.forEach { it.join(70000) }
         val notes = qs.indices.joinToString("\n\n") { "Sawal: " + qs[it] + "\nMila: " + (found[it] ?: "") }
         val rep = gen(key,
-            "Write a detailed, well organised research report using ONLY the findings given. Speak like Gemini to an ordinary Indian: easy everyday Hindustani in Roman letters, no heavy Hindi, no English office words. " +
-            "Use short plain heading lines (no markdown, no asterisks, no #), short paragraphs, 350 to 600 words. Include exact dates, numbers and names from the findings. " +
+            "Write a detailed, well organised research report using ONLY the findings given. Write in the same language and script as the topic, clear and natural like ChatGPT or Gemini. " +
+            "Use short ## heading lines, **bold** for key words, short paragraphs, 350 to 600 words. Include exact dates, numbers and names from the findings. " +
             "Start with a 2 line summary, then the details, then what it means for the user. If findings disagree or are missing, say so honestly. " + personal,
             "Topic: $q\n\nFindings:\n$notes")
-        return rep?.replace("*", "")?.replace("#", "") ?: "Report nahi ban paayi. Dobara try karo."
+        return rep ?: "Report nahi ban paayi. Dobara try karo."
     }
 }

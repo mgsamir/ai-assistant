@@ -688,20 +688,32 @@ class MainActivity : Activity() {
     }
 
     // jawab ko saaf, line-by-line dikhao: heading mote akshar mein, 1. 2. 3. alag-alag line par
+    // ChatGPT / Gemini jaisa dikhna: ## heading, **bold**, - bullets, 1. 2. 3. list
     private fun styled(t: String): CharSequence {
         val sb = android.text.SpannableStringBuilder()
         val lines = t.split("\n")
         for ((i, raw) in lines.withIndex()) {
-            val l = raw.trimEnd()
+            var l = raw.trimEnd()
             val st = sb.length
-            sb.append(l)
-            val head = l.isNotBlank() && l.endsWith(":") && l.length < 70 && !l.startsWith("-") && !l[0].isDigit()
+            var kind = 0 // 1 heading, 2 bullet, 3 numbered
+            val h = Regex("^\\s*#{1,6}\\s+(.*)$").find(l)
+            if (h != null) { l = h.groupValues[1]; kind = 1 }
+            else if (Regex("^\\s*[-*\u2022]\\s+").containsMatchIn(l)) { l = "\u2022 " + l.replace(Regex("^\\s*[-*\u2022]\\s+"), ""); kind = 2 }
+            else if (Regex("^\\s*\\d+[.)]\\s").containsMatchIn(l)) { l = l.trimStart(); kind = 3 }
+            // inline **bold**
+            val parts = l.replace("`", "").split("**")
+            for ((pi, seg) in parts.withIndex()) {
+                val ss = sb.length
+                sb.append(if (pi % 2 == 1 || pi == parts.size - 1) seg.replace("*", "") else seg.replace("*", ""))
+                if (pi % 2 == 1) sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), ss, sb.length, 0)
+            }
+            val head = kind == 1 || (kind == 0 && l.isNotBlank() && l.endsWith(":") && l.length < 70 && !l[0].isDigit())
             if (head) {
                 sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), st, sb.length, 0)
                 sb.setSpan(android.text.style.RelativeSizeSpan(1.12f), st, sb.length, 0)
-            } else if (Regex("^(\\d+[.)]|-)\\s").containsMatchIn(l)) {
+            } else if (kind == 2 || kind == 3) {
                 val n = l.indexOf(' ')
-                sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), st, st + n, 0)
+                if (kind == 3 && n > 0) sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), st, st + n, 0)
                 sb.setSpan(android.text.style.LeadingMarginSpan.Standard(0, dp(22)), st, sb.length, 0)
             }
             if (i < lines.size - 1) sb.append("\n")

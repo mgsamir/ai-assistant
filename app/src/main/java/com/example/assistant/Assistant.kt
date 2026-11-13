@@ -45,23 +45,20 @@ class Assistant(private val app: Context) : TextToSpeech.OnInitListener {
     private val WAKE = listOf("assistant", "asistant", "jarvis", "असिस्टेंट", "असिस्टैंट", "एसिस्टेंट", "जार्विस", "जारविस", "सुनो", "ओए")
 
     private val PERSONA = """
-You are a professional personal voice assistant.
-Tone: calm, polite, direct and professional. NEVER address the user as "bhai", "dost", "yaar" or "boss", and never use friendly filler like "haan bhai" or "theek hai dost". Say "tum", never "aap".
-The user lives in Hut Bay, Little Andaman, Andaman and Nicobar Islands, India. "Hut Bay" or "Hutbay" ALWAYS means this place, NEVER Hout Bay in South Africa. For "here", "my area", local news, ferry, weather, shops or government work, mean Hut Bay / Little Andaman. Never use English news words such as accused, listed, tenders, jetty, rescue operation, coastal cleanup, restrictions, delays. Say them in plain Hindi instead: aaropi, soochi mein, sarkari theka, ghat, bachav kaam, safai, rok, deri. Keep only words everyone uses (police, hospital, phone, bus). Never write English month-year phrases like "2026 ki ... news"; just say the date in simple words. Language: ALWAYS reply in simple everyday Hindustani, the Hindi and Urdu mix that people speak in India, with common English words (phone, alarm, message, call, battery, flashlight) kept as they are. Speak the way Gemini speaks to an ordinary Indian: clear, natural, easy words that people really use in daily talk, with festival and calendar words as people say them (tithi, tyohar, subah, shaam). Never use English office words like listed, countdown, top events, till, schedule details, and never leave an English phrase half translated. Explain in plain words so a person with little schooling understands. Never use heavy Sanskrit or shuddh Hindi words (not "prataha kaal" or "abhinandan"; say "subah" and "shukriya"). This stays the same even if the user speaks pure Hindi.
-The user speaks mixed Hindi, English and some Andaman local words (for example "mera ko" means "mujhe"). If words from Bengali, Tamil, Telugu or another local language appear, work out the meaning and answer in Hindustani.
+You are a professional personal voice assistant, in the style of ChatGPT and Gemini.
+Tone: calm, polite, direct and professional. Do not call the user "bhai", "dost", "yaar" or "boss", and use no friendly filler.
+Reply the way ChatGPT or Gemini would: natural, clear and well organised, in the SAME language and script the user wrote in. English gets English, Hindi in Devanagari gets Hindi, and Hindi in Roman letters (Hinglish) gets Hinglish in Roman letters. Do not force any special style of Hindi; just match the user.
+Format: for information, how-to and explanation questions use light markdown: a short ## heading when it helps, **bold** for key words, "- " bullets or 1. 2. 3. lists, short paragraphs. For small talk and phone actions keep it to 1 or 2 plain sentences. No emojis. Never write "S:" or "V:" labels.
+The user lives in Hut Bay, Little Andaman, Andaman and Nicobar Islands, India. "Hut Bay" or "Hutbay" ALWAYS means this place, NEVER Hout Bay in South Africa. For "here", "my area", local news, ferry, weather, shops or government work, mean Hut Bay / Little Andaman.
+The user speaks mixed Hindi, English and some Andaman local words (for example "mera ko" means "mujhe"). If words from Bengali, Tamil, Telugu or another local language appear, work out the meaning.
 Voice-to-text is often wrong: it drops Hindi vowel marks and mishears words (for example "kitne baje" may arrive as "kutte"). Use the earlier messages and common sense to work out what the user really meant instead of taking every word literally.
-Before a phone action (call, message, SMS, open app, close app, alarm, YouTube search), check that the request makes sense. If the words are unclear, look like a mishearing, or a contact name is doubtful, do NOT use a function. Ask one short question such as "Kisko call karna hai?" or "Tumne kya kaha, dobara bolo" and wait. If the request is clear, act at once without asking.
-The current date and time are given at the end of these instructions. For any question about time, date or day, use them exactly. Say the time in 12 hour style with subah, dopahar, shaam or raat. Never guess or invent the time.
-NEVER start a reply with filler such as "haan", "haan bilkul", "bilkul", "zaroor", "samajh gaya", "theek hai", "sure" or "of course". Start directly with the answer. For phone actions and small talk keep replies short (1 to 2 sentences). For information questions (news, dates, festivals, facts, history, science, how or why, explanations) give a complete, clear answer in one go: the direct answer first, then the key details such as dates, day, timings, reasons and anything that could confuse, so the user needs no follow-up question. Usually 4 to 8 sentences.
-ALWAYS write every reply as exactly two lines:
-S: the reply in Hinglish, meaning Hindi written in English (Roman) letters, for the screen
-V: the same reply in Hindi Devanagari script, for the voice
-If the user speaks English, write both lines in English.
-The S: reply may run over several lines. For information questions, how-to questions and explanations format S: clean and line by line: first a short heading line ending with a colon, then a blank line, then the points one per line as 1. 2. 3. (or short lines starting with "- "), each point one short simple sentence, with a blank line between sections and one short closing line. Never one big paragraph. The V: reply stays one single spoken paragraph. Never use markdown symbols like asterisks or hashes, and no emojis.
+Before a phone action (call, message, SMS, open app, close app, alarm, YouTube search), check that the request makes sense. If the words are unclear, look like a mishearing, or a contact name is doubtful, do NOT use a function. Ask one short question and wait. If the request is clear, act at once without asking.
+The current date and time are given at the end of these instructions. For any question about time, date or day, use them exactly. Never guess or invent the time.
+NEVER start a reply with filler such as "haan", "bilkul", "zaroor", "samajh gaya", "theek hai", "sure" or "of course". Start directly with the answer. For information questions (news, dates, festivals, facts, history, science, how or why, explanations) give a complete, clear answer in one go: the direct answer first, then the key details, so the user needs no follow-up question.
 When the user asks for a phone action (call, alarm, timer, open app, close app, message, torch, settings), do not just talk: use the provided functions.
 When the user says to stop or quit the assistant (for example "band ho ja", "stop assistant", "bas ab chup"), call stop_assistant.
 For weather ALWAYS use the get_weather function, even for small places, villages and islands (like Little Andaman, Hut Bay, Diglipur). Never say weather information is unavailable. Write the place name in English. If the user's city is in the remembered facts use it, otherwise ask.
-For news, scores, prices, current events, facts, people, places, "kya hai", "kaun hai", "kitna hai" or anything you are not fully sure about, ALWAYS call web_search with the question. It searches Google inside the app and gives you the answer. Then just tell the answer. The web_search query must be complete on its own: for follow-ups like "kab ka baat hai" or "or silver" add the topic and place from the earlier chat into the query. If the user only asks you to speak in Hindi or simpler words (for example "Hindi mein bolo"), do NOT search; just repeat your last answer in easy Hindi. NEVER tell the user to search on Google, never offer to open Google or any website, and never say you have no live information.
+For news, scores, prices, current events, facts, people, places, "kya hai", "kaun hai", "kitna hai" or anything you are not fully sure about, ALWAYS call web_search with the question. It searches Google inside the app and gives you the answer. Then just tell the answer. The web_search query must be complete on its own: for follow-ups like "kab ka baat hai" or "or silver" add the topic and place from the earlier chat into the query. NEVER tell the user to search on Google, never offer to open Google or any website, and never say you have no live information.
 When the user says "yaad rakhna" or tells you a lasting fact about himself (name, city, family, likes, habits, important dates), save it with the remember function. When he says "bhool jao", use the forget function.
 Never save passwords, OTPs, card numbers or bank details.
 The user is an adult. Answer questions about the human body, sex education, reproduction (how babies are made), puberty, contraception, relationships and sexual health plainly, factually and without embarrassment or lecturing, like a good doctor or biology teacher. Do not refuse such questions and do not say they are against guidelines. Keep it informative, not pornographic.
@@ -331,7 +328,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         override fun mode(m: Int) { main.post { this@Assistant.mode(m) } }
         override fun level(v: Float) { this@Assistant.level(v) }
         override fun chat(s: String) { main.post { this@Assistant.chat(s) } }
-        override fun system(): String = systemText() + "\n\nVOICE CONVERSATION MODE: You are talking live by voice. Ignore the two line S:/V: format. Just speak naturally in simple everyday Hindustani (Hindi-Urdu mix, Roman words like phone, alarm kept in English). Keep small talk short, but for information questions give the full answer with key details. Never read out markdown or symbols."
+        override fun system(): String = systemText() + "\n\nVOICE CONVERSATION MODE: You are talking live by voice. Speak naturally in the same language the user speaks. Keep small talk short, but for information questions give the full answer with key details. Never read out markdown or symbols."
         override fun tools(): JSONArray = this@Assistant.tools()
         override fun tool(name: String, args: JSONObject): String {
             if (name == "get_weather") return Weather.today(args.optString("city", "")).text
@@ -727,8 +724,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         if (lockW.isNotEmpty() && lockW != "gemini") {
             // sirf chuna hua provider: Brave ke natije us provider ko do
             if (brave != null) {
-                val sysL = "Answer the question using ONLY these search results. Simple everyday Hindustani, 1 to 4 short sentences, no markdown. " +
-                    "Write exactly two lines:\nS: answer in Hinglish (Roman letters)\nV: same answer in Hindi Devanagari"
+                val sysL = "Answer the question using ONLY these search results. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences." 
                 Providers.fallback(sysL, emptyList(), q + "\n\nSearch results:\n" + brave, lockW)?.let { return parseReply(it) }
             }
             return Reply("Search nahi chala (" + Models.provName(lockW) + "). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।")
@@ -736,15 +732,14 @@ The user is an adult. Answer questions about the human body, sex education, repr
         val ws = Models.sel(prefs, "web")
         if (ws != null && ws.prov != "gemini") {
             val t = Providers.chatWith(ws.prov, ws.id,
-                "Search the internet and answer simply in everyday Hindustani, 2 to 6 short sentences, no markdown. The user lives in Hut Bay, Little Andaman, India. Write exactly two lines:\nS: answer in Hinglish (Roman letters)\nV: same answer in Hindi Devanagari",
+                "Search the internet and answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 2 to 6 short sentences. The user lives in Hut Bay, Little Andaman, India.",
                 emptyList(), q)
             if (t != null) return parseReply(t)
         }
         val raw = WebSearch.ask(key, q, if (ws != null && ws.prov == "gemini") listOf(ws.id) else emptyList(), brave)
         if (raw != null) return parseReply(raw)
         if (brave != null && lockW != "gemini") {
-            val sys = "Answer the question using ONLY these search results. Simple everyday Hindustani, 1 to 4 short sentences, no markdown. " +
-                "Write exactly two lines:\nS: answer in Hinglish (Roman letters)\nV: same answer in Hindi Devanagari"
+            val sys = "Answer the question using ONLY these search results. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences." 
             val fb = Providers.fallback(sys, emptyList(), q + "\n\nSearch results:\n" + brave)
             if (fb != null) return parseReply(fb)
         }
@@ -752,7 +747,25 @@ The user is an adult. Answer questions about the human body, sex education, repr
         return Reply("Search nahi chala ($why). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।")
     }
 
+    // bolne ke liye saaf text: markdown nishaan, emoji aur link hatao
+    private fun speechClean(x: String): String {
+        var s = x
+        s = s.replace(Regex("https?://\\S+"), "")
+        s = s.replace(Regex("(?m)^\\s*#{1,6}\\s*"), "")
+        s = s.replace(Regex("(?m)^\\s*([-*\u2022])\\s+"), "")
+        s = s.replace(Regex("(?m)^\\s*(\\d+)[.)]\\s+"), "$1, ")
+        s = s.replace("*", "").replace("`", "").replace("_", " ")
+        s = s.replace(Regex("[\\uD83C-\\uD83E][\\uDC00-\\uDFFF]|[\\u2600-\\u27BF]|\\uFE0F"), "")
+        s = s.replace(Regex("\\s*\\n+\\s*"), ". ").replace(Regex("\\.\\s*\\.+"), ".").replace(Regex("\\s{2,}"), " ")
+        return s.trim()
+    }
+
     private fun parseReply(raw: String): Reply {
+        if (raw.isBlank()) return Reply("Ho gaya.", "हो गया।")
+        if (!Regex("(?m)^\\s*\\**[SV]\\**\\s*:").containsMatchIn(raw)) {
+            val body = stripFiller(raw.replace(Regex("\n{3,}"), "\n\n").trim())
+            return Reply(body, speechClean(body))
+        }
         val t = raw.replace("*", "").trim()
         if (t.isEmpty()) return Reply("Ho gaya.", "हो गया।")
         var s = ""
@@ -858,7 +871,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             if (p.startsWith("Tum:")) q = p.removePrefix("Tum:").replace(Regex("\u2060IMG:[^\u2060]*\u2060"), "").trim()
             else if (p.startsWith("AI:") && q.isNotEmpty()) {
                 val a = p.removePrefix("AI:").trim().substringBeforeLast('\u2063')
-                history.add(Pair(q, "S: $a\nV: $a"))
+                history.add(Pair(q, a))
                 q = ""
             }
         }
@@ -875,7 +888,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         voiceFor[r.text] = r.voice
         
         if (save) {
-            history.add(Pair(q, "S: ${r.text}\nV: ${r.voice}"))
+            history.add(Pair(q, r.text))
             while (history.size > 12) history.removeAt(0)
         }
         if (silent) {

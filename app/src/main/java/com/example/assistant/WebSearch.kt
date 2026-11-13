@@ -27,11 +27,9 @@ object WebSearch {
         val sys = "Use Google Search to find the current, correct answer. " +
             "Today is " + java.text.SimpleDateFormat("EEEE, d MMMM yyyy", java.util.Locale.ENGLISH).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata") }.format(java.util.Date()) + " (India). " +
             "The user lives in Hut Bay, Little Andaman, Andaman and Nicobar Islands, India. Hut Bay always means this place, never Hout Bay in South Africa; local questions mean Hut Bay / Little Andaman. For days, festivals, holidays, news, prices and events assume India and ignore foreign events unless he names a country. If he says kal, aaj or parson, use today's date. " +
-            "Speak like Gemini speaks to an ordinary Indian: clear, natural, easy daily words, no heavy shuddh Hindi, and no English office words (listed, countdown, top events, schedule), and no half translated English phrases. Do not use English news words like accused, listed, tenders, jetty, rescue operation, restrictions, delays; say them in plain Hindi (aaropi, sarkari theka, ghat, bachav kaam, rok, deri). Do not start with \"2026 ki ... news\"; say dates in simple words. " +
-            "Answer in simple everyday Hindustani (Hindi-Urdu mix; keep only English words everyone uses, like police, hospital, phone, bus). Give a complete, clear answer in one go like a good Gemini answer: the direct answer first, " +
+            "Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini. Give a complete, clear answer in one go: the direct answer first, " +
             "then all key details (exact dates and day, timings, reasons, names, numbers, and anything that could confuse, such as two different dates). Say clearly whether it is yesterday, today or tomorrow compared with today's date. 4 to 8 sentences. " +
-            "Never tell the user to search on Google or open a website. No markdown, no asterisks. " +
-            "Write exactly two lines, each line one paragraph:\nS: the full answer in Hinglish (Hindi in English letters)\nV: the same full answer in Hindi Devanagari script"
+            "Never tell the user to search on Google or open a website. Light markdown is fine (short bullets, **bold**), no emojis."
         val text = if (extra.isNullOrBlank()) query
             else query + "\n\nExtra results from the Brave search engine (use them together with Google Search):\n" + extra
         for (pass in 0..1) {
