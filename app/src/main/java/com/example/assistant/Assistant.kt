@@ -835,6 +835,9 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
 
     // Purani baat-cheet wapas kholo (naya chat / branch)
+    // chat mein dikhane ke liye bheji photo ka chhipa tag (sirf dikhane ke liye, model ko nahi jaata)
+    @Volatile var imgTag: String = ""
+
     fun loadChat(text: String) {
         log.setLength(0)
         log.append(text)
@@ -845,7 +848,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         val parts = text.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.filter { it.isNotEmpty() }
         var q = ""
         for (p in parts) {
-            if (p.startsWith("Tum:")) q = p.removePrefix("Tum:").trim()
+            if (p.startsWith("Tum:")) q = p.removePrefix("Tum:").replace(Regex("\u2060IMG:[^\u2060]*\u2060"), "").trim()
             else if (p.startsWith("AI:") && q.isNotEmpty()) {
                 val a = p.removePrefix("AI:").trim().substringBeforeLast('\u2063')
                 history.add(Pair(q, "S: $a\nV: $a"))
@@ -895,7 +898,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         status("Soch raha hoon...")
         lastQ = q
         pendingSources = null
-        if (echo) chat("\nTum: $q\n")
+        if (echo) { chat("\nTum: " + imgTag + q + "\n"); imgTag = "" }
         thread {
             try {
                 val codeQ = Regex("(?i)\\b(code|coding|program|script|function|bug|error|kotlin|java|python|html|css|javascript|sql|api|app banao|website banao)\\b|कोड|प्रोग्राम").containsMatchIn(q)
@@ -979,7 +982,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 }
                 if (code == 200) answeredBy = nameOf(okModel)
                 if (code != 200) {
-                    val fb = if (lock == "gemini") null else Providers.fallback(systemText(), history.takeLast(6), q)
+                    // photo ke saath sawal ho to dusra (photo na dekh sakne wala) model jawab na de
+                    val fb = if (lock == "gemini" || att != null) null else Providers.fallback(systemText(), history.takeLast(6), q)
                     if (fb != null) {
                         answeredBy = nameOf(Providers.lastModel)
                         main.post { deliver(parseReply(fb), q, true) }

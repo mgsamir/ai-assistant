@@ -46,7 +46,7 @@ object Chats {
 
     @Synchronized fun save(p: SharedPreferences, id: String, log: String) {
         val title = log.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.firstOrNull { it.startsWith("Tum:") }
-            ?.removePrefix("Tum:")?.trim()?.take(40)?.ifBlank { null } ?: "Chat"
+            ?.removePrefix("Tum:")?.replace(Regex("\u2060IMG:[^\u2060]*\u2060"), "")?.trim()?.take(40)?.ifBlank { null } ?: "Chat"
         // isi chat ki file badlo; bilkul ek jaisi dusri entry ho to hata do
         val l = read(p).filter { it.id != id && !(it.title == title && it.log == log) }.toMutableList()
         l.add(C(id, title, System.currentTimeMillis(), log))

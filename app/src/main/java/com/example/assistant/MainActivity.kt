@@ -253,7 +253,7 @@ class MainActivity : Activity() {
         if (t.startsWith("Tum:")) {
             addUser(t.removePrefix("Tum:").trim())
             addPending()
-            if (::orbList.isInitialized) orbAdd(true, t.removePrefix("Tum:").trim())
+            if (::orbList.isInitialized) orbAdd(true, splitImg(t.removePrefix("Tum:").trim()).first)
         } else if (t.startsWith("AI:")) {
             removePending()
             val body = t.removePrefix("AI:").trim()
@@ -316,9 +316,45 @@ class MainActivity : Activity() {
     private var lastBox: View? = null
     private var aiCount = 0
 
-    private fun addUser(text: String) {
+    // chat mein bheji hui photo ka chhota nishaan (file ka naam) ek chhipe hue tag mein rehta hai
+    private val EDIT_RE = Regex("(?i)(4k|8k|\\bhd\\b|upscal|enhanc|badl|badal|bana\\s?(do|o|na)|edit|hata\\s?(do|o)|hatao|remove|background|colou?r|saaf|sudhar|sharp|blur|cartoon|anime|ghibli|filter|restore|dhundhl|brighten|crop|resize|convert|change)")
+
+    private val IMG_TAG = Regex("\u2060IMG:([^\u2060]*)\u2060")
+
+    private fun splitImg(s: String): Pair<String, String?> {
+        val m = IMG_TAG.find(s) ?: return Pair(s, null)
+        return Pair(s.replace(m.value, "").trim(), m.groupValues[1])
+    }
+
+    private fun thumbTag(): String {
+        val b = pendBmp ?: return ""
+        return try {
+            val d = java.io.File(filesDir, "chat_img"); d.mkdirs()
+            val n = System.currentTimeMillis().toString() + ".jpg"
+            val sc = 600f / maxOf(b.width, b.height)
+            val sb = if (sc < 1f) android.graphics.Bitmap.createScaledBitmap(b, (b.width * sc).toInt().coerceAtLeast(1), (b.height * sc).toInt().coerceAtLeast(1), true) else b
+            java.io.File(d, n).outputStream().use { sb.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, it) }
+            "\u2060IMG:$n\u2060"
+        } catch (e: Exception) { "" }
+    }
+
+    private fun addUser(raw: String) {
+        val (text, img) = splitImg(raw)
         lastUserText = text
         val row = LinearLayout(this).apply { gravity = Gravity.END }
+        val colU = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.END }
+        if (img != null) {
+            val f = java.io.File(java.io.File(filesDir, "chat_img"), img)
+            val bm = try { android.graphics.BitmapFactory.decodeFile(f.path) } catch (e: Exception) { null }
+            if (bm != null) colU.addView(android.widget.ImageView(this).apply {
+                setImageBitmap(bm)
+                scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(v: View, o: android.graphics.Outline) { o.setRoundRect(0, 0, v.width, v.height, dp(18).toFloat()) }
+                }
+                clipToOutline = true
+            }, LinearLayout.LayoutParams(dp(200), dp(200)).apply { bottomMargin = dp(8) })
+        }
         val tv = TextView(this).apply {
             this.text = text
             textSize = 16f
@@ -331,7 +367,8 @@ class MainActivity : Activity() {
                 setColor(Color.parseColor("#0F0F0F"))
             }
         }
-        row.addView(tv)
+        colU.addView(tv)
+        row.addView(colU)
         chatList.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dp(18)
             bottomMargin = dp(10)
@@ -539,7 +576,7 @@ class MainActivity : Activity() {
     private fun branchFrom(idx: Int) {
         val e = AssistantService.engine ?: return
         val full = e.log.toString()
-        val parts = full.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.filter { it.isNotEmpty() }
+        val parts = full.split(Regex("\n(?=(?:Tum|AI): )")).map { it.replace(IMG_TAG, "").trim() }.filter { it.isNotEmpty() }
         val keep = ArrayList<String>()
         var n = -1
         for (p in parts) {
@@ -1070,11 +1107,12 @@ class MainActivity : Activity() {
         }
         val key = Keys.get(getSharedPreferences("p", Context.MODE_PRIVATE))
         val att = pendAtt
+        val tag0 = thumbTag()
         pendAtt = null
         pendMode = ""
         refreshHints()
         if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
-        showChat("Tum: $t")
+        showChat("Tum: $tag0$t")
         if (key.isEmpty()) { finishMedia(null, mode, "API key nahi mili"); return true }
         kotlin.concurrent.thread {
             val out = when (mode) {
@@ -2161,7 +2199,11 @@ class MainActivity : Activity() {
         }
         return android.widget.ImageView(this).apply {
             setImageResource(res)
-            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(v: View, o: android.graphics.Outline) { o.setOval(0, 0, v.width, v.height) }
+            }
+            clipToOutline = true
             layoutParams = LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp))
         }
     }
@@ -2198,7 +2240,7 @@ class MainActivity : Activity() {
             tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
             tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
             row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
-            row.addView(IconView(this).apply { kind = if (cur == prov) 42 else -1 }, LinearLayout.LayoutParams(dp(36), dp(36)))
+            row.addView(if (cur == prov) IconView(this).apply { kind = 42 } else View(this), LinearLayout.LayoutParams(dp(36), dp(36)))
             row.setOnClickListener {
                 Models.setLock(p, prov)
                 refreshTitle()
@@ -2245,7 +2287,7 @@ class MainActivity : Activity() {
         }
 
         lateinit var render: () -> Unit
-        fun tick(on: Boolean): View = IconView(this).apply { kind = if (on) 42 else -1 }
+        fun tick(on: Boolean): View = if (on) IconView(this).apply { kind = 42 } else View(this)
         fun row(title: String, sub: String?, prov: String?, checked: Boolean, usage: Usage.Info? = null, hold: (() -> Unit)? = null, go: () -> Unit): View {
             val r = LinearLayout(this)
             r.gravity = Gravity.CENTER_VERTICAL
@@ -2291,7 +2333,8 @@ class MainActivity : Activity() {
         render = {
             col.removeAllViews()
             val none = Models.CATS.all { Models.sel(p, it.first) == null }
-            col.addView(row("Auto", "Adapts to your needs", null, none) {
+            col.addView(row("Auto", "Adapts to your needs", null, none && Models.lock(p).isEmpty()) {
+                Models.setLock(p, "")
                 for ((k, _) in Models.CATS) Models.setSel(p, k, null)
                 refreshTitle(); render()
             })
@@ -2316,7 +2359,6 @@ class MainActivity : Activity() {
             val all = Models.list(p).filter { it.free && !Usage.paidOnly(it) }
             val lockP = Models.lock(p)
             for (prov in listOf("gemini", "openai", "groq", "openrouter")) {
-                if (lockP.isNotEmpty() && prov != lockP) continue
                 val mine = all.filter { it.prov == prov }
                 if (mine.isEmpty()) continue
                 col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(14), dp(6), dp(14), dp(2)) })
@@ -2327,8 +2369,19 @@ class MainActivity : Activity() {
                 ph.addView(badge(prov, 36), LinearLayout.LayoutParams(dp(36), dp(36)))
                 ph.addView(TextView(this).apply { text = provName(prov); textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
                     LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
-                ph.addView(IconView(this).apply { kind = if (open) 44 else 43 }, LinearLayout.LayoutParams(dp(36), dp(36)))
-                ph.setOnClickListener { if (open) openProv.remove(prov) else openProv.add(prov); render() }
+                val provAuto = lockP == prov && Models.CATS.all { c -> Models.sel(p, c.first)?.prov != prov }
+                ph.addView(tick(provAuto), LinearLayout.LayoutParams(dp(34), dp(34)))
+                ph.addView(IconView(this).apply {
+                    kind = if (open) 44 else 43
+                    setOnClickListener { if (open) openProv.remove(prov) else openProv.add(prov); render() }
+                }, LinearLayout.LayoutParams(dp(40), dp(40)))
+                // naam dabao: us provider ka apna Auto (uske sab models), chevron dabao: list khulo/band
+                ph.setOnClickListener {
+                    Models.setLock(p, prov)
+                    for ((k, _) in Models.CATS) Models.setSel(p, k, null)
+                    openProv.add(prov)
+                    refreshTitle(); render()
+                }
                 col.addView(ph)
                 if (!open) continue
                 var firstCat = true
@@ -2345,6 +2398,7 @@ class MainActivity : Activity() {
                             if (Usage.paidOnly(mm)) {
                                 Toast.makeText(this, "Ye model free plan mein nahi chalta. Paid key ho to isko lamba dabakar apni limit daalo.", Toast.LENGTH_LONG).show()
                             } else {
+                                if (cat == "chat" || cat == "coding") Models.setLock(p, mm.prov)
                                 Models.setSel(p, cat, if (on) null else mm)
                                 refreshTitle(); render()
                             }
@@ -2570,14 +2624,18 @@ class MainActivity : Activity() {
             return
         }
         if (t.isEmpty()) t = "Isme kya hai? Aasaan shabdon mein batao."
+        // photo ke saath "badlo / 4K / hatao" jaisa kaam ho to seedha photo-edit chalao
+        if (pendMode.isEmpty() && pendAtt?.first?.startsWith("image/") == true && EDIT_RE.containsMatchIn(t)) pendMode = "image"
         if (runSpecial(t)) { input.text?.clear(); return }
         val e = AssistantService.engine
         if (e == null) {
             return
         }
         val att = pendAtt
+        val tag = thumbTag()
         pendAtt = null
         refreshHints()
+        e.imgTag = tag
         e.sendText(t, false, att)
         input.text?.clear()
         input.requestFocus()
@@ -2957,8 +3015,10 @@ class MainActivity : Activity() {
             return
         }
         val att = pendAtt
+        val tag = thumbTag()
         pendAtt = null
         refreshHints()
+        e.imgTag = tag
         e.sendText(t, true, att)
         orbInput.text?.clear()
     }
