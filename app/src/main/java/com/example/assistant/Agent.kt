@@ -42,7 +42,7 @@ object Agent {
     fun run(key: String, q: String, agent: String): String {
         if (key.isEmpty()) return "Gemini key nahi mili."
         try {
-            val sys = "Reply in the same language as the task, clear and natural. The user lives in Hut Bay, Little Andaman, India. Give the final result clearly and briefly."
+            val sys = "Reply in the same language as the task, clear and natural. Give the final result clearly and briefly."
             val body = JSONObject().put("agent", agent).put("input", sys + "\n\nTask: " + q).put("background", true)
             var (code, resp) = call(BASE, key, body)
             if (code !in 200..299) {

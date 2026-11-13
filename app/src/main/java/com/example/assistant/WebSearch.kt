@@ -26,7 +26,7 @@ object WebSearch {
         lastErr = ""
         val sys = "Use Google Search to find the current, correct answer. " +
             "Today is " + java.text.SimpleDateFormat("EEEE, d MMMM yyyy", java.util.Locale.ENGLISH).apply { timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata") }.format(java.util.Date()) + " (India). " +
-            "The user lives in Hut Bay, Little Andaman, Andaman and Nicobar Islands, India. Hut Bay always means this place, never Hout Bay in South Africa; local questions mean Hut Bay / Little Andaman. For days, festivals, holidays, news, prices and events assume India and ignore foreign events unless he names a country. If he says kal, aaj or parson, use today's date. " +
+            "Do not assume where the user lives and do not bring up any home location. If he names Hut Bay it means Hut Bay in Little Andaman, India, never Hout Bay in South Africa. For days, festivals, holidays, news, prices and events assume India and ignore foreign events unless he names a country. If he says kal, aaj or parson, use today's date. " +
             "Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini. Give a complete, clear answer in one go: the direct answer first, " +
             "then all key details (exact dates and day, timings, reasons, names, numbers, and anything that could confuse, such as two different dates). Say clearly whether it is yesterday, today or tomorrow compared with today's date. 4 to 8 sentences. " +
             "Never tell the user to search on Google or open a website. Light markdown is fine (short bullets, **bold**), no emojis."
