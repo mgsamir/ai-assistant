@@ -2271,6 +2271,7 @@ class MainActivity : Activity() {
         sv.background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#101010")) }
         var thinkOpen = true
         val openProv = mutableSetOf<String>()
+        val tabOf = HashMap<String, String>()
         Models.CATS.mapNotNull { Models.sel(p, it.first) }.forEach { openProv.add(it.prov) }
         if (openProv.isEmpty()) openProv.add("gemini")
         fun provName(x: String) = when (x) { "gemini" -> "Gemini"; "openai" -> "ChatGPT (OpenAI)"; "groq" -> "Groq"; "openrouter" -> "OpenRouter"; else -> x }
@@ -2384,26 +2385,35 @@ class MainActivity : Activity() {
                 }
                 col.addView(ph)
                 if (!open) continue
-                var firstCat = true
-                for ((cat, label) in Models.CATS) {
-                    val items = mine.filter { it.cat == cat }.sortedByDescending { it.free }
-                    if (items.isEmpty()) continue
-                    if (!firstCat) col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(18), dp(10), dp(18), dp(0)) })
-                    firstCat = false
-                    col.addView(head(label.uppercase() + "  \u00b7  " + items.size))
-                    val cur = Models.sel(p, cat)
-                    for (mm in items) {
-                        val on = cur != null && cur.key == mm.key
-                        col.addView(row(mm.name, null, mm.prov, on, Usage.info(mm), if (mm.prov == "gemini" || mm.prov == "openai") ({ askLimit(mm) { render() } }) else null) {
-                            if (Usage.paidOnly(mm)) {
-                                Toast.makeText(this, "Ye model free plan mein nahi chalta. Paid key ho to isko lamba dabakar apni limit daalo.", Toast.LENGTH_LONG).show()
-                            } else {
-                                if (cat == "chat" || cat == "coding") Models.setLock(p, mm.prov)
-                                Models.setSel(p, cat, if (on) null else mm)
-                                refreshTitle(); render()
-                            }
-                        })
-                    }
+                // ek line mein kaam ke naam (Chat / Coding / Web search ...), jisko dabao usi ke models neeche
+                val cats = Models.CATS.filter { c -> mine.any { it.cat == c.first } }
+                val tab = (tabOf[prov]?.takeIf { k -> cats.any { it.first == k } }) ?: cats.first().first
+                val hs = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+                val tabs = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(18), dp(8), dp(18), dp(8)) }
+                cats.forEachIndexed { i, (k, label) ->
+                    if (i > 0) tabs.addView(TextView(this).apply { text = "/"; textSize = 15f; setTextColor(Color.parseColor("#5A5A62")); setPadding(dp(10), 0, dp(10), 0) })
+                    tabs.addView(TextView(this).apply {
+                        text = label; textSize = 15f
+                        if (k == tab) { setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD } else setTextColor(Color.parseColor("#8A8A92"))
+                        setPadding(0, dp(6), 0, dp(6))
+                        setOnClickListener { tabOf[prov] = k; render() }
+                    })
+                }
+                hs.addView(tabs)
+                col.addView(hs)
+                val items = mine.filter { it.cat == tab }.sortedByDescending { it.free }
+                val cur = Models.sel(p, tab)
+                for (mm in items) {
+                    val on = cur != null && cur.key == mm.key
+                    col.addView(row(mm.name, null, mm.prov, on, Usage.info(mm), if (mm.prov == "gemini" || mm.prov == "openai") ({ askLimit(mm) { render() } }) else null) {
+                        if (Usage.paidOnly(mm)) {
+                            Toast.makeText(this, "Ye model free plan mein nahi chalta. Paid key ho to isko lamba dabakar apni limit daalo.", Toast.LENGTH_LONG).show()
+                        } else {
+                            if (tab == "chat" || tab == "coding") Models.setLock(p, mm.prov)
+                            Models.setSel(p, tab, if (on) null else mm)
+                            refreshTitle(); render()
+                        }
+                    })
                 }
                 if (prov != "gemini") col.addView(TextView(this).apply {
                     text = "Only gives answers, no phone actions."
