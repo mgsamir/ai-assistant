@@ -114,7 +114,7 @@ object Providers {
         val key = Extra.eleven
         if (key.isEmpty() || text.isBlank()) return null
         return try {
-            val c = URL("https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM?output_format=mp3_44100_64")
+            val c = URL("https://api.elevenlabs.io/v1/text-to-speech/${Voice.cur(Usage.p).eleven}?output_format=mp3_44100_64")
                 .openConnection() as HttpURLConnection
             c.requestMethod = "POST"
             c.connectTimeout = 8000

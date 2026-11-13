@@ -1305,6 +1305,14 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r5.setOnClickListener { dlg.dismiss(); showProviders() }
         col.addView(r5, 1)
+        val r6 = LinearLayout(this)
+        r6.gravity = Gravity.CENTER_VERTICAL
+        r6.setPadding(0, dp(14), 0, dp(14))
+        r6.addView(IconView(this).apply { kind = 2 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        r6.addView(TextView(this).apply { text = "Voice"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        r6.setOnClickListener { dlg.dismiss(); showVoices() }
+        col.addView(r6, 2)
         dlg.setContentView(col)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -2206,6 +2214,62 @@ class MainActivity : Activity() {
             clipToOutline = true
             layoutParams = LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp))
         }
+    }
+
+    // left menu ka "Voice" page: ladki / ladke ki awaaz chuno, dabate hi namuna sunao
+    private fun showVoices() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val dlg = fullDlg()
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
+        val top = FrameLayout(this)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#1A1A1A")
+        top.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.CENTER_VERTICAL))
+        top.addView(TextView(this).apply { text = "Voice"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        lateinit var draw: () -> Unit
+        draw = {
+            list.removeAllViews()
+            val cur = Voice.cur(p)
+            for (girl in listOf(true, false)) {
+                list.addView(TextView(this).apply {
+                    text = if (girl) "GIRL" else "BOY"; textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(Color.parseColor("#B0B0B8")); setPadding(dp(4), dp(14), 0, dp(8))
+                })
+                for (v in Voice.ALL.filter { it.girl == girl }) {
+                    val on = v.id == cur.id
+                    val row = LinearLayout(this).apply {
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(dp(14), dp(12), dp(16), dp(12))
+                        background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")); setStroke(dp(1), Color.parseColor(if (on) "#4F8BFF" else "#1F1F24")) }
+                    }
+                    row.addView(TextView(this).apply {
+                        text = v.name.take(1); textSize = 18f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor(if (girl) "#C2417A" else "#3B6FD4")) }
+                    }, LinearLayout.LayoutParams(dp(44), dp(44)))
+                    val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                    tx.addView(TextView(this).apply { text = v.name; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+                    tx.addView(TextView(this).apply { text = v.note; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
+                    row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
+                    row.addView(if (on) IconView(this).apply { kind = 42 } else View(this), LinearLayout.LayoutParams(dp(34), dp(34)))
+                    row.setOnClickListener {
+                        Voice.set(p, v.id)
+                        draw()
+                        AssistantService.engine?.sample()
+                    }
+                    list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+                }
+            }
+            list.addView(TextView(this).apply {
+                text = "Live baat-cheet ki awaaz agli baar shuru karne par badlegi."
+                textSize = 12.5f; setTextColor(Color.parseColor("#9A9AA2")); setPadding(dp(4), dp(6), dp(4), dp(10))
+            })
+        }
+        draw()
+        root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        dlg.setContentView(root)
+        dlg.show()
     }
 
     // left menu ka "Models" page: provider chuno. Auto aur model list sirf usi ki.

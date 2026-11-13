@@ -137,7 +137,7 @@ class LiveSession(private val ctx: Context, private val key: String, private val
         setup.put("generationConfig", JSONObject()
             .put("responseModalities", JSONArray().put("AUDIO"))
             .put("speechConfig", JSONObject().put("voiceConfig", JSONObject()
-                .put("prebuiltVoiceConfig", JSONObject().put("voiceName", "Puck")))))
+                .put("prebuiltVoiceConfig", JSONObject().put("voiceName", Voice.cur(Usage.p).gemini)))))
         setup.put("systemInstruction", JSONObject().put("parts",
             JSONArray().put(JSONObject().put("text", cb.system()))))
         // function declarations (Live API camelCase maangta hai)

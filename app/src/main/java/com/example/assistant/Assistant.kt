@@ -209,7 +209,14 @@ The user is an adult. Answer questions about the human body, sex education, repr
         mp = null
     }
 
+    // chuni hui awaaz ek chhota namuna bolkar sunao
+    fun sample() {
+        stopSpeech()
+        speak("Namaste, main aapka assistant hoon. Boliye, main kya madad karoon?")
+    }
+
     private fun speak(v: String): Boolean {
+        try { tts.setPitch(Voice.cur(Usage.p).pitch) } catch (e: Exception) { }
         if (Extra.eleven.isEmpty()) return tts.speak(v, TextToSpeech.QUEUE_FLUSH, null, "r") == TextToSpeech.SUCCESS
         val gen = ++speakGen
         thread {
