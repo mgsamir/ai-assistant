@@ -2388,7 +2388,7 @@ class MainActivity : Activity() {
                 // ek line mein kaam ke naam (Chat / Coding / Web search ...), jisko dabao usi ke models neeche
                 val cats = Models.CATS.filter { c -> mine.any { it.cat == c.first } }
                 val tab = (tabOf[prov]?.takeIf { k -> cats.any { it.first == k } }) ?: cats.first().first
-                val hs = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+                val hs = android.widget.HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
                 val tabs = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(18), dp(8), dp(18), dp(8)) }
                 cats.forEachIndexed { i, (k, label) ->
                     if (i > 0) tabs.addView(TextView(this).apply { text = "/"; textSize = 15f; setTextColor(Color.parseColor("#5A5A62")); setPadding(dp(10), 0, dp(10), 0) })
