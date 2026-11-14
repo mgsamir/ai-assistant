@@ -79,6 +79,9 @@ The user is an adult. Answer questions about the human body, sex education, repr
     private var listening = false
     private var listenStart = 0L
     private var busy = false
+    // ek samay mein ek sawaal: roka gaya ya naya aaya to purane ke jawab ignore ho jaate hain
+    @Volatile private var curReq = 0
+    @Volatile var dictating = false
     private var retried = false
     private var errs = 0
     private var awaiting = 0L
@@ -275,6 +278,33 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
     // Jawab ke neeche speaker dabane par wahi jawab dobara bolo (dobara dabane par ruk jao)
     fun isBusy(): Boolean = busy
+
+    private fun postG(g: Int, f: () -> Unit) { main.post { if (g == curReq) f() } }
+
+    // stop dabaya: jo kaam chal raha hai use rok do, jawab ab nahi aayega
+    fun cancelRequest() {
+        curReq++
+        busy = false
+        stopSpeech()
+        Act.end(true)
+        mode(0)
+        status("Ruk gaya")
+    }
+
+    // mic se likhwate samay assistant ka apna sunna rok do
+    fun pauseListening() {
+        dictating = true
+        if (listening) {
+            try { recognizer?.cancel() } catch (e: Exception) { }
+            listening = false
+        }
+        mode(0)
+    }
+
+    fun resumeListening() {
+        dictating = false
+        if (live() && !muted) scheduleListen(400)
+    }
     fun replay(screenText: String) {
         if (busy) {
             stopSpeech()
@@ -452,6 +482,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
 
     private fun beginListen() {
+        if (dictating) return
         if (app.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             status("Mic ki permission do (app kholkar)")
             return
@@ -612,7 +643,16 @@ The user is an adult. Answer questions about the human body, sex education, repr
     fun research(q: String, cb: (String) -> Unit) {
         val key = Keys.get(prefs)
         val p = if (personal) { val m = loadMem(); if (m.isEmpty()) "" else "Facts about the user you may use: " + m.joinToString("; ") } else ""
-        thread { cb(Research.run(key, q, p)) }
+        Act.start()
+        val st = Act.begin(1, "Deep research", "Question:\n" + q + "\n\nThe question is split into parts, each part is searched, then one full report is written. This can take 1 to 2 minutes.")
+        val g = ++curReq
+        thread {
+            val r = Research.run(key, q, p)
+            if (g != curReq) return@thread
+            Act.ok(st, "Report ready", r.take(700))
+            Act.end()
+            cb(r)
+        }
     }
 
     fun securityScan(cb: (String) -> Unit) { thread { cb(Security.report(app)) } }
@@ -620,7 +660,16 @@ The user is an adult. Answer questions about the human body, sex education, repr
     fun agent(q: String, cb: (String) -> Unit) {
         val key = Keys.get(prefs)
         val id = Models.sel(prefs, "agent")?.id ?: "antigravity-preview-05-2026"
-        thread { cb(Agent.run(key, q, id)) }
+        Act.start()
+        val st = Act.begin(2, "Agent is working", "Task:\n" + q + "\nAgent: " + id + "\n\nThe agent works on its own and can take several minutes.")
+        val g = ++curReq
+        thread {
+            val r = Agent.run(key, q, id)
+            if (g != curReq) return@thread
+            if (r.startsWith("Agent se") || r.startsWith("Agent ne")) Act.fail(st, "No result", r) else Act.ok(st, "Finished", r.take(700))
+            Act.end()
+            cb(r)
+        }
     }
 
     private fun systemText(): String {
@@ -725,35 +774,45 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
     // मॉडल का जवाब "S: ..." (स्क्रीन) और "V: ..." (आवाज़) में बाँटता है
     // Google se jawab; na mile to Brave ke natije + Groq/OpenRouter se; tab bhi na mile to wajah dikhao
+    private fun fin(s: Act.Step, r: Reply, ok: Boolean = true): Reply {
+        if (ok) Act.ok(s, "Done", r.text.take(700)) else Act.fail(s, "Failed", r.text)
+        return r
+    }
+
     private fun webAnswer(key: String, q0: String): Reply {
         val q = if (Regex("hut\\s*bay", RegexOption.IGNORE_CASE).containsMatchIn(q0) && !q0.contains("andaman", true)) q0 + " Little Andaman Andaman Nicobar India" else q0
+        val sS = Act.begin(1, "Searching the web", "Query:\n" + q)
         val brave = Providers.brave(q)
+        val rs0 = Providers.lastResults
+        if (brave != null && rs0.isNotEmpty()) Act.ok(sS, rs0.size.toString() + " results from Brave Search", rs0.joinToString("\n\n") { "\u2022 " + it.first + "\n  " + it.second })
+        else Act.ok(sS, "Using Google Search through the model", "Brave Search gave no results, so the model searches by itself.")
+        val sW = Act.begin(3, "Writing the answer from the results", "")
         pendingSources = Providers.lastResults.takeIf { brave != null && it.isNotEmpty() }
         val lockW = Models.lock(prefs)
         if (lockW.isNotEmpty() && lockW != "gemini") {
             // sirf chuna hua provider: Brave ke natije us provider ko do
             if (brave != null) {
                 val sysL = "Answer the question using ONLY these search results. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences." 
-                Providers.fallback(sysL, emptyList(), q + "\n\nSearch results:\n" + brave, lockW)?.let { return parseReply(it) }
+                Providers.fallback(sysL, emptyList(), q + "\n\nSearch results:\n" + brave, lockW)?.let { return fin(sW, parseReply(it)) }
             }
-            return Reply("Search nahi chala (" + Models.provName(lockW) + "). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।")
+            return fin(sW, Reply("Search nahi chala (" + Models.provName(lockW) + "). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।"), false)
         }
         val ws = Models.sel(prefs, "web")
         if (ws != null && ws.prov != "gemini") {
             val t = Providers.chatWith(ws.prov, ws.id,
                 "Search the internet and answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 2 to 6 short sentences.",
                 emptyList(), q)
-            if (t != null) return parseReply(t)
+            if (t != null) return fin(sW, parseReply(t))
         }
         val raw = WebSearch.ask(key, q, if (ws != null && ws.prov == "gemini") listOf(ws.id) else emptyList(), brave)
-        if (raw != null) return parseReply(raw)
+        if (raw != null) return fin(sW, parseReply(raw))
         if (brave != null && lockW != "gemini") {
             val sys = "Answer the question using ONLY these search results. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences." 
             val fb = Providers.fallback(sys, emptyList(), q + "\n\nSearch results:\n" + brave)
-            if (fb != null) return parseReply(fb)
+            if (fb != null) return fin(sW, parseReply(fb))
         }
         val why = WebSearch.lastErr.ifBlank { "pata nahi" }
-        return Reply("Search nahi chala ($why). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।")
+        return fin(sW, Reply("Search nahi chala ($why). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।"), false)
     }
 
     // bolne ke liye saaf text: markdown nishaan, emoji aur link hatao
@@ -853,9 +912,11 @@ The user is an adult. Answer questions about the human body, sex education, repr
             busy = true
             mode(2)
             pendingSources = null
+            val g = ++curReq
+            Act.start()
             thread {
                 val r = webAnswer(key, q)
-                main.post { deliver(r, q, true) }
+                postG(g) { deliver(r, q, true) }
             }
         } else {
             noWebOnce = (web == false)
@@ -888,6 +949,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
 
     private fun deliver(r: Reply, q: String, save: Boolean) {
+        Act.end()
         val who = answeredBy
         answeredBy = ""
         pendingSources?.let { sourcesFor[r.text] = it }
@@ -925,6 +987,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
         busy = true
         mode(2)
         status("Soch raha hoon...")
+        val g = ++curReq
+        Act.start()
         lastQ = q
         pendingSources = null
         if (echo) { chat("\nTum: " + imgTag + q + "\n"); imgTag = "" }
@@ -938,12 +1002,14 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 // left menu se Groq / OpenRouter chuna ho: Auto bhi sirf usi ke models se (photo/file ho to Gemini)
                 if (lock.isNotEmpty() && lock != "gemini" && att == null) {
                     var txtL: String? = null
+                    val stL = Act.begin(3, "Asking " + Models.provName(lock) + " models", "Only " + Models.provName(lock) + " is allowed (chosen in Models)\n\nPrompt:\n" + q.take(400))
                     if (pick != null) txtL = Providers.chatWith(pick.prov, pick.id, systemText(), history.takeLast(6), q)?.also { answeredBy = pick.name }
                     if (txtL == null) txtL = Providers.fallback(systemText(), history.takeLast(6), q, lock)?.also { answeredBy = Models.list(prefs).firstOrNull { m -> m.id == Providers.lastModel }?.name ?: Providers.lastModel }
+                    if (txtL != null) Act.ok(stL, "Answered by " + answeredBy, txtL.take(700)) else Act.fail(stL, "No answer", "")
                     if (txtL != null) {
-                        main.post { deliver(parseReply(txtL), q, true) }
+                        postG(g) { deliver(parseReply(txtL), q, true) }
                     } else {
-                        main.post {
+                        postG(g) {
                             mode(0)
                             beep(2)
                             deliver(Reply(Models.provName(lock) + " se jawab nahi mila. Thodi der baad dobara try karo ya Models mein dusra chuno.", Models.provName(lock) + " से जवाब नहीं मिला। थोड़ी देर बाद दोबारा कोशिश करो।"), q, false)
@@ -954,10 +1020,12 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 var okModel = ""
                 fun nameOf(id: String) = Models.list(prefs).firstOrNull { it.id == id }?.name ?: id
                 if (pick != null && pick.prov != "gemini" && att == null) {
+                    val stP = Act.begin(3, "Asking " + pick.name, "Provider: " + pick.prov + "\nModel: " + pick.id + "\n\nPrompt:\n" + q.take(400))
                     val txt = Providers.chatWith(pick.prov, pick.id, systemText(), history.takeLast(6), q)
+                    if (txt != null) Act.ok(stP, "Answered", txt.take(700)) else Act.fail(stP, "No answer, trying the next model", "")
                     if (txt != null) {
                         answeredBy = pick.name
-                        main.post { deliver(parseReply(txt), q, true) }
+                        postG(g) { deliver(parseReply(txt), q, true) }
                         return@thread
                     }
                 }
@@ -985,6 +1053,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 val t0 = SystemClock.uptimeMillis()
                 for (m in order) {
                     if (SystemClock.uptimeMillis() - t0 > 40000) break
+                    val stM = Act.begin(3, "Asking " + nameOf(m), "POST generateContent\nModel: " + m + (if (att != null) "\nAttached: " + att.first else "") + "\n\nPrompt:\n" + q.take(400))
                     try {
                         val lvl = Models.think(prefs)
                         val rb = JSONObject(body.toString())
@@ -1003,23 +1072,27 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         if (code == 200) okModel = m
                         resp = (if (code == 200) c.inputStream else c.errorStream).bufferedReader().readText()
                         if (code == 200) Usage.hit("gemini", m, try { JSONObject(resp).optJSONObject("usageMetadata")?.optInt("totalTokenCount") ?: 0 } catch (e: Exception) { 0 })
+                        if (code == 200) Act.ok(stM, "Answered", resp.take(700)) else Act.fail(stM, "HTTP " + code + (if (code == 503 || code == 429) " (busy), trying the next model" else ""), resp.take(500))
                         if (code == 200 || code == 401 || code == 403 || (code == 400 && resp.contains("API key", ignoreCase = true))) break
                     } catch (e: Exception) {
                         code = 0
                         resp = ""
+                        Act.fail(stM, "No connection or timed out", e.message ?: "")
                     }
                 }
                 if (code == 200) answeredBy = nameOf(okModel)
                 if (code != 200) {
                     // photo ke saath sawal ho to dusra (photo na dekh sakne wala) model jawab na de
+                    val stF = if (lock == "gemini" || att != null) null else Act.begin(3, "Trying backup models", "Groq and OpenRouter free models\n\nPrompt:\n" + q.take(400))
                     val fb = if (lock == "gemini" || att != null) null else Providers.fallback(systemText(), history.takeLast(6), q)
+                    if (stF != null) { if (fb != null) Act.ok(stF, "Answered by " + Providers.lastModel, fb.take(700)) else Act.fail(stF, "No backup model answered", "") }
                     if (fb != null) {
                         answeredBy = nameOf(Providers.lastModel)
-                        main.post { deliver(parseReply(fb), q, true) }
+                        postG(g) { deliver(parseReply(fb), q, true) }
                         return@thread
                     }
                     val er = apiError(code, resp)
-                    main.post {
+                    postG(g) {
                         mode(0)
                         beep(2)
                         deliver(er, q, false)
@@ -1041,15 +1114,25 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 val pre = HashMap<Int, Reply>()
                 calls.forEachIndexed { idx, c ->
                     if (c.getString("name") == "get_weather") {
-                        pre[idx] = Weather.today(c.optJSONObject("args")?.optString("city", "") ?: "")
+                        val cityW = c.optJSONObject("args")?.optString("city", "") ?: ""
+                        val stW = Act.begin(1, "Getting weather" + (if (cityW.isNotBlank()) " for $cityW" else ""), "get_weather(city=\"$cityW\")")
+                        pre[idx] = Weather.today(cityW)
+                        Act.ok(stW, pre[idx]!!.text.take(90), pre[idx]!!.text)
                     } else if (c.getString("name") == "web_search") {
                         val qq = c.optJSONObject("args")?.optString("query", "") ?: ""
                         pre[idx] = webAnswer(key, qq)
                     }
                 }
-                main.post {
+                postG(g) {
                     val results = calls.mapIndexed { idx, c ->
-                        pre[idx] ?: runAction(c.getString("name"), c.optJSONObject("args") ?: JSONObject())
+                        pre[idx] ?: run {
+                            val nm = c.getString("name")
+                            val ag = c.optJSONObject("args") ?: JSONObject()
+                            val stA = Act.begin(2, "Phone action: $nm", nm + "(" + ag.toString() + ")")
+                            val rr = runAction(nm, ag)
+                            Act.ok(stA, rr.text.take(90), rr.text)
+                            rr
+                        }
                     }
                     val r = if (results.isNotEmpty()) {
                         Reply(results.joinToString(". ") { it.text }, results.joinToString(". ") { it.voice })
@@ -1059,8 +1142,9 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     deliver(r, q, true)
                 }
             } catch (e: Exception) {
-                main.post {
+                postG(g) {
                     busy = false
+                    Act.end()
                     mode(0)
                     beep(2)
                     status("Error: ${e.message}")

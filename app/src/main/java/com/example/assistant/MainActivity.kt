@@ -212,6 +212,10 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawArc(RectF(3f, 14f, 17f, 28f), 180f, 180f, false, p)
                 c.drawLine(19f, 4f, 19f, 9f, p); c.drawLine(16.5f, 6.5f, 21.5f, 6.5f, p)
             }
+            46 -> { p.style = Paint.Style.FILL; c.drawRoundRect(RectF(6.5f, 6.5f, 17.5f, 17.5f), 2.5f, 2.5f, p); p.style = Paint.Style.STROKE }
+            47 -> { c.drawLine(9f, 6f, 15f, 12f, p); c.drawLine(15f, 12f, 9f, 18f, p) }
+            48 -> { c.drawCircle(12f, 12f, 8f, p); c.drawLine(4f, 12f, 20f, 12f, p); c.drawOval(RectF(8.5f, 4f, 15.5f, 20f), p) }
+            49 -> { c.drawLine(6f, 8f, 11f, 12f, p); c.drawLine(11f, 12f, 6f, 16f, p); c.drawLine(13f, 17f, 18f, 17f, p) }
             23 -> { c.drawLine(19f, 12f, 5f, 12f, p); c.drawLine(11f, 6f, 5f, 12f, p); c.drawLine(5f, 12f, 11f, 18f, p) }
             else -> {
                 val t = Path()
@@ -238,6 +242,13 @@ class MainActivity : Activity() {
     private lateinit var chatList: LinearLayout
     private lateinit var chatScroll: ScrollView
     private var pending: View? = null
+    private var pendTitle: TextView? = null
+    private lateinit var barV: LinearLayout
+    private lateinit var recRow: LinearLayout
+    private lateinit var recText: TextView
+    private lateinit var wave: WaveView
+    private var dict: Dictation? = null
+    private var recOn = false
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
@@ -257,6 +268,7 @@ class MainActivity : Activity() {
             if (::orbList.isInitialized) orbAdd(true, splitImg(t.removePrefix("Tum:").trim()).first)
         } else if (t.startsWith("AI:")) {
             removePending()
+            Act.takeFinished()?.let { addSummaryRow(it) }
             val body = t.removePrefix("AI:").trim()
             val who = body.substringAfterLast('\u2063', "")
             val txt = body.substringBeforeLast('\u2063').trim()
@@ -378,19 +390,68 @@ class MainActivity : Activity() {
     }
 
     private fun addPending() {
-        val tv = TextView(this).apply {
-            text = "..."
-            textSize = 22f
-            setTextColor(Color.parseColor("#B0B0B8"))
+        val row = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), dp(10), dp(6))
         }
-        pending = tv
-        chatList.addView(tv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        row.addView(DotsView(this), LinearLayout.LayoutParams(dp(34), dp(24)))
+        val tv = TextView(this).apply { text = "Thinking"; textSize = 16f; setTextColor(Color.parseColor("#9A9AA2")); maxLines = 1 }
+        row.addView(tv, LinearLayout.LayoutParams(-2, -2))
+        row.addView(IconView(this).apply { kind = 47; tint = Color.parseColor("#9A9AA2") }, LinearLayout.LayoutParams(dp(26), dp(26)))
+        row.setOnClickListener { ActUi.sheet(this) }
+        pending = row
+        pendTitle = tv
+        chatList.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        updatePendingRow()
         scrollDown()
+    }
+
+    private fun updatePendingRow() {
+        val tv = pendTitle ?: return
+        if (pending == null) return
+        tv.text = Act.current()?.title ?: "Thinking"
     }
 
     private fun removePending() {
         pending?.let { chatList.removeView(it) }
         pending = null
+        pendTitle = null
+    }
+
+    // jawab ke upar chhoti line: kya kya kiya (dabane par poori list)
+    private fun addSummaryRow(steps: List<Act.Step>) {
+        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(4), dp(10), dp(8)) }
+        row.addView(TextView(this).apply { text = ActUi.summaryLabel(steps); textSize = 15f; setTextColor(Color.parseColor("#9A9AA2")) })
+        row.addView(IconView(this).apply { kind = 47; tint = Color.parseColor("#9A9AA2") }, LinearLayout.LayoutParams(dp(26), dp(26)))
+        row.setOnClickListener { ActUi.sheet(this, steps) }
+        chatList.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    // kaam ki halat badli: stop-box, "Searching" line, steps wali sheet
+    private fun onActChange() {
+        refreshVoiceBtn()
+        updatePendingRow()
+        ActUi.refresh?.invoke()
+        if (pending != null && !Act.running && Act.stopped) {
+            removePending()
+            chatList.addView(TextView(this).apply {
+                text = "Stopped"; textSize = 14f; setTextColor(Color.parseColor("#9A9AA2")); setPadding(0, dp(6), 0, dp(6))
+            })
+            scrollDown()
+        }
+    }
+
+    private fun refreshVoiceBtn() {
+        if (!::voiceBtn.isInitialized) return
+        if (Act.running) {
+            voiceBtn.kind = 46
+            voiceBtn.tint = Color.BLACK
+            voiceBtn.background = oval("#F2F2F2")
+        } else {
+            voiceBtn.kind = if (::input.isInitialized && !input.text.isNullOrBlank()) 4 else 3
+            voiceBtn.tint = Color.WHITE
+            voiceBtn.background = oval("#4F8BFF")
+        }
     }
 
     // AI ka jawab: baayin taraf, bina bubble, neeche chhote buttons
@@ -1096,6 +1157,7 @@ class MainActivity : Activity() {
             e.agent(t) { rep ->
                 runOnUiThread {
                     removePending()
+                    Act.takeFinished()?.let { addSummaryRow(it) }
                     addAi(rep)
                     if (::orbList.isInitialized) orbAdd(false, rep)
                 }
@@ -1112,6 +1174,7 @@ class MainActivity : Activity() {
             e.research(t) { rep ->
                 runOnUiThread {
                     removePending()
+                    Act.takeFinished()?.let { addSummaryRow(it) }
                     addAi(rep)
                     if (::orbList.isInitialized) orbAdd(false, rep)
                 }
@@ -2671,6 +2734,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
+        barV = bar
         chipRow = LinearLayout(this).apply { visibility = View.GONE }
         pillRow = LinearLayout(this).apply { visibility = View.GONE }
         val composer = LinearLayout(this).apply {
@@ -2686,6 +2750,35 @@ class MainActivity : Activity() {
             addView(bar, LinearLayout.LayoutParams(-1, -2))
             addView(pillRow, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(4); bottomMargin = dp(4) })
         }
+        // bolte samay: upar Hindi text, neeche X / lakeerein / stop / send
+        recText = TextView(this).apply {
+            textSize = 19f
+            setTextColor(Color.parseColor("#F2F2F2"))
+            setLineSpacing(0f, 1.25f)
+            setPadding(dp(8), dp(10), dp(8), dp(12))
+            visibility = View.GONE
+        }
+        composer.addView(recText, 0, LinearLayout.LayoutParams(-1, -2))
+        wave = WaveView(this)
+        recRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            addView(IconView(this@MainActivity).apply {
+                kind = 1; rotation = 45f; tint = Color.WHITE; background = oval("#262626")
+                setOnClickListener { cancelRec() }
+            }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            addView(wave, LinearLayout.LayoutParams(0, dp(34), 1f).apply { leftMargin = dp(14); rightMargin = dp(14) })
+            addView(IconView(this@MainActivity).apply {
+                kind = 46; tint = Color.WHITE; background = oval("#262626")
+                setOnClickListener { stopRec(false) }
+            }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            addView(IconView(this@MainActivity).apply {
+                kind = 4; tint = Color.WHITE; background = oval("#4F8BFF")
+                setOnClickListener { stopRec(true) }
+            }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { leftMargin = dp(8) })
+        }
+        composer.addView(recRow, LinearLayout.LayoutParams(-1, -2))
         bar.addView(icon(1, 44) { showPlus() })
         input = EditText(this).apply {
             hint = "Ask AI"
@@ -2704,13 +2797,13 @@ class MainActivity : Activity() {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun afterTextChanged(s: Editable?) {
-                    voiceBtn.kind = if (s.isNullOrBlank()) 3 else 4
+                    refreshVoiceBtn()
                 }
             })
         }
         bar.addView(input, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        bar.addView(icon(2, 44) { talk() })
-        voiceBtn = icon(3, 48) { sendInput() }
+        bar.addView(icon(2, 44) { startRec() })
+        voiceBtn = icon(3, 48) { if (Act.running) AssistantService.engine?.cancelRequest() else sendInput() }
         voiceBtn.tint = Color.WHITE
         voiceBtn.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
@@ -2745,6 +2838,7 @@ class MainActivity : Activity() {
             ins
         }
 
+        Act.onChange = { onActChange() }
         setContentView(FrameLayout(this).apply {
             addView(root, FrameLayout.LayoutParams(-1, -1))
             addView(buildOrbScreen(), FrameLayout.LayoutParams(-1, -1))
@@ -3218,12 +3312,79 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        if (recOn) { val t = dict?.full() ?: ""; dict?.cancel(); endRec(t, false) }
         // app peeche jaye to mic band (background mein nahi chalta)
         if (::orbScreen.isInitialized && orbScreen.visibility == View.VISIBLE) closeOrb()
     }
 
     override fun onBackPressed() {
         if (orbScreen.visibility == View.VISIBLE) closeOrb() else super.onBackPressed()
+    }
+
+    // ---------- mic se likhwana ----------
+    private fun showRec(on: Boolean) {
+        barV.visibility = if (on) View.GONE else View.VISIBLE
+        recRow.visibility = if (on) View.VISIBLE else View.GONE
+        recText.visibility = if (on) View.VISIBLE else View.GONE
+        if (on) {
+            chipRow.visibility = View.GONE
+            pillRow.visibility = View.GONE
+            recText.text = "Bolo..."
+            recText.setTextColor(Color.parseColor("#7A7A82"))
+            wave.clear()
+        } else {
+            refreshHints()
+        }
+    }
+
+    private fun startRec() {
+        if (recOn) return
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)
+            return
+        }
+        val e = AssistantService.engine
+        e?.pauseListening()
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(input.windowToken, 0)
+        val d = dict ?: Dictation(this).also { dict = it }
+        val ok = d.start(input.text.toString(), object : Dictation.Cb {
+            override fun text(full: String) {
+                if (!recOn) return
+                recText.setTextColor(Color.parseColor(if (full.isBlank()) "#7A7A82" else "#F2F2F2"))
+                recText.text = if (full.isBlank()) "Bolo..." else if (full.length > 260) "\u2026" + full.takeLast(260) else full
+            }
+            override fun level(v: Float) { if (recOn) wave.push(v) }
+            override fun ended(full: String) { endRec(full, false) }
+            override fun failed(msg: String) { Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show() }
+        })
+        if (!ok) { e?.resumeListening(); return }
+        recOn = true
+        showRec(true)
+    }
+
+    // text input mein rakh do (ya seedha bhej do) aur normal bar wapas
+    private fun endRec(t: String, send: Boolean) {
+        if (!recOn) return
+        recOn = false
+        showRec(false)
+        AssistantService.engine?.resumeListening()
+        input.setText(t)
+        input.setSelection(input.text.length)
+        if (send && t.isNotBlank()) sendInput()
+    }
+
+    private fun stopRec(send: Boolean) {
+        val d = dict
+        if (!recOn || d == null) return
+        d.stop { t -> endRec(t, send) }
+    }
+
+    private fun cancelRec() {
+        if (!recOn) return
+        dict?.cancel()
+        recOn = false
+        showRec(false)
+        AssistantService.engine?.resumeListening()
     }
 
     private fun talk() {
