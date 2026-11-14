@@ -85,7 +85,7 @@ object ActUi {
         val body = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(act, 6), 0, dp(act, 10)) }
         root.addView(ScrollView(act).apply { isVerticalScrollBarEnabled = false; addView(body) }, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        var open: Act.Step? = null
+        var openStep: Act.Step? = null
         lateinit var showList: () -> Unit
 
         fun steps(): List<Act.Step> = fixed ?: Act.steps
@@ -106,12 +106,13 @@ object ActUi {
         }
 
         fun showDetail(s: Act.Step) {
-            open = s
+            openStep = s
             title.text = s.title
             title.maxLines = 1
             title.ellipsize = android.text.TextUtils.TruncateAt.END
             btn.kind = 23
-            btn.setOnClickListener { open = null; showList() }
+            btn.rotation = 0f
+            btn.setOnClickListener { openStep = null; showList() }
             body.removeAllViews()
             val st = when (s.state) { Act.RUN -> "Running"; Act.FAIL -> "Failed"; else -> "Done" }
             body.addView(label("Status"))
@@ -122,7 +123,7 @@ object ActUi {
         }
 
         showList = {
-            open = null
+            openStep = null
             title.text = "Summary"
             btn.kind = 1
             btn.rotation = 45f
@@ -168,7 +169,7 @@ object ActUi {
         }
 
         showList()
-        ActUi.refresh = { if (d.isShowing) { val o = open; if (o != null) showDetail(o) else showList() } }
+        ActUi.refresh = { if (d.isShowing) { val o = openStep; if (o != null) showDetail(o) else showList() } }
         d.setOnDismissListener { ActUi.refresh = null }
         d.setContentView(root)
         d.show()
