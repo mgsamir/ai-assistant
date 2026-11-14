@@ -332,6 +332,8 @@ class MainActivity : Activity() {
     // chat mein bheji hui photo ka chhota nishaan (file ka naam) ek chhipe hue tag mein rehta hai
     private val EDIT_RE = Regex("(?i)(4k|8k|\\bhd\\b|upscal|enhanc|badl|badal|bana\\s?(do|o|na)|edit|hata\\s?(do|o)|hatao|remove|background|colou?r|saaf|sudhar|sharp|blur|cartoon|anime|ghibli|filter|restore|dhundhl|brighten|crop|resize|convert|change)")
 
+    private val ENH_RE = Regex("(?i)(4k|8k|2k|\\bhd\\b|full\\s?hd|upscal|enhanc|saaf|clear|clarity|sharp|quality|dhundhl|blur|resolution|badha|sudhar|restore)")
+
     private val IMG_TAG = Regex("\u2060IMG:([^\u2060]*)\u2060")
 
     private fun splitImg(s: String): Pair<String, String?> {
@@ -721,31 +723,6 @@ class MainActivity : Activity() {
             }
             list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
-        // Services: ye chat ke model nahi, assistant ke kaam ke tools hain (sirf dikhane ke liye)
-        list.addView(TextView(this).apply {
-            text = "SERVICES"; textSize = 13f; typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#B0B0B8")); setPadding(dp(4), dp(14), 0, dp(8))
-        })
-        fun svc(logo: String, title: String, sub: String, on: Boolean) {
-            val row = LinearLayout(this).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(14), dp(12), dp(16), dp(12))
-                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")); setStroke(dp(1), Color.parseColor("#1F1F24")) }
-            }
-            provLogo(logo, 48)?.let { row.addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
-            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-            tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
-            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
-            row.addView(TextView(this).apply {
-                text = if (on) "On" else "Off"; textSize = 13f
-                setTextColor(Color.parseColor(if (on) "#34D399" else "#8A8A92"))
-            })
-            list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-        }
-        svc("brave", "Brave Search", "Web search aur sources", Extra.brave.isNotBlank())
-        svc("elevenlabs", "ElevenLabs", "Natural awaaz (voice)", Extra.eleven.isNotBlank())
-        svc("virustotal", "VirusTotal", "App security scan", Extra.vt.isNotBlank())
         root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
         dlg.setContentView(root)
         dlg.show()
@@ -1193,18 +1170,25 @@ class MainActivity : Activity() {
         showChat("Tum: $tag0$t")
         if (key.isEmpty()) { finishMedia(null, mode, "API key nahi mili"); return true }
         kotlin.concurrent.thread {
-            val out = when (mode) {
+            var note = ""
+            var out = when (mode) {
                 "image" -> Media.image(key, t, att, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "photo"))
                 "video" -> Media.video(key, t, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "video"))
                 else -> Media.music(key, t, Models.sel(getSharedPreferences("p", Context.MODE_PRIVATE), "music"))
             }
             val err = Media.lastErr
-            runOnUiThread { finishMedia(out, mode, err) }
+            // Gemini ka image model nahi chala, aur photo ko HD / saaf karna hai: phone par hi bada aur saaf karo
+            if (out == null && mode == "image" && att != null && ENH_RE.containsMatchIn(t)) {
+                val e2 = try { Enhance.run(att, t) } catch (x: Throwable) { null }
+                if (e2 != null) { out = e2.first; note = "Gemini ka image model abhi nahi chala, isliye photo phone par hi bada aur saaf kiya: " + e2.second }
+            }
+            val fin = out
+            runOnUiThread { finishMedia(fin, mode, err, note) }
         }
         return true
     }
 
-    private fun finishMedia(out: Media.Out?, kind: String, err: String) {
+    private fun finishMedia(out: Media.Out?, kind: String, err: String, note: String = "") {
         removePending()
         if (out == null) {
             val t = "Nahi ban paaya. " + err.ifBlank { "Dobara try karo." }
@@ -1215,6 +1199,9 @@ class MainActivity : Activity() {
         val uri = saveMedia(out, kind)
         if (kind == "image") saveGenerated(out)
         chatList.addView(mediaView(out, kind, uri), LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8); bottomMargin = dp(8) })
+        if (note.isNotBlank()) chatList.addView(TextView(this).apply {
+            text = note; textSize = 12.5f; setTextColor(Color.parseColor("#E5C06A")); setPadding(0, 0, 0, dp(6))
+        })
         scrollDown()
         if (::orbList.isInitialized) {
             orbList.addView(mediaView(out, kind, uri), LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8); bottomMargin = dp(8) })
@@ -1327,6 +1314,13 @@ class MainActivity : Activity() {
         } catch (e: Exception) { null }
     }
 
+    // poori screen ki oonchai (status bar aur neeche ki navigation patti samet)
+    private fun realHeight(): Int {
+        val dm = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION") windowManager.defaultDisplay.getRealMetrics(dm)
+        return dm.heightPixels
+    }
+
     private fun showDrawer() {
         if (drawerShown) return
         drawerShown = true
@@ -1413,7 +1407,7 @@ class MainActivity : Activity() {
         dlg.setContentView(col)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
-            setLayout((resources.displayMetrics.widthPixels * 0.78f).toInt(), ViewGroup.LayoutParams.MATCH_PARENT)
+            setLayout((resources.displayMetrics.widthPixels * 0.56f).toInt(), realHeight())
             setGravity(Gravity.TOP or Gravity.START)
             // upar status bar se neeche navigation bar tak poora bhare
             addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
@@ -2414,6 +2408,31 @@ class MainActivity : Activity() {
             val n = free.count { it.prov == prov }
             item(prov, Models.provName(prov), if (n > 0) "$n free models" else "Auto: free models")
         }
+        // Services: ye chat ke model nahi, assistant ke kaam ke tools hain (sirf dikhane ke liye)
+        list.addView(TextView(this).apply {
+            text = "SERVICES"; textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#B0B0B8")); setPadding(dp(4), dp(14), 0, dp(8))
+        })
+        fun svc(logo: String, title: String, sub: String, on: Boolean) {
+            val row = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(12), dp(16), dp(12))
+                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")); setStroke(dp(1), Color.parseColor("#1F1F24")) }
+            }
+            provLogo(logo, 48)?.let { row.addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
+            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+            tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
+            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
+            row.addView(TextView(this).apply {
+                text = if (on) "On" else "Off"; textSize = 13f
+                setTextColor(Color.parseColor(if (on) "#34D399" else "#8A8A92"))
+            })
+            list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        }
+        svc("brave", "Brave Search", "Web search aur sources", Extra.brave.isNotBlank())
+        svc("elevenlabs", "ElevenLabs", "Natural awaaz (voice)", Extra.eleven.isNotBlank())
+        svc("virustotal", "VirusTotal", "App security scan", Extra.vt.isNotBlank())
         root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
         dlg.setContentView(root)
         dlg.show()
