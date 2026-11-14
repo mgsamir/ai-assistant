@@ -16,7 +16,7 @@ import android.view.View
 
 // Mic dabane par: bolte raho, Hindi text banta rahe. Beech mein chup rehne par bhi band nahi hota,
 // jab tak stop / send na dabao. Sab main thread par chalta hai.
-class Dictation(private val ctx: Context) {
+class Dictation(private val ctx: Context) : Dict {
     interface Cb {
         fun text(full: String)
         fun level(v: Float)
@@ -65,11 +65,11 @@ class Dictation(private val ctx: Context) {
         else -> a.trim() + " " + b.trim()
     }
 
-    fun full(): String = join(join(base, committed), partial)
+    override fun full(): String = join(join(base, committed), partial)
 
     private fun emit() { cb?.text(full()) }
 
-    fun start(existing: String, callback: Cb): Boolean {
+    override fun start(existing: String, callback: Cb): Boolean {
         if (active) return true
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
             callback.failed("Speech recognition nahi mila")
@@ -184,7 +184,7 @@ class Dictation(private val ctx: Context) {
     }
 
     // stop dabaya: abhi tak ka text de do (aakhri shabd ke liye thoda ruk kar)
-    fun stop(done: (String) -> Unit) {
+    override fun stop(done: (String) -> Unit) {
         if (!active) { done(full()); return }
         stopping = done
         try { rec?.stopListening() } catch (e: Exception) { }
@@ -200,7 +200,7 @@ class Dictation(private val ctx: Context) {
     }
 
     // X dabaya: sab chhod do
-    fun cancel() {
+    override fun cancel() {
         stopping = null
         shutdown()
     }

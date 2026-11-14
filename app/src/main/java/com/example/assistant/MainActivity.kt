@@ -247,7 +247,9 @@ class MainActivity : Activity() {
     private lateinit var recRow: LinearLayout
     private lateinit var recText: TextView
     private lateinit var wave: WaveView
-    private var dict: Dictation? = null
+    private var dict: Dict? = null
+    private var dictOld: Dictation? = null
+    private var dictNew: WhisperDictation? = null
     private var recOn = false
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
@@ -3367,7 +3369,10 @@ class MainActivity : Activity() {
         val e = AssistantService.engine
         e?.pauseListening()
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(input.windowToken, 0)
-        val d = dict ?: Dictation(this).also { dict = it }
+        // Groq key ho to ek hi mic stream (nishaan jalta-bujhta nahi), warna phone ki speech service
+        val d: Dict = if (Extra.groq.isNotBlank()) (dictNew ?: WhisperDictation(this).also { dictNew = it })
+                      else (dictOld ?: Dictation(this).also { dictOld = it })
+        dict = d
         val ok = d.start(input.text.toString(), object : Dictation.Cb {
             override fun text(full: String) {
                 if (!recOn) return
