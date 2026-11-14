@@ -47,10 +47,11 @@ class SpinDots(ctx: Context) : View(ctx) {
 
 // Text par chamak ki patti baayen se daayen guzarti hai; chahe to shabd badalte rehte hain (Thinking, Mulling ...)
 class ShimmerText(ctx: Context) : TextView(ctx) {
-    var dim = Color.parseColor("#7E7E86")
-    var lit = Color.parseColor("#F2F2F2")
+    var dim = Color.parseColor("#A8A8B2")
+    var lit = Color.parseColor("#FFFFFF")
     var shimmer = true
     private var words: List<String>? = null
+    init { typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
     private val tick = object : Runnable {
         override fun run() {
             val w = words ?: return
@@ -144,13 +145,6 @@ object ActUi {
     fun sheet(act: Activity, fixed: List<Act.Step>? = null) {
         val d = Dialog(act)
         d.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        d.window?.apply {
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            setGravity(Gravity.BOTTOM)
-            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, (act.resources.displayMetrics.heightPixels * 0.82f).toInt())
-            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            attributes = attributes.also { it.dimAmount = 0.6f }
-        }
         val root = LinearLayout(act).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
@@ -255,7 +249,7 @@ object ActUi {
                 val failed = s.state == Act.FAIL
                 val tv: TextView
                 if (running) {
-                    tv = ShimmerText(act).apply { dim = Color.parseColor(if (iconKind != 0) "#B9B9C0" else "#7E7E86") }
+                    tv = ShimmerText(act).apply { dim = Color.parseColor(if (iconKind != 0) "#C4C4CC" else "#A8A8B2") }
                     if (s.kind == 0) (tv as ShimmerText).cycle(WORDS) else tv.text = s.title
                 } else {
                     tv = TextView(act)
@@ -279,6 +273,18 @@ object ActUi {
         ActUi.refresh = { if (d.isShowing) { val o = openStep; if (o != null) showDetail(o) else showList() } }
         d.setOnDismissListener { ActUi.refresh = null }
         d.setContentView(root)
+        // window ka naap content lagane ke BAAD, warna sheet patli patti ban jaati hai
+        d.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setGravity(Gravity.BOTTOM)
+            setLayout(ViewGroup.LayoutParams.MATCH_PARENT, (act.resources.displayMetrics.heightPixels * 0.82f).toInt())
+            addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            val lp = attributes
+            lp.dimAmount = 0.6f
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+            lp.height = (act.resources.displayMetrics.heightPixels * 0.82f).toInt()
+            attributes = lp
+        }
         root.translationY = act.resources.displayMetrics.heightPixels.toFloat()
         d.show()
         root.post {

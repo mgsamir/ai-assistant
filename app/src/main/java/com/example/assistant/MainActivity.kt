@@ -398,7 +398,7 @@ class MainActivity : Activity() {
         }
         row.background = ActUi.ripple(this, dp(10))
         row.addView(SpinDots(this), LinearLayout.LayoutParams(dp(30), dp(30)))
-        val tv = ShimmerText(this).apply { text = "Thinking"; textSize = 16f; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END; maxWidth = (resources.displayMetrics.widthPixels * 0.66f).toInt() }
+        val tv = ShimmerText(this).apply { text = "Thinking"; textSize = 17f; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END; maxWidth = (resources.displayMetrics.widthPixels * 0.66f).toInt() }
         row.addView(tv, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
         row.addView(IconView(this).apply { kind = 47; tint = Color.parseColor("#9A9AA2") }, LinearLayout.LayoutParams(dp(26), dp(26)))
         row.setOnClickListener { ActUi.sheet(this) }
@@ -1407,7 +1407,7 @@ class MainActivity : Activity() {
         dlg.setContentView(col)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
-            setLayout((resources.displayMetrics.widthPixels * 0.56f).toInt(), realHeight())
+            setLayout((resources.displayMetrics.widthPixels * 0.50f).toInt(), realHeight())
             setGravity(Gravity.TOP or Gravity.START)
             // upar status bar se neeche navigation bar tak poora bhare
             addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)

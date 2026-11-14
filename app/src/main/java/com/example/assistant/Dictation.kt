@@ -103,6 +103,18 @@ class Dictation(private val ctx: Context) {
                 val t = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 if (!t.isNullOrBlank()) { partial = t; emit() }
             }
+            // Android 13+: ek hi sunne ka daur, beech ke ruk-ruk kar aane wale hisse yahin aate hain (mic baar baar band-chalu nahi hota)
+            override fun onSegmentResults(b: Bundle) {
+                val t = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                if (!t.isNullOrBlank()) { committed = join(committed, t); misses = 0 }
+                partial = ""
+                emit()
+            }
+            override fun onEndOfSegmentedSession() {
+                partial = ""
+                emit()
+                if (stopping != null) finish() else again(120, false)
+            }
             override fun onResults(b: Bundle?) {
                 val t = b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 if (!t.isNullOrBlank()) { committed = join(committed, t); misses = 0 }
@@ -151,6 +163,7 @@ class Dictation(private val ctx: Context) {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            if (android.os.Build.VERSION.SDK_INT >= 33) putExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION, true)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, ctx.packageName)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
