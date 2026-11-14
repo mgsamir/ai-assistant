@@ -242,7 +242,7 @@ class MainActivity : Activity() {
     private lateinit var chatList: LinearLayout
     private lateinit var chatScroll: ScrollView
     private var pending: View? = null
-    private var pendTitle: TextView? = null
+    private var pendTitle: ShimmerText? = null
     private lateinit var barV: LinearLayout
     private lateinit var recRow: LinearLayout
     private lateinit var recText: TextView
@@ -394,9 +394,10 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(6), dp(10), dp(6))
         }
-        row.addView(DotsView(this), LinearLayout.LayoutParams(dp(34), dp(24)))
-        val tv = TextView(this).apply { text = "Thinking"; textSize = 16f; setTextColor(Color.parseColor("#9A9AA2")); maxLines = 1 }
-        row.addView(tv, LinearLayout.LayoutParams(-2, -2))
+        row.background = ActUi.ripple(this, dp(10))
+        row.addView(SpinDots(this), LinearLayout.LayoutParams(dp(30), dp(30)))
+        val tv = ShimmerText(this).apply { text = "Thinking"; textSize = 16f; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END; maxWidth = (resources.displayMetrics.widthPixels * 0.66f).toInt() }
+        row.addView(tv, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
         row.addView(IconView(this).apply { kind = 47; tint = Color.parseColor("#9A9AA2") }, LinearLayout.LayoutParams(dp(26), dp(26)))
         row.setOnClickListener { ActUi.sheet(this) }
         pending = row
@@ -409,7 +410,8 @@ class MainActivity : Activity() {
     private fun updatePendingRow() {
         val tv = pendTitle ?: return
         if (pending == null) return
-        tv.text = Act.current()?.title ?: "Thinking"
+        val s = Act.current()
+        if (s == null || s.kind == 0) tv.cycle(ActUi.WORDS) else { tv.cycle(null); tv.text = s.title }
     }
 
     private fun removePending() {

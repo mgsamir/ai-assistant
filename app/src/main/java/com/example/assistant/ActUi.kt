@@ -3,9 +3,14 @@ package com.example.assistant
 import android.app.Activity
 import android.app.Dialog
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Shader
+import android.graphics.drawable.RippleDrawable
+import android.view.animation.DecelerateInterpolator
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -19,6 +24,85 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+
+// Chaar dot jo ghoomte aur chamakte hain (kaam chalte samay, Claude jaisa)
+class SpinDots(ctx: Context) : View(ctx) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#4F8BFF") }
+    override fun onDraw(c: Canvas) {
+        val t = SystemClock.uptimeMillis()
+        val ang = (t % 2400L) / 2400f * (2f * Math.PI.toFloat())
+        val m = minOf(width, height).toFloat()
+        val cx = width / 2f
+        val cy = height / 2f
+        val rr = m * 0.30f
+        for (i in 0 until 4) {
+            val a = ang + i * (Math.PI.toFloat() / 2f)
+            val pulse = 0.5f + 0.5f * Math.sin((ang * 2f + i).toDouble()).toFloat()
+            p.alpha = (140 + 115 * pulse).toInt()
+            c.drawCircle(cx + rr * Math.cos(a.toDouble()).toFloat(), cy + rr * Math.sin(a.toDouble()).toFloat(), m * (0.075f + 0.04f * pulse), p)
+        }
+        postInvalidateOnAnimation()
+    }
+}
+
+// Text par chamak ki patti baayen se daayen guzarti hai; chahe to shabd badalte rehte hain (Thinking, Mulling ...)
+class ShimmerText(ctx: Context) : TextView(ctx) {
+    var dim = Color.parseColor("#7E7E86")
+    var lit = Color.parseColor("#F2F2F2")
+    var shimmer = true
+    private var words: List<String>? = null
+    private val tick = object : Runnable {
+        override fun run() {
+            val w = words ?: return
+            val n = w[((SystemClock.uptimeMillis() / 1900L) % w.size).toInt()]
+            if (text.toString() != n) text = n
+            postDelayed(this, 500)
+        }
+    }
+
+    fun cycle(list: List<String>?) {
+        if (list === words) return
+        words = list
+        removeCallbacks(tick)
+        if (list != null) { text = list[0]; post(tick) }
+    }
+
+    override fun onAttachedToWindow() { super.onAttachedToWindow(); if (words != null) post(tick) }
+    override fun onDetachedFromWindow() { removeCallbacks(tick); super.onDetachedFromWindow() }
+
+    override fun onDraw(c: Canvas) {
+        if (!shimmer || width <= 0) { paint.shader = null; super.onDraw(c); return }
+        val w = width.toFloat()
+        val t = (SystemClock.uptimeMillis() % 1700L) / 1700f
+        val x = -w * 0.5f + t * w * 2.0f
+        paint.shader = LinearGradient(x, 0f, x + w * 0.5f, 0f, intArrayOf(dim, lit, dim), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        super.onDraw(c)
+        paint.shader = null
+        postInvalidateOnAnimation()
+    }
+}
+
+// Steps ke beech ki seedhi lakeer (timeline)
+class TimeCol(ctx: Context, private val first: Boolean, private val last: Boolean) : View(ctx) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2E2E32"); strokeWidth = 2f * ctx.resources.displayMetrics.density }
+    override fun onDraw(c: Canvas) {
+        if (first && last) return
+        val h = height.toFloat()
+        c.drawLine(width / 2f, if (first) h / 2f else 0f, width / 2f, if (last) h / 2f else h, p)
+    }
+}
+
+// Chalta hua step: dhadakta hua dot
+class PulseDot(ctx: Context) : View(ctx) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#4F8BFF") }
+    override fun onDraw(c: Canvas) {
+        val ph = (SystemClock.uptimeMillis() % 1100L) / 1100f
+        val k = 0.5f + 0.5f * Math.sin(ph * 2.0 * Math.PI).toFloat()
+        p.alpha = (150 + 105 * k).toInt()
+        c.drawCircle(width / 2f, height / 2f, minOf(width, height) / 2f * (0.7f + 0.3f * k), p)
+        postInvalidateOnAnimation()
+    }
+}
 
 // Teen dot jo baari baari se chamakte hain ("kaam chal raha hai")
 class DotsView(ctx: Context) : View(ctx) {
@@ -39,6 +123,10 @@ class DotsView(ctx: Context) : View(ctx) {
 // "Kya kya kar raha hai": steps ki list, kisi step par dabao to uski poori jaankari
 object ActUi {
     @Volatile var refresh: (() -> Unit)? = null
+    val WORDS = listOf("Thinking", "Mulling", "Weighing", "Pondering", "Cogitating", "Reasoning")
+
+    fun ripple(c: Context, r: Int = 0): android.graphics.drawable.Drawable =
+        RippleDrawable(ColorStateList.valueOf(Color.parseColor("#2EFFFFFF")), null, GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = r.toFloat() })
 
     private fun dp(c: Context, v: Int) = (v * c.resources.displayMetrics.density).toInt()
 
@@ -75,6 +163,10 @@ object ActUi {
             background = GradientDrawable().apply { cornerRadius = dp(act, 3).toFloat(); setColor(Color.parseColor("#3A3A3A")) }
         }, LinearLayout.LayoutParams(dp(act, 40), dp(act, 5)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(act, 10) })
 
+        fun close() {
+            root.animate().translationY(root.height.toFloat()).setDuration(240).setInterpolator(android.view.animation.AccelerateInterpolator(1.4f))
+                .withEndAction { if (d.isShowing) d.dismiss() }.start()
+        }
         val head = FrameLayout(act)
         val btn = IconView(act)
         val title = TextView(act).apply { textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER }
@@ -127,7 +219,7 @@ object ActUi {
             title.text = "Summary"
             btn.kind = 1
             btn.rotation = 45f
-            btn.setOnClickListener { d.dismiss() }
+            btn.setOnClickListener { close() }
             body.removeAllViews()
             val list = steps()
             if (list.isEmpty()) {
@@ -135,34 +227,49 @@ object ActUi {
                     text = "Working..."; textSize = 16f; setTextColor(Color.parseColor("#9A9AA2")); setPadding(dp(act, 6), dp(act, 20), 0, 0)
                 })
             }
-            for (s in list) {
-                val row = LinearLayout(act).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(act, 12), 0, dp(act, 12)) }
+            list.forEachIndexed { idx, s ->
+                val firstRow = idx == 0
+                val lastRow = idx == list.size - 1
+                val running = s.state == Act.RUN
                 val iconKind = when (s.kind) { 1 -> 48; 2 -> 49; else -> 0 }
-                if (iconKind != 0) {
-                    row.addView(FrameLayout(act).apply {
-                        background = GradientDrawable().apply { cornerRadius = dp(act, 12).toFloat(); setColor(Color.parseColor("#232323")) }
-                        addView(IconView(act).apply { kind = iconKind }, FrameLayout.LayoutParams(-1, -1))
-                    }, LinearLayout.LayoutParams(dp(act, 40), dp(act, 40)))
-                } else {
-                    row.addView(FrameLayout(act).apply {
-                        addView(View(act).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#4A4A4A")) } },
-                            FrameLayout.LayoutParams(dp(act, 9), dp(act, 9), Gravity.CENTER))
-                    }, LinearLayout.LayoutParams(dp(act, 40), dp(act, 40)))
+                val row = LinearLayout(act).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    background = ripple(act, dp(act, 10))
+                    minimumHeight = dp(act, 48)
                 }
-                val tx = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL }
+                val col = FrameLayout(act)
+                col.addView(TimeCol(act, firstRow, lastRow), FrameLayout.LayoutParams(-1, -1))
+                if (iconKind != 0) {
+                    col.addView(FrameLayout(act).apply {
+                        background = GradientDrawable().apply { cornerRadius = dp(act, 11).toFloat(); setColor(Color.parseColor("#232323")) }
+                        addView(IconView(act).apply { kind = iconKind }, FrameLayout.LayoutParams(-1, -1))
+                    }, FrameLayout.LayoutParams(dp(act, 36), dp(act, 36), Gravity.CENTER))
+                } else if (running) {
+                    col.addView(PulseDot(act), FrameLayout.LayoutParams(dp(act, 11), dp(act, 11), Gravity.CENTER))
+                } else {
+                    col.addView(View(act).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#4A4A4E")) } },
+                        FrameLayout.LayoutParams(dp(act, 9), dp(act, 9), Gravity.CENTER))
+                }
+                row.addView(col, LinearLayout.LayoutParams(dp(act, 40), -1))
+                val tx = LinearLayout(act).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(act, 9), 0, dp(act, 9)) }
                 val failed = s.state == Act.FAIL
-                tx.addView(TextView(act).apply {
-                    text = (if (failed) "Failed: " else "") + s.title + (if (failed) "  ⚠" else "")
-                    textSize = 17f
-                    setTextColor(if (iconKind != 0) Color.WHITE else Color.parseColor("#D8D8DC"))
-                    if (iconKind != 0) typeface = Typeface.DEFAULT_BOLD
-                })
-                if (s.detail.isNotBlank()) tx.addView(TextView(act).apply {
+                val tv: TextView
+                if (running) {
+                    tv = ShimmerText(act).apply { dim = Color.parseColor(if (iconKind != 0) "#B9B9C0" else "#7E7E86") }
+                    if (s.kind == 0) (tv as ShimmerText).cycle(WORDS) else tv.text = s.title
+                } else {
+                    tv = TextView(act)
+                    tv.text = (if (failed) "Failed: " else "") + s.title + (if (failed) "  \u26A0" else "")
+                }
+                tv.textSize = 17f
+                if (!running) tv.setTextColor(if (iconKind != 0) Color.WHITE else Color.parseColor("#D8D8DC"))
+                if (iconKind != 0) tv.typeface = Typeface.DEFAULT_BOLD
+                tx.addView(tv)
+                if (s.detail.isNotBlank() && !(running && s.kind == 0)) tx.addView(TextView(act).apply {
                     text = s.detail.lines().first().take(110); textSize = 13.5f; setTextColor(Color.parseColor("#9A9AA2")); maxLines = 2
                 })
-                row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(act, 12) })
-                if (s.state == Act.RUN) row.addView(DotsView(act), LinearLayout.LayoutParams(dp(act, 34), dp(act, 22)))
-                else row.addView(TextView(act).apply { text = String.format("%.1fs", s.secs()); textSize = 12.5f; setTextColor(Color.parseColor("#7A7A82")) })
+                row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(act, 6) })
+                if (!running) row.addView(TextView(act).apply { text = String.format("%.1fs", s.secs()); textSize = 12.5f; setTextColor(Color.parseColor("#7A7A82")) })
                 if (s.req.isNotBlank() || s.detail.isNotBlank() || s.res.isNotBlank()) row.setOnClickListener { showDetail(s) }
                 body.addView(row, LinearLayout.LayoutParams(-1, -2))
             }
@@ -172,6 +279,10 @@ object ActUi {
         ActUi.refresh = { if (d.isShowing) { val o = openStep; if (o != null) showDetail(o) else showList() } }
         d.setOnDismissListener { ActUi.refresh = null }
         d.setContentView(root)
+        root.translationY = act.resources.displayMetrics.heightPixels.toFloat()
         d.show()
+        root.post {
+            root.animate().translationY(0f).setDuration(320).setInterpolator(DecelerateInterpolator(1.8f)).start()
+        }
     }
 }
