@@ -1454,7 +1454,32 @@ class MainActivity : Activity() {
     }
 
     // app ka poora report: copy / share karke kisi ko bhejne ke liye
-    private fun showAppReport(pkg: String, label: String) {
+    private var exportingSrc = false
+
+    // poore app ka Java source zip mein (Downloads), progress setLabel se dikhta hai
+    private fun fullSource(apk: String, name: String, setLabel: (String) -> Unit) {
+        if (exportingSrc) return
+        exportingSrc = true
+        Toast.makeText(this, "Poora source ban raha hai. Bade app mein kai minute lagte hain, app khula rakho.", Toast.LENGTH_LONG).show()
+        Thread {
+            try {
+                val tmp = java.io.File(cacheDir, "srcout")
+                tmp.deleteRecursively(); tmp.mkdirs()
+                JadxView.exportAll(apk, tmp) { p -> runOnUiThread { setLabel("Source $p%") } }
+                runOnUiThread { setLabel("Zip ban rahi hai...") }
+                val where = ApkSource.saveToDownloads(this, name + "_source.zip", "application/zip") { o -> JadxView.zipDir(tmp, o) }
+                tmp.deleteRecursively()
+                runOnUiThread { Toast.makeText(this, "Save hua: $where", Toast.LENGTH_LONG).show() }
+            } catch (e: Throwable) {
+                runOnUiThread { Toast.makeText(this, "Source nahi ban paya: " + (e.message ?: e.javaClass.simpleName), Toast.LENGTH_LONG).show() }
+            } finally {
+                exportingSrc = false
+                runOnUiThread { setLabel("Full source") }
+            }
+        }.start()
+    }
+
+    private fun showAppReport(pkg: String, label: String, reverse: Boolean = false) {
         val dlg = fullDlg()
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
@@ -1474,18 +1499,30 @@ class MainActivity : Activity() {
             background = GradientDrawable().apply { setColor(Color.parseColor("#2B3A67")); cornerRadius = dp(14).toFloat() }
             setOnClickListener { onC() }
         }
-        btns.addView(btn("Code") { showCodeBrowser(pkg, label) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { rightMargin = dp(4) })
-        btns.addView(btn("Copy") {
+        val btns2 = LinearLayout(this)
+        btns2.setPadding(dp(16), 0, dp(16), dp(8))
+        if (reverse) {
+            var fsBtn: TextView? = null
+            fsBtn = btn("Full source") {
+                val apkP = try { packageManager.getApplicationInfo(pkg, 0).sourceDir } catch (e: Exception) { null }
+                if (apkP != null) fullSource(apkP, pkg) { t -> fsBtn?.text = t }
+            }
+            btns.addView(fsBtn, LinearLayout.LayoutParams(0, dp(46), 1f).apply { rightMargin = dp(4) })
+            btns.addView(btn("Code") { showCodeBrowser(pkg, label) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(4) })
+        }
+        if (!reverse) btns.addView(btn("Code") { showCodeBrowser(pkg, label) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { rightMargin = dp(4) })
+        (if (reverse) btns2 else btns).addView(btn("Copy") {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("report", tv.text))
             Toast.makeText(this, "Copy", Toast.LENGTH_SHORT).show()
         }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(4); rightMargin = dp(4) })
-        btns.addView(btn("Share") {
+        (if (reverse) btns2 else btns).addView(btn("Share") {
             try {
                 startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, tv.text.toString()), "Report bhejo"))
             } catch (e: Exception) { }
         }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(4) })
         col.addView(btns, LinearLayout.LayoutParams(-1, -2))
+        if (reverse) col.addView(btns2, LinearLayout.LayoutParams(-1, -2))
         col.addView(sv, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(col, FrameLayout.LayoutParams(-1, -1))
         val topBar = FrameLayout(this)
@@ -1554,7 +1591,7 @@ class MainActivity : Activity() {
             r.background = GradientDrawable().apply { setColor(Color.parseColor("#0F0F0F")); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.parseColor("#26262B")) }
             r.addView(TextView(this).apply { text = lab; textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
             r.addView(TextView(this).apply { text = pk; textSize = 12f; setTextColor(Color.parseColor("#A8A8B0")) })
-            r.setOnClickListener { showCodeBrowser(pk, lab) }
+            r.setOnClickListener { showAppReport(pk, lab, true) }
             content.addView(r, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
         }
         dlg.setContentView(root)
@@ -1662,29 +1699,8 @@ class MainActivity : Activity() {
                         hv.addView(TextView(this).apply { text = label; textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
                         hv.addView(TextView(this).apply { text = pkg; textSize = 11f; setTextColor(Color.parseColor("#A8A8B0")) })
                         head.addView(hv, LinearLayout.LayoutParams(0, -2, 1f))
-                        var busyExp = false
                         var fullPill: TextView? = null
-                        fullPill = pill("Full source") {
-                            if (busyExp) return@pill
-                            busyExp = true
-                            toast("Poora source ban raha hai. Bade app mein kai minute lagte hain, app khula rakho.")
-                            Thread {
-                                try {
-                                    val tmp = java.io.File(cacheDir, "srcout")
-                                    tmp.deleteRecursively(); tmp.mkdirs()
-                                    JadxView.exportAll(apk, tmp) { p -> runOnUiThread { fullPill?.text = "Source $p%" } }
-                                    runOnUiThread { fullPill?.text = "Zip ban rahi hai..." }
-                                    val where = ApkSource.saveToDownloads(this, pkg + "_source.zip", "application/zip") { o -> JadxView.zipDir(tmp, o) }
-                                    tmp.deleteRecursively()
-                                    toast("Save hua: $where")
-                                } catch (e: Throwable) {
-                                    toast("Source nahi ban paya: " + (e.message ?: e.javaClass.simpleName))
-                                } finally {
-                                    busyExp = false
-                                    runOnUiThread { fullPill?.text = "Full source" }
-                                }
-                            }.start()
-                        }
+                        fullPill = pill("Full source") { fullSource(apk, pkg) { t -> fullPill?.text = t } }
                         head.addView(fullPill, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(8) })
                         head.addView(pill("Save all") {
                             toast("Zip ban rahi hai, thoda ruko...")
