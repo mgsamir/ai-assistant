@@ -1574,8 +1574,8 @@ class MainActivity : Activity() {
             pr.orientation = LinearLayout.VERTICAL
             pr.setPadding(dp(14), dp(14), dp(14), dp(14))
             pr.background = GradientDrawable().apply { setColor(Color.parseColor("#12203D")); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.parseColor("#2B3A67")) }
-            pr.addView(TextView(this).apply { text = "APK file kholo"; textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-            pr.addView(TextView(this).apply { text = "Phone mein rakhi kisi bhi APK file ka code, bina install kiye"; textSize = 12f; setTextColor(Color.parseColor("#B8C4E0")) })
+            pr.addView(TextView(this).apply { text = "APK File"; textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+            pr.addView(TextView(this).apply { text = "Open and analyze an APK from device storage"; textSize = 12f; setTextColor(Color.parseColor("#B8C4E0")) })
             pr.setOnClickListener {
                 val i = Intent(Intent.ACTION_OPEN_DOCUMENT)
                 i.addCategory(Intent.CATEGORY_OPENABLE)
