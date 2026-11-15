@@ -2816,11 +2816,9 @@ class MainActivity : Activity() {
             background = null
             maxLines = 8
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            imeOptions = EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+            // keyboard ka Enter sirf nayi line likhta hai (bhejna sirf upar wale teer / send button se)
+            imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             setPadding(dp(6), dp(12), dp(6), dp(12))
-            setOnEditorActionListener { _, id, _ ->
-                if (id == EditorInfo.IME_ACTION_SEND) { sendInput(); true } else false
-            }
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
