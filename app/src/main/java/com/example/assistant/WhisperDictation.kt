@@ -71,7 +71,7 @@ class WhisperDictation(private val ctx: Context) : Dict {
 
     private fun emit() {
         val t = full()
-        cb?.text(if (speaking || pending.get() > 0) (if (t.isBlank()) "…" else "$t …") else t)
+        cb?.text(t)
     }
 
     override fun start(existing: String, callback: Dictation.Cb): Boolean {
@@ -226,15 +226,23 @@ class WhisperDictation(private val ctx: Context) : Dict {
         return s
     }
 
+    // bhasha apne aap pehchani jaati hai: English bolo to English (Latin), Hindi bolo to Devanagari
     private fun transcribe(wav: ByteArray): String {
-        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+        val first = transcribeOnce(wav, null)
+        // kabhi Urdu lipi aa jaye to Hindi maan kar dobara
+        if (first.any { it in '\u0600'..'\u06FF' }) return transcribeOnce(wav, "hi")
+        return first
+    }
+
+    private fun transcribeOnce(wav: ByteArray, lang: String?): String {
+        val mb = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("file", "a.wav", wav.toRequestBody("audio/wav".toMediaType()))
             .addFormDataPart("model", "whisper-large-v3-turbo")
-            .addFormDataPart("language", "hi")
             .addFormDataPart("response_format", "json")
             .addFormDataPart("temperature", "0")
-            .addFormDataPart("prompt", "यह हिंदी में बातचीत है।")
-            .build()
+            .addFormDataPart("prompt", "Hello, how are you? नमस्ते, आप कैसे हैं? Hi. कैसे हो? What are you doing? क्या कर रहे हो?")
+        if (lang != null) mb.addFormDataPart("language", lang)
+        val body = mb.build()
         val req = Request.Builder().url("https://api.groq.com/openai/v1/audio/transcriptions")
             .header("Authorization", "Bearer " + Extra.groq).post(body).build()
         http.newCall(req).execute().use { r ->
