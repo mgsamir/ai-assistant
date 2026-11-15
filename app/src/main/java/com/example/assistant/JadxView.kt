@@ -58,6 +58,35 @@ object JadxView {
         "Decode nahi ho paya (" + e.javaClass.simpleName + ": " + (e.message ?: "") + ")"
     }
 
+    // poore ऐप ka saara Java source (aur resources) folder mein
+    fun exportAll(apk: String, out: File, onProgress: (Int) -> Unit) {
+        close()
+        val a = JadxArgs()
+        a.setInputFile(File(apk))
+        a.setOutDir(out)
+        a.setSkipResources(false)
+        a.setThreadsCount(2)
+        a.setShowInconsistentCode(true)
+        val d = JadxDecompiler(a)
+        try {
+            d.load()
+            d.save(400) { done, total -> if (total > 0) onProgress(((done * 100) / total).toInt()) }
+        } finally {
+            try { d.close() } catch (e: Throwable) { }
+        }
+    }
+
+    fun zipDir(dir: File, out: java.io.OutputStream) {
+        java.util.zip.ZipOutputStream(out.buffered()).use { zo ->
+            val base = dir.absolutePath.length + 1
+            dir.walkTopDown().filter { it.isFile }.forEach { f ->
+                zo.putNextEntry(java.util.zip.ZipEntry(f.absolutePath.substring(base)))
+                f.inputStream().use { it.copyTo(zo) }
+                zo.closeEntry()
+            }
+        }
+    }
+
     @Synchronized
     fun close() { try { dec?.close() } catch (e: Throwable) { }; dec = null; path = null }
 }

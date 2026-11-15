@@ -1032,6 +1032,16 @@ class MainActivity : Activity() {
             try {
                 when (rq) {
                     101, 103 -> d?.data?.let { readPicked(it) }
+                    104 -> d?.data?.let { u ->
+                        var nm = "app"
+                        contentResolver.query(u, null, null, null, null)?.use { c ->
+                            if (c.moveToFirst()) { val ix = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME); if (ix >= 0) nm = c.getString(ix) ?: nm }
+                        }
+                        val f = java.io.File(cacheDir, "picked.apk")
+                        contentResolver.openInputStream(u)?.use { ins -> f.outputStream().use { ins.copyTo(it) } }
+                        val stem = nm.substringBeforeLast(".").ifBlank { "app" }
+                        runOnUiThread { showCodeBrowser(stem, stem, f.absolutePath) }
+                    }
                     102 -> {
                         val u = camUri
                         if (u != null) readPicked(u, "image/jpeg")
@@ -1522,6 +1532,21 @@ class MainActivity : Activity() {
                 .filter { ai -> listOf("com.miui.", "com.xiaomi.", "com.mi.", "com.android.", "com.qualcomm.", "com.google.android.").none { ai.packageName.startsWith(it) } || ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0 }
                 .map { it.loadLabel(pm).toString() to it.packageName }.sortedBy { it.first.lowercase() }
         } catch (e: Exception) { emptyList() }
+        run {
+            val pr = LinearLayout(this)
+            pr.orientation = LinearLayout.VERTICAL
+            pr.setPadding(dp(14), dp(14), dp(14), dp(14))
+            pr.background = GradientDrawable().apply { setColor(Color.parseColor("#12203D")); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.parseColor("#2B3A67")) }
+            pr.addView(TextView(this).apply { text = "APK file kholo"; textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+            pr.addView(TextView(this).apply { text = "Phone mein rakhi kisi bhi APK file ka code, bina install kiye"; textSize = 12f; setTextColor(Color.parseColor("#B8C4E0")) })
+            pr.setOnClickListener {
+                val i = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                i.addCategory(Intent.CATEGORY_OPENABLE)
+                i.type = "*/*"
+                startActivityForResult(i, 104)
+            }
+            content.addView(pr, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+        }
         for ((lab, pk) in apps) {
             val r = LinearLayout(this)
             r.orientation = LinearLayout.VERTICAL
@@ -1537,8 +1562,8 @@ class MainActivity : Activity() {
     }
 
     // GitHub jaisa file browser: folder, file, code. Save karne par Downloads/AppCode mein
-    private fun showCodeBrowser(pkg: String, label: String) {
-        val apk = try { packageManager.getApplicationInfo(pkg, 0).sourceDir } catch (e: Exception) { null }
+    private fun showCodeBrowser(pkg: String, label: String, apkOverride: String? = null) {
+        val apk = apkOverride ?: try { packageManager.getApplicationInfo(pkg, 0).sourceDir } catch (e: Exception) { null }
         if (apk == null) { Toast.makeText(this, "Ye app phone mein nahi hai", Toast.LENGTH_SHORT).show(); return }
         val dlg = fullDlg()
         val root = FrameLayout(this)
@@ -1637,6 +1662,30 @@ class MainActivity : Activity() {
                         hv.addView(TextView(this).apply { text = label; textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
                         hv.addView(TextView(this).apply { text = pkg; textSize = 11f; setTextColor(Color.parseColor("#A8A8B0")) })
                         head.addView(hv, LinearLayout.LayoutParams(0, -2, 1f))
+                        var busyExp = false
+                        var fullPill: TextView? = null
+                        fullPill = pill("Full source") {
+                            if (busyExp) return@pill
+                            busyExp = true
+                            toast("Poora source ban raha hai. Bade app mein kai minute lagte hain, app khula rakho.")
+                            Thread {
+                                try {
+                                    val tmp = java.io.File(cacheDir, "srcout")
+                                    tmp.deleteRecursively(); tmp.mkdirs()
+                                    JadxView.exportAll(apk, tmp) { p -> runOnUiThread { fullPill?.text = "Source $p%" } }
+                                    runOnUiThread { fullPill?.text = "Zip ban rahi hai..." }
+                                    val where = ApkSource.saveToDownloads(this, pkg + "_source.zip", "application/zip") { o -> JadxView.zipDir(tmp, o) }
+                                    tmp.deleteRecursively()
+                                    toast("Save hua: $where")
+                                } catch (e: Throwable) {
+                                    toast("Source nahi ban paya: " + (e.message ?: e.javaClass.simpleName))
+                                } finally {
+                                    busyExp = false
+                                    runOnUiThread { fullPill?.text = "Full source" }
+                                }
+                            }.start()
+                        }
+                        head.addView(fullPill, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(8) })
                         head.addView(pill("Save all") {
                             toast("Zip ban rahi hai, thoda ruko...")
                             Thread {
