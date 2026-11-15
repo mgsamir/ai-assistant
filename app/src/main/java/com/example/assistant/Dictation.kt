@@ -215,6 +215,13 @@ class Dictation(private val ctx: Context) : Dict {
     }
 }
 
+// Lambe text ke liye: oonchai ek had tak badhti hai, usse zyada hone par andar scroll hota hai
+class MaxHeightScroll(ctx: Context, private val maxPx: Int) : android.widget.ScrollView(ctx) {
+    override fun onMeasure(w: Int, h: Int) {
+        super.onMeasure(w, View.MeasureSpec.makeMeasureSpec(maxPx, View.MeasureSpec.AT_MOST))
+    }
+}
+
 // Awaaz ki oonchai ke hisaab se chalti hui khadi lakeerein (jaisa Claude / ChatGPT mein)
 class WaveView(ctx: Context) : View(ctx) {
     private val n = 44

@@ -246,6 +246,7 @@ class MainActivity : Activity() {
     private lateinit var barV: LinearLayout
     private lateinit var recRow: LinearLayout
     private lateinit var recText: TextView
+    private lateinit var recScroll: MaxHeightScroll
     private lateinit var wave: WaveView
     private var dict: Dict? = null
     private var dictOld: Dictation? = null
@@ -2779,9 +2780,13 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#E6E6E6"))
             setLineSpacing(0f, 1.15f)
             setPadding(dp(6), dp(6), dp(6), dp(8))
-            visibility = View.GONE
         }
-        composer.addView(recText, 0, LinearLayout.LayoutParams(-1, -2))
+        recScroll = MaxHeightScroll(this, (resources.displayMetrics.heightPixels * 0.42f).toInt()).apply {
+            isVerticalScrollBarEnabled = false
+            visibility = View.GONE
+            addView(recText, ViewGroup.LayoutParams(-1, -2))
+        }
+        composer.addView(recScroll, 0, LinearLayout.LayoutParams(-1, -2))
         wave = WaveView(this)
         recRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -2809,8 +2814,8 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#F2F2F2"))
             textSize = 16f
             background = null
-            maxLines = 4
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            maxLines = 8
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             imeOptions = EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             setPadding(dp(6), dp(12), dp(6), dp(12))
             setOnEditorActionListener { _, id, _ ->
@@ -3348,12 +3353,11 @@ class MainActivity : Activity() {
     private fun showRec(on: Boolean) {
         barV.visibility = if (on) View.GONE else View.VISIBLE
         recRow.visibility = if (on) View.VISIBLE else View.GONE
-        recText.visibility = if (on) View.VISIBLE else View.GONE
+        recScroll.visibility = View.GONE
         if (on) {
             chipRow.visibility = View.GONE
             pillRow.visibility = View.GONE
-            recText.text = "Ask AI"
-            recText.setTextColor(Color.parseColor("#8D8D95"))
+            recText.text = ""
             wave.clear()
         } else {
             refreshHints()
@@ -3376,8 +3380,9 @@ class MainActivity : Activity() {
         val ok = d.start(input.text.toString(), object : Dictation.Cb {
             override fun text(full: String) {
                 if (!recOn) return
-                recText.setTextColor(Color.parseColor(if (full.isBlank()) "#8D8D95" else "#E6E6E6"))
-                recText.text = if (full.isBlank()) "Ask AI" else if (full.length > 260) "\u2026" + full.takeLast(260) else full
+                recText.text = full
+                recScroll.visibility = if (full.isBlank()) View.GONE else View.VISIBLE
+                recScroll.post { recScroll.fullScroll(View.FOCUS_DOWN) }
             }
             override fun level(v: Float) { if (recOn) wave.push(v) }
             override fun ended(full: String) { endRec(full, false) }
