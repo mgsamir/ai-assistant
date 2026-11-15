@@ -2775,10 +2775,10 @@ class MainActivity : Activity() {
         }
         // bolte samay: upar Hindi text, neeche X / lakeerein / stop / send
         recText = TextView(this).apply {
-            textSize = 19f
-            setTextColor(Color.parseColor("#F2F2F2"))
-            setLineSpacing(0f, 1.25f)
-            setPadding(dp(8), dp(10), dp(8), dp(12))
+            textSize = 16f
+            setTextColor(Color.parseColor("#E6E6E6"))
+            setLineSpacing(0f, 1.15f)
+            setPadding(dp(6), dp(6), dp(6), dp(8))
             visibility = View.GONE
         }
         composer.addView(recText, 0, LinearLayout.LayoutParams(-1, -2))
@@ -2788,18 +2788,18 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             visibility = View.GONE
             addView(IconView(this@MainActivity).apply {
-                kind = 1; rotation = 45f; tint = Color.WHITE; background = oval("#262626")
+                kind = 1; rotation = 45f; tint = Color.parseColor("#C8C8CC"); background = oval("#232323")
                 setOnClickListener { cancelRec() }
-            }, LinearLayout.LayoutParams(dp(44), dp(44)))
-            addView(wave, LinearLayout.LayoutParams(0, dp(34), 1f).apply { leftMargin = dp(14); rightMargin = dp(14) })
+            }, LinearLayout.LayoutParams(dp(34), dp(34)))
+            addView(wave, LinearLayout.LayoutParams(0, dp(26), 1f).apply { leftMargin = dp(12); rightMargin = dp(12) })
             addView(IconView(this@MainActivity).apply {
-                kind = 46; tint = Color.WHITE; background = oval("#262626")
+                kind = 46; tint = Color.WHITE; background = oval("#232323")
                 setOnClickListener { stopRec(false) }
-            }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            }, LinearLayout.LayoutParams(dp(34), dp(34)))
             addView(IconView(this@MainActivity).apply {
                 kind = 4; tint = Color.WHITE; background = oval("#4F8BFF")
                 setOnClickListener { stopRec(true) }
-            }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { leftMargin = dp(8) })
+            }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { leftMargin = dp(8) })
         }
         composer.addView(recRow, LinearLayout.LayoutParams(-1, -2))
         bar.addView(icon(1, 44) { showPlus() })
@@ -3352,8 +3352,8 @@ class MainActivity : Activity() {
         if (on) {
             chipRow.visibility = View.GONE
             pillRow.visibility = View.GONE
-            recText.text = "Bolo..."
-            recText.setTextColor(Color.parseColor("#7A7A82"))
+            recText.text = "Ask AI"
+            recText.setTextColor(Color.parseColor("#8D8D95"))
             wave.clear()
         } else {
             refreshHints()
@@ -3376,8 +3376,8 @@ class MainActivity : Activity() {
         val ok = d.start(input.text.toString(), object : Dictation.Cb {
             override fun text(full: String) {
                 if (!recOn) return
-                recText.setTextColor(Color.parseColor(if (full.isBlank()) "#7A7A82" else "#F2F2F2"))
-                recText.text = if (full.isBlank()) "Bolo..." else if (full.length > 260) "\u2026" + full.takeLast(260) else full
+                recText.setTextColor(Color.parseColor(if (full.isBlank()) "#8D8D95" else "#E6E6E6"))
+                recText.text = if (full.isBlank()) "Ask AI" else if (full.length > 260) "\u2026" + full.takeLast(260) else full
             }
             override fun level(v: Float) { if (recOn) wave.push(v) }
             override fun ended(full: String) { endRec(full, false) }

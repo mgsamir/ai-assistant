@@ -217,11 +217,11 @@ class Dictation(private val ctx: Context) : Dict {
 
 // Awaaz ki oonchai ke hisaab se chalti hui khadi lakeerein (jaisa Claude / ChatGPT mein)
 class WaveView(ctx: Context) : View(ctx) {
-    private val n = 30
+    private val n = 44
     private val lv = FloatArray(n)
     private var last = 0f
     private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#F2F2F2")
+        color = Color.parseColor("#CFCFD3")
         strokeCap = Paint.Cap.ROUND
     }
 
@@ -242,9 +242,9 @@ class WaveView(ctx: Context) : View(ctx) {
         val w = width.toFloat()
         val h = height.toFloat()
         val gap = w / n
-        p.strokeWidth = gap * 0.42f
+        p.strokeWidth = gap * 0.34f
         for (i in 0 until n) {
-            val a = 0.14f + 0.86f * lv[i]
+            val a = 0.07f + 0.93f * lv[i]
             val bh = h * a
             val x = gap * (i + 0.5f)
             c.drawLine(x, h / 2f - bh / 2f, x, h / 2f + bh / 2f, p)
