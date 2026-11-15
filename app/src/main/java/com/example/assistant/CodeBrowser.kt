@@ -219,6 +219,20 @@ class ApkSource(private val apk: String) {
         return out.values.sortedWith(compareBy({ !it.dir }, { it.name }))
     }
 
+    // Java jaisa code (jadx) ya saaf naamon wala XML / resources
+    fun readAlt(path: String): String {
+        val seg = path.split("/").filter { it.isNotEmpty() }
+        if (seg.isNotEmpty() && isDex(seg[0])) {
+            return JadxView.javaOf(apk, seg.drop(1).joinToString("/").replace('/', '.'))
+        }
+        return JadxView.resourceOf(apk, path)
+    }
+
+    fun hasAlt(path: String): Boolean {
+        val seg = path.split("/").filter { it.isNotEmpty() }
+        return (seg.size > 1 && isDex(seg[0])) || path.endsWith(".xml") || path.endsWith("resources.arsc")
+    }
+
     // file ka padhne layak text
     fun read(path: String): String {
         val seg = path.split("/").filter { it.isNotEmpty() }
@@ -228,6 +242,7 @@ class ApkSource(private val apk: String) {
             val c = classes(seg[0]).firstOrNull { it.first == want } ?: return "Class nahi mili"
             return smali(seg[0], want) ?: ("(smali nahi ban paya, sirf dhancha)\n\n" + d.describe(c.second))
         }
+        if (path == "resources.arsc") return JadxView.resourceOf(apk, path)
         return try {
             ZipFile(apk).use { z ->
                 val e = z.getEntry(path) ?: return "File nahi mili"

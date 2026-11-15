@@ -41,10 +41,22 @@ android {
 
     kotlinOptions { jvmTarget = '17' }
 
-    packaging { resources { excludes += ['META-INF/*', 'META-INF/**'] } }
+    packaging {
+        resources {
+            excludes += ['META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/LICENSE*', 'META-INF/NOTICE*',
+                         'META-INF/DEPENDENCIES', 'META-INF/INDEX.LIST', 'META-INF/MANIFEST.MF', 'META-INF/*.md',
+                         'META-INF/versions/**', 'META-INF/maven/**', 'META-INF/proguard/**', 'META-INF/*.kotlin_module',
+                         'META-INF/AL2.0', 'META-INF/LGPL2.1', 'META-INF/native-image/**', 'META-INF/*.version', 'META-INF/gradle/**']
+            // jadx apne plugin ServiceLoader se dhoondhta hai, isliye ye files rakhni hain
+            merges += ['META-INF/services/**']
+        }
+    }
 }
 
 dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'org.smali:baksmali:2.5.2'
+    // Java jaisa code + XML/resources decode (jadx)
+    implementation 'io.github.skylot:jadx-core:1.5.1'
+    implementation 'io.github.skylot:jadx-dex-input:1.5.1'
 }

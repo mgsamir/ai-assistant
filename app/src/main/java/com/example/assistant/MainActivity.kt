@@ -1553,12 +1553,13 @@ class MainActivity : Activity() {
         val title = TextView(this).apply { textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.START }
         var cur = ""
         var viewing: String? = null
+        var alt = false
         var src: ApkSource? = null
         val topBar = FrameLayout(this)
         topBar.setBackgroundColor(Color.BLACK)
         lateinit var render: () -> Unit
         val goBack = {
-            if (viewing != null) { viewing = null; render() }
+            if (viewing != null) { viewing = null; alt = false; render() }
             else if (cur.isEmpty()) dlg.dismiss()
             else { cur = cur.substringBeforeLast("/", ""); render() }
         }
@@ -1604,10 +1605,16 @@ class MainActivity : Activity() {
                     val txt = full.ifEmpty { tv.text.toString() }; val nm = v.replace('/', '_') + ".txt"
                     Thread { try { toast("Save hua: " + ApkSource.saveToDownloads(this, nm, "text/plain") { it.write(txt.toByteArray()) }) } catch (e: Exception) { toast("Save nahi hua: ${e.message}") } }.start()
                 })
+                if (s.hasAlt(v)) {
+                    val isCls = v.substringBefore("/").let { it.startsWith("classes") && it.endsWith(".dex") }
+                    val lab = if (isCls) (if (alt) "Smali" else "Java") else (if (alt) "Quick" else "Resolved")
+                    bar.addView(pill(lab) { alt = !alt; render() }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
+                }
                 body.addView(bar, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(10) })
+                if (alt) tv.text = "Pehli baar 10-30 second lag sakte hain, ruko"
                 body.addView(tv)
                 Thread {
-                    var r = try { s.read(v) } catch (e: Throwable) { "Padh nahi paya: ${e.message}" }
+                    var r = try { if (alt) s.readAlt(v) else s.read(v) } catch (e: Throwable) { "Padh nahi paya: ${e.message}" }
                     full = r
                     if (r.length > 200_000) r = r.take(200_000) + "\n...(aage ka chhota kiya, Save mein poora milega)"
                     runOnUiThread { stopV(); tv.text = r }
@@ -1651,7 +1658,7 @@ class MainActivity : Activity() {
                             r.addView(TextView(this).apply { text = n.name; textSize = 15.5f; setTextColor(Color.WHITE) }, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
                             if (!n.dir && n.size > 0) r.addView(TextView(this).apply { text = if (n.size > 1024) "${n.size / 1024} KB" else "${n.size} B"; textSize = 12f; setTextColor(Color.parseColor("#A8A8B0")) })
                             val full = if (cur.isEmpty()) n.name else cur + "/" + n.name
-                            r.setOnClickListener { if (n.dir) { cur = full; render() } else { viewing = full; render() } }
+                            r.setOnClickListener { if (n.dir) { cur = full; render() } else { viewing = full; alt = false; render() } }
                             c.addView(r)
                         }
                         body.addView(c, LinearLayout.LayoutParams(-1, -2))
