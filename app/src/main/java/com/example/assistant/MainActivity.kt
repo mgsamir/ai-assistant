@@ -212,6 +212,9 @@ class IconView(ctx: Context) : View(ctx) {
                 c.drawArc(RectF(3f, 14f, 17f, 28f), 180f, 180f, false, p)
                 c.drawLine(19f, 4f, 19f, 9f, p); c.drawLine(16.5f, 6.5f, 21.5f, 6.5f, p)
             }
+            52 -> { p.style = Paint.Style.FILL; c.drawRoundRect(RectF(7f, 5.5f, 10.8f, 18.5f), 1.3f, 1.3f, p); c.drawRoundRect(RectF(13.2f, 5.5f, 17f, 18.5f), 1.3f, 1.3f, p); p.style = Paint.Style.STROKE }
+            53 -> { p.style = Paint.Style.FILL; c.drawPath(Path().apply { moveTo(8.5f, 5.5f); lineTo(18.5f, 12f); lineTo(8.5f, 18.5f); close() }, p); p.style = Paint.Style.STROKE }
+            54 -> { c.drawLine(12f, 5f, 12f, 18.5f, p); c.drawLine(6.5f, 13f, 12f, 18.5f, p); c.drawLine(17.5f, 13f, 12f, 18.5f, p) }
             46 -> { p.style = Paint.Style.FILL; c.drawRoundRect(RectF(6.5f, 6.5f, 17.5f, 17.5f), 2.5f, 2.5f, p); p.style = Paint.Style.STROKE }
             47 -> { c.drawLine(9f, 6f, 15f, 12f, p); c.drawLine(15f, 12f, 9f, 18f, p) }
             48 -> { c.drawCircle(12f, 12f, 8f, p); c.drawLine(4f, 12f, 20f, 12f, p); c.drawOval(RectF(8.5f, 4f, 15.5f, 20f), p) }
@@ -254,6 +257,9 @@ class MainActivity : Activity() {
     private lateinit var greet: LinearLayout
     private lateinit var glow: GlowView
     private var stoppedAt = 0L
+    private lateinit var speakFab: FrameLayout
+    private lateinit var speakIcon: IconView
+    private lateinit var jumpBtn: FrameLayout
     private var external = false
     private lateinit var recRow: LinearLayout
     private lateinit var recText: TextView
@@ -2853,9 +2859,33 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
         chatFrame.addView(greet, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER).apply { bottomMargin = dp(40) })
         chatFrame.addView(chatScroll, FrameLayout.LayoutParams(-1, -1))
+        // purane text par ho to ek tap mein sabse neeche
+        jumpBtn = FrameLayout(this).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#262626")); setStroke(dp(1), Color.parseColor("#34343A")) }
+            addView(IconView(this@MainActivity).apply { kind = 54; tint = Color.WHITE }, FrameLayout.LayoutParams(-1, -1))
+            visibility = View.GONE
+            setOnClickListener {
+                val ch = chatScroll.getChildAt(0)
+                chatScroll.smoothScrollTo(0, ((ch?.height ?: 0) - chatScroll.height).coerceAtLeast(0))
+            }
+        }
+        chatFrame.addView(jumpBtn, FrameLayout.LayoutParams(dp(44), dp(44), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(12) })
+        chatScroll.setOnScrollChangeListener { _, _, _, _, _ -> updateJump() }
+        // jab speaker se jawab sunte ho: upar gol pause / play button
+        speakIcon = IconView(this).apply { kind = 52; tint = Color.WHITE }
+        speakFab = FrameLayout(this).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#1F4BD8")) }
+            addView(speakIcon, FrameLayout.LayoutParams(-1, -1))
+            visibility = View.GONE
+            setOnClickListener {
+                val e = AssistantService.engine
+                if (e != null) { if (e.speakState == 1) e.pauseSpeech() else if (e.speakState == 2) e.resumeSpeech() }
+            }
+        }
+        chatFrame.addView(speakFab, FrameLayout.LayoutParams(dp(52), dp(52), Gravity.TOP or Gravity.END).apply { topMargin = dp(10); rightMargin = dp(4) })
         chatList.setOnHierarchyChangeListener(object : ViewGroup.OnHierarchyChangeListener {
-            override fun onChildViewAdded(p: View?, c: View?) { updateGreet() }
-            override fun onChildViewRemoved(p: View?, c: View?) { updateGreet() }
+            override fun onChildViewAdded(p: View?, c: View?) { updateGreet(); chatScroll.post { updateJump() } }
+            override fun onChildViewRemoved(p: View?, c: View?) { updateGreet(); chatScroll.post { updateJump() } }
         })
         root.addView(chatFrame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         chatFrame.post { updateGreet() }
@@ -3003,7 +3033,7 @@ class MainActivity : Activity() {
     }
 
     // ---------- bataon ke kaam ----------
-    private fun sendInput() {
+    private fun sendInput(spoken: Boolean = false) {
         var t = input.text.toString().trim()
         if (t.isEmpty() && pendAtt == null && (pendMode.isEmpty() || pendMode == "learn")) {
             openOrb()
@@ -3022,8 +3052,10 @@ class MainActivity : Activity() {
         pendAtt = null
         refreshHints()
         e.imgTag = tag
-        e.sendText(t, false, att)
+        // mic se bolkar bheja to jawab bolega; tippe hue sandesh ka jawab chup chaap likha aayega
+        e.sendText(t, spoken, att)
         input.text?.clear()
+        if (spoken) return
         input.requestFocus()
         input.post {
             input.requestFocus()
@@ -3053,6 +3085,8 @@ class MainActivity : Activity() {
             android.os.SystemClock.elapsedRealtime() - stoppedAt > 120_000L) newChat()
         stoppedAt = 0L
         attach(15)
+        AssistantService.engine?.onSpeak = { updateSpeakFab() }
+        updateSpeakFab()
         autoSecurity()
     }
 
@@ -3503,6 +3537,40 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun updateJump() {
+        if (!::jumpBtn.isInitialized) return
+        val ch = chatScroll.getChildAt(0) ?: return
+        val max = ch.height - chatScroll.height
+        val show = max > dp(300) && chatScroll.scrollY < max - dp(200)
+        if (show && jumpBtn.visibility != View.VISIBLE) {
+            jumpBtn.animate().cancel(); jumpBtn.alpha = 0f; jumpBtn.visibility = View.VISIBLE
+            jumpBtn.animate().alpha(1f).setDuration(150).start()
+        } else if (!show && jumpBtn.visibility == View.VISIBLE) {
+            jumpBtn.animate().cancel()
+            jumpBtn.animate().alpha(0f).setDuration(120).withEndAction { jumpBtn.visibility = View.GONE }.start()
+        }
+    }
+
+    private fun updateSpeakFab() {
+        if (!::speakFab.isInitialized) return
+        val st = AssistantService.engine?.speakState ?: 0
+        if (st == 0) {
+            if (speakFab.visibility == View.VISIBLE) {
+                speakFab.animate().cancel()
+                speakFab.animate().alpha(0f).scaleX(0.6f).scaleY(0.6f).setDuration(160).withEndAction { speakFab.visibility = View.GONE }.start()
+            }
+        } else {
+            speakIcon.kind = if (st == 1) 52 else 53
+            speakIcon.invalidate()
+            if (speakFab.visibility != View.VISIBLE) {
+                speakFab.animate().cancel()
+                speakFab.alpha = 0f; speakFab.scaleX = 0.6f; speakFab.scaleY = 0.6f
+                speakFab.visibility = View.VISIBLE
+                speakFab.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(180).start()
+            } else { speakFab.alpha = 1f; speakFab.scaleX = 1f; speakFab.scaleY = 1f }
+        }
+    }
+
     // khali chat par taara + salaam, aur neeche se uthti rangeen lehar
     private fun updateGreet() {
         if (!::greet.isInitialized) return
@@ -3572,7 +3640,7 @@ class MainActivity : Activity() {
         AssistantService.engine?.resumeListening()
         input.setText(t)
         input.setSelection(input.text.length)
-        if (send && t.isNotBlank()) sendInput()
+        if (send && t.isNotBlank()) sendInput(true)
     }
 
     private fun stopRec(send: Boolean) {

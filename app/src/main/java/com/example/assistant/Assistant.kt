@@ -199,7 +199,35 @@ The user is an adult. Answer questions about the human body, sex education, repr
     private var mp: android.media.MediaPlayer? = null
     @Volatile private var speakGen = 0
 
+    // bolne ki halat: 0 band, 1 chal raha, 2 ruka hua (UI mein gol pause/play button ke liye)
+    @Volatile var speakState = 0
+        private set
+    var onSpeak: (() -> Unit)? = null
+    private var spokenText: String? = null
+
+    private fun setSpeak(s: Int) {
+        if (speakState == s) return
+        speakState = s
+        main.post { onSpeak?.invoke() }
+    }
+
+    fun pauseSpeech() {
+        if (speakState != 1) return
+        val m = mp
+        if (m != null) { try { if (m.isPlaying) m.pause() } catch (e: Exception) { } }
+        else { speakGen++; try { tts.stop() } catch (e: Exception) { } }   // phone ki apni awaaz ruk nahi sakti, dobara shuru se bolegi
+        setSpeak(2)
+    }
+
+    fun resumeSpeech() {
+        if (speakState != 2) return
+        val m = mp
+        if (m != null) { try { m.start() } catch (e: Exception) { }; setSpeak(1) }
+        else { val t = spokenText; if (t != null) speak(t) else setSpeak(0) }
+    }
+
     private fun stopSpeech() {
+        setSpeak(0)
         speakGen++
         try { tts.stop() } catch (e: Exception) { }
         try { mp?.stop() } catch (e: Exception) { }
@@ -224,6 +252,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
 
     private fun speak(v: String): Boolean {
+        spokenText = v
+        setSpeak(1)
         try { val cv = Voice.cur(Usage.p); deviceVoice(cv.girl); tts.setPitch(cv.pitch) } catch (e: Exception) { }
         val gen = ++speakGen
         thread {
@@ -241,7 +271,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     val m = android.media.MediaPlayer()
                     mp = m
                     m.setDataSource(f.absolutePath)
-                    m.setOnPreparedListener { it.start(); mode(3) }
+                    m.setOnPreparedListener { if (speakState != 2) it.start(); mode(3) }
                     m.setOnCompletionListener { main.post { if (mp === it) speakDone() } }
                     m.setOnErrorListener { _, _, _ -> main.post { speakDone() }; true }
                     m.prepareAsync()
@@ -254,6 +284,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
 
     private fun speakDone() {
+        if (speakState == 2) return
+        setSpeak(0)
         busy = false
         if (convo && !muted) mode(1) else mode(0)
         if (ambient) {
