@@ -249,7 +249,7 @@ class MainActivity : Activity() {
     private lateinit var rightSlot: LinearLayout
     private lateinit var bottomRow: LinearLayout
     private lateinit var plusBtn: View
-    private lateinit var micBtn: View
+    private lateinit var composerMic: View
     private var composerExpanded = false
     private lateinit var greet: LinearLayout
     private lateinit var glow: GlowView
@@ -2932,7 +2932,7 @@ class MainActivity : Activity() {
                 }
             })
         }
-        micBtn = icon(2, 44) { startRec() }
+        composerMic = icon(2, 44) { startRec() }
         voiceBtn = icon(3, 48) { if (Act.running) AssistantService.engine?.cancelRequest() else sendInput() }
         voiceBtn.tint = Color.WHITE
         voiceBtn.background = GradientDrawable().apply {
@@ -2950,7 +2950,7 @@ class MainActivity : Activity() {
         bar.addView(inputRow, LinearLayout.LayoutParams(-1, -2))
         bar.addView(bottomRow, LinearLayout.LayoutParams(-1, -2))
         leftSlot.addView(plusBtn)
-        rightSlot.addView(micBtn)
+        rightSlot.addView(composerMic)
         rightSlot.addView(voiceBtn)
         composerV = composer
         root.addView(composer, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -3492,13 +3492,13 @@ class MainActivity : Activity() {
         if (on) {
             bottomRow.addView(plusBtn)
             bottomRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-            bottomRow.addView(micBtn)
+            bottomRow.addView(composerMic)
             bottomRow.addView(voiceBtn)
             bottomRow.visibility = View.VISIBLE
         } else {
             bottomRow.visibility = View.GONE
             leftSlot.addView(plusBtn)
-            rightSlot.addView(micBtn)
+            rightSlot.addView(composerMic)
             rightSlot.addView(voiceBtn)
         }
     }
