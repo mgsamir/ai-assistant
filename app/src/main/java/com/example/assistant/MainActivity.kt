@@ -1428,7 +1428,7 @@ class MainActivity : Activity() {
         r5.addView(IconView(this).apply { kind = 40 }, LinearLayout.LayoutParams(dp(48), dp(40)))
         r5.addView(TextView(this).apply { text = "Models"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
-        r5.setOnClickListener { dlg.dismiss(); showProviders() }
+        r5.setOnClickListener { dlg.dismiss(); showModelSettings() }
         col.addView(r5, 1)
         val r6 = LinearLayout(this)
         r6.gravity = Gravity.CENTER_VERTICAL
@@ -2460,91 +2460,74 @@ class MainActivity : Activity() {
     }
 
     // left menu ka "Models" page: provider chuno. Auto aur model list sirf usi ki.
-    private fun showProviders() {
-        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
-        val dlg = fullDlg()
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
-        val top = FrameLayout(this)
-        val back = icon(23, 40) { dlg.dismiss() }
-        back.background = oval("#1A1A1A")
-        top.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.CENTER_VERTICAL))
-        top.addView(TextView(this).apply { text = "Models"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
-        root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
-        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val free = Models.list(p).filter { it.free && !Usage.paidOnly(it) && it.cat == "chat" }
-        val cur = Models.lock(p)
-        fun colorOf(x: String) = when (x) { "gemini" -> "#4F8BFF"; "groq" -> "#F55036"; "openrouter" -> "#7C5CFF"; else -> "#6B7280" }
-        fun letterOf(x: String) = when (x) { "gemini" -> "G"; "groq" -> "Gq"; "openrouter" -> "OR"; else -> "A" }
-        fun item(prov: String, title: String, sub: String) {
-            val row = LinearLayout(this).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(14), dp(14), dp(16), dp(14))
-                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")); setStroke(dp(1), Color.parseColor(if (cur == prov) "#4F8BFF" else "#1F1F24")) }
-            }
-            val lg = provLogo(prov, 48)
-            if (lg != null) row.addView(lg, LinearLayout.LayoutParams(dp(48), dp(48)))
-            else row.addView(TextView(this).apply {
-                text = letterOf(prov); textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
-                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor(if (prov.isEmpty()) "#2A2A2A" else colorOf(prov))) }
-            }, LinearLayout.LayoutParams(dp(44), dp(44)))
-            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-            tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
-            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
-            row.addView(if (cur == prov) IconView(this).apply { kind = 42 } else View(this), LinearLayout.LayoutParams(dp(36), dp(36)))
-            row.setOnClickListener {
-                Models.setLock(p, prov)
-                refreshTitle()
-                dlg.dismiss()
-            }
-            list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-        }
-        item("", "All providers", "Auto: Gemini, Groq aur OpenRouter teeno")
-        for (prov in listOf("gemini", "groq", "openrouter")) {
-            val n = free.count { it.prov == prov }
-            item(prov, Models.provName(prov), if (n > 0) "$n free models" else "Auto: free models")
-        }
-        // Services: ye chat ke model nahi, assistant ke kaam ke tools hain (sirf dikhane ke liye)
-        list.addView(TextView(this).apply {
-            text = "SERVICES"; textSize = 13f; typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#B0B0B8")); setPadding(dp(4), dp(14), 0, dp(8))
-        })
-        fun svc(logo: String, title: String, sub: String, on: Boolean) {
-            val row = LinearLayout(this).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(14), dp(12), dp(16), dp(12))
-                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")); setStroke(dp(1), Color.parseColor("#1F1F24")) }
-            }
-            provLogo(logo, 48)?.let { row.addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
-            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-            tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
-            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
-            row.addView(TextView(this).apply {
-                text = if (on) "On" else "Off"; textSize = 13f
-                setTextColor(Color.parseColor(if (on) "#34D399" else "#8A8A92"))
-            })
-            list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-        }
-        svc("brave", "Brave Search", "Web search aur sources", Extra.brave.isNotBlank())
-        svc("elevenlabs", "ElevenLabs", "Natural awaaz (voice)", Extra.eleven.isNotBlank())
-        svc("virustotal", "VirusTotal", "App security scan", Extra.vt.isNotBlank())
-        root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
-        dlg.setContentView(root)
-        dlg.show()
-    }
-
-    private fun showModels() {
+    // upar title dabane par: sirf provider (All / Gemini / Groq / OpenRouter), har ek ka apna Auto
+    private fun showModelMenu() {
         val p = getSharedPreferences("p", Context.MODE_PRIVATE)
         val dlg = android.app.Dialog(this)
         dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         val col = LinearLayout(this)
         col.orientation = LinearLayout.VERTICAL
-        col.setPadding(dp(6), dp(10), dp(6), dp(10))
+        col.setPadding(dp(8), dp(10), dp(8), dp(10))
         val sv = ScrollView(this)
         sv.isVerticalScrollBarEnabled = false
         sv.addView(col)
         sv.background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#101010")) }
+        val cur = Models.lock(p)
+        val free = Models.list(p).filter { it.free && !Usage.paidOnly(it) && it.cat == "chat" }
+        val single = Models.sel(p, "chat")
+        fun item(prov: String, title: String, sub: String) {
+            val on = cur == prov
+            val row = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(12), dp(14), dp(12))
+                background = ActUi.ripple(this@MainActivity, dp(18))
+            }
+            val lg = provLogo(prov, 40)
+            if (lg != null) row.addView(lg, LinearLayout.LayoutParams(dp(40), dp(40)))
+            else row.addView(TextView(this).apply {
+                text = "A"; textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.parseColor("#2A2A2A")) }
+            }, LinearLayout.LayoutParams(dp(40), dp(40)))
+            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+            tx.addView(TextView(this).apply { text = sub; textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) })
+            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
+            row.addView(if (on) IconView(this).apply { kind = 42 } else View(this), LinearLayout.LayoutParams(dp(32), dp(32)))
+            row.setOnClickListener {
+                // us provider ka Auto: uske saare models apne aap badalte rahenge
+                Models.setLock(p, prov)
+                for ((k, _) in Models.CATS) Models.setSel(p, k, null)
+                refreshTitle()
+                dlg.dismiss()
+            }
+            col.addView(row, LinearLayout.LayoutParams(-1, -2))
+        }
+        item("", "Auto", "Gemini, Groq aur OpenRouter teeno")
+        for (prov in listOf("gemini", "groq", "openrouter")) {
+            val n = free.count { it.prov == prov }
+            val only = if (cur == prov && single != null && single.prov == prov) "Only: " + single.name else "Auto \u00b7 $n free models"
+            item(prov, Models.provName(prov), only)
+        }
+        dlg.setContentView(sv)
+        dlg.window?.apply {
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            setLayout((resources.displayMetrics.widthPixels * 0.80f).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
+            setGravity(Gravity.TOP or Gravity.START)
+            attributes = attributes.apply { x = dp(10); y = dp(80) }
+        }
+        dlg.show()
+    }
+
+    // menu mein "Models": Auto, Thinking level, har provider ke models (Chat / Coding / Web search / Agent) aur tools
+    private fun showModelSettings() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val dlg = fullDlg()
+        val col = LinearLayout(this)
+        col.orientation = LinearLayout.VERTICAL
+        col.setPadding(dp(2), dp(4), dp(2), dp(24))
+        val sv = ScrollView(this)
+        sv.isVerticalScrollBarEnabled = false
+        sv.addView(col)
         var thinkOpen = true
         val openProv = mutableSetOf<String>()
         val tabOf = HashMap<String, String>()
@@ -2631,6 +2614,24 @@ class MainActivity : Activity() {
                 col.addView(row("Medium", "Balanced depth", null, lv == "medium") { p.edit().putString("think", "medium").apply(); render() })
                 col.addView(row("High", "Extra thorough", null, lv == "high") { p.edit().putString("think", "high").apply(); render() })
             }
+            // Auto ke tools: Brave Search aur baaki, Auto ke saath har jagah ek saath kaam karte hain
+            col.addView(line(), LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(14), dp(6), dp(14), dp(2)) })
+            col.addView(head("AUTO TOOLS"))
+            fun svc(logo: String, title: String, sub: String, on: Boolean) {
+                val r = LinearLayout(this)
+                r.gravity = Gravity.CENTER_VERTICAL
+                r.setPadding(dp(18), dp(11), dp(18), dp(11))
+                provLogo(logo, 36)?.let { r.addView(it, LinearLayout.LayoutParams(dp(36), dp(36))) }
+                val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                tx.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
+                tx.addView(TextView(this).apply { text = sub; textSize = 13.5f; setTextColor(Color.parseColor("#B0B0B8")) })
+                r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
+                r.addView(TextView(this).apply { text = if (on) "On" else "Off"; textSize = 13f; setTextColor(Color.parseColor(if (on) "#34D399" else "#8A8A92")) })
+                col.addView(r)
+            }
+            svc("brave", "Brave Search", "Web search aur sources", Extra.brave.isNotBlank())
+            svc("elevenlabs", "ElevenLabs", "Natural awaaz (voice)", Extra.eleven.isNotBlank())
+            svc("virustotal", "VirusTotal", "App security scan", Extra.vt.isNotBlank())
             // sirf free models dikhte hain, paid sab hata diye
             for ((k, _) in Models.CATS) Models.sel(p, k)?.let { if (!it.free || Usage.paidOnly(it)) Models.setSel(p, k, null) }
             val all = Models.list(p).filter { it.free && !Usage.paidOnly(it) }
@@ -2700,13 +2701,15 @@ class MainActivity : Activity() {
             }
         }
         render()
-        dlg.setContentView(sv)
-        dlg.window?.apply {
-            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
-            setLayout((resources.displayMetrics.widthPixels * 0.86f).toInt(), (resources.displayMetrics.heightPixels * 0.78f).toInt())
-            setGravity(Gravity.TOP or Gravity.START)
-            attributes = attributes.apply { x = dp(10); y = dp(80) }
-        }
+        val pageRoot = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(14), dp(48), dp(14), dp(12)) }
+        val top = FrameLayout(this)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#1A1A1A")
+        top.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.CENTER_VERTICAL))
+        top.addView(TextView(this).apply { text = "Models"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        pageRoot.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
+        pageRoot.addView(sv, LinearLayout.LayoutParams(-1, 0, 1f))
+        dlg.setContentView(pageRoot)
         dlg.show()
         if (Models.stale(p)) {
             val key = Keys.get(p)
@@ -2815,12 +2818,12 @@ class MainActivity : Activity() {
             setTextColor(Color.parseColor("#F2F2F2"))
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
-            setOnClickListener { showModels() }
+            setOnClickListener { showModelMenu() }
         }
         titleV = title
         refreshTitle()
         header.addView(title, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(12) })
-        header.addView(IconView(this).apply { kind = 43; tint = Color.parseColor("#B0B0B8"); setOnClickListener { showModels() } }, LinearLayout.LayoutParams(dp(30), dp(30)))
+        header.addView(IconView(this).apply { kind = 43; tint = Color.parseColor("#B0B0B8"); setOnClickListener { showModelMenu() } }, LinearLayout.LayoutParams(dp(30), dp(30)))
         header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         val avatar = TextView(this).apply {
             text = "S"
