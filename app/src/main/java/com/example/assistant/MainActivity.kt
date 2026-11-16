@@ -257,6 +257,9 @@ class MainActivity : Activity() {
     private lateinit var greet: LinearLayout
     private lateinit var glow: GlowView
     private var stoppedAt = 0L
+    private var imeVisible = false
+    private var kbWasOpen = false
+    private lateinit var kbAnchor: EditText
     private lateinit var speakFab: FrameLayout
     private lateinit var speakIcon: IconView
     private lateinit var jumpBtn: FrameLayout
@@ -2843,7 +2846,6 @@ class MainActivity : Activity() {
         }
         val chatFrame = FrameLayout(this)
         glow = GlowView(this)
-        chatFrame.addView(glow, FrameLayout.LayoutParams(-1, -1))
         greet = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -2941,6 +2943,21 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { leftMargin = dp(8) })
         }
         composer.addView(recRow, LinearLayout.LayoutParams(-1, -2))
+        // bolte samay keyboard khula rakhne ke liye ek anokha chhota dabba (dikhta nahi) jis par focus tik jaata hai
+        kbAnchor = EditText(this).apply {
+            background = null
+            alpha = 0f
+            isCursorVisible = false
+            setPadding(0, 0, 0, 0)
+            inputType = InputType.TYPE_CLASS_TEXT
+            imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: Editable?) { if (!s.isNullOrEmpty()) s.clear() }
+            })
+        }
+        composer.addView(kbAnchor, LinearLayout.LayoutParams(dp(1), dp(1)))
         plusBtn = icon(1, 44) { showPlus() }
         input = EditText(this).apply {
             hint = "Ask AI"
@@ -3007,6 +3024,7 @@ class MainActivity : Activity() {
                 left = ins.systemWindowInsetLeft
                 right = ins.systemWindowInsetRight
             }
+            imeVisible = if (Build.VERSION.SDK_INT >= 30) ins.isVisible(WindowInsets.Type.ime()) else (ins.systemWindowInsetBottom > dp(160))
             v.setPadding(left + dp(16), top, right + dp(16), bottom)
             ins
         }
@@ -3015,6 +3033,7 @@ class MainActivity : Activity() {
         setContentView(FrameLayout(this).apply {
             addView(root, FrameLayout.LayoutParams(-1, -1))
             addView(buildOrbScreen(), FrameLayout.LayoutParams(-1, -1))
+            addView(glow, FrameLayout.LayoutParams(-1, -1))
         })
         root.requestApplyInsets()
 
@@ -3611,7 +3630,10 @@ class MainActivity : Activity() {
         }
         val e = AssistantService.engine
         e?.pauseListening()
-        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(input.windowToken, 0)
+        // keyboard khula ho to khula hi rahe (focus us chhote dabbe par chala jaata hai), band ho to band hi rahe
+        kbWasOpen = imeVisible
+        if (kbWasOpen) kbAnchor.requestFocus()
+        else (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(input.windowToken, 0)
         // Groq key ho to ek hi mic stream (nishaan jalta-bujhta nahi), warna phone ki speech service
         val d: Dict = if (Extra.groq.isNotBlank()) (dictNew ?: WhisperDictation(this).also { dictNew = it })
                       else (dictOld ?: Dictation(this).also { dictOld = it })
@@ -3630,6 +3652,13 @@ class MainActivity : Activity() {
         if (!ok) { e?.resumeListening(); return }
         recOn = true
         showRec(true)
+        if (kbWasOpen) kbAnchor.post { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(kbAnchor, 0) }
+    }
+
+    private fun restoreKb() {
+        if (!kbWasOpen) return
+        input.requestFocus()
+        input.post { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(input, 0) }
     }
 
     // text input mein rakh do (ya seedha bhej do) aur normal bar wapas
@@ -3637,6 +3666,7 @@ class MainActivity : Activity() {
         if (!recOn) return
         recOn = false
         showRec(false)
+        restoreKb()
         AssistantService.engine?.resumeListening()
         input.setText(t)
         input.setSelection(input.text.length)
@@ -3654,6 +3684,7 @@ class MainActivity : Activity() {
         dict?.cancel()
         recOn = false
         showRec(false)
+        restoreKb()
         AssistantService.engine?.resumeListening()
     }
 

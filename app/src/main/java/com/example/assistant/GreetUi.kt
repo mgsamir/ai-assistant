@@ -62,29 +62,28 @@ class GlowView(ctx: Context) : View(ctx) {
     override fun onDraw(c: Canvas) {
         if (!running) return
         val t = (SystemClock.uptimeMillis() - t0) / 1000f
-        if (t > 3.2f) { running = false; return }
-        val env = when {
-            t < 0.9f -> t / 0.9f
-            t < 1.8f -> 1f
-            else -> max(0f, 1f - (t - 1.8f) / 1.4f)
-        }
+        if (t > 3.4f) { running = false; return }
         val d = resources.displayMetrics.density
-        val gap = 9f * d
-        val cols = (width / gap).toInt() + 1
-        val rows = 20
-        val zone = height * 0.36f
-        val rowH = zone / rows
-        for (i in 0 until cols) {
-            val fx = i / max(1f, (cols - 1).toFloat())
+        // chaudai: dono kinaron tak poori (pehli aur aakhri bindi theek kinare par)
+        val cols = max(8, (width / (9f * d)).toInt())
+        val gx = width.toFloat() / cols
+        val rows = max(10, (height / (9f * d)).toInt())
+        val gy = height.toFloat() / rows
+        val rise = min(1f, t / 1.7f)                              // lehar neeche se upar tak badhti hai
+        val fade = 1f - min(1f, max(0f, (t - 1.9f) / 1.4f))       // phir poori ghul jaati hai
+        for (i in 0..cols) {
+            val fx = i / cols.toFloat()
             val col = if (fx < 0.5f) mix(pink, purple, fx * 2f) else mix(purple, blue, (fx - 0.5f) * 2f)
-            val wave = 0.5f + 0.5f * sin(i * 0.33f + t * 3.2f)
-            for (j in 0 until rows) {
-                val fy = j / rows.toFloat()
-                val a = (1f - fy * (1.25f - 0.55f * wave)) * env
-                if (a <= 0.03f) continue
+            for (j in 0..rows) {
+                val fy = j / rows.toFloat()                           // 0 neeche, 1 upar
+                val reach = ((rise * 1.15f - fy) / 0.22f).coerceIn(0f, 1f)
+                val base = (1f - fy) * (1f - fy * 0.35f)
+                val wave = 0.62f + 0.38f * sin(i * 0.33f + j * 0.17f + t * 3.4f)
+                val a = reach * base * wave * fade
+                if (a <= 0.02f) continue
                 p.color = col
-                p.alpha = (a * 200f).toInt().coerceIn(0, 255)
-                c.drawCircle(i * gap + gap / 2f, height - (j + 0.5f) * rowH, d * (0.9f + 1.5f * a), p)
+                p.alpha = (a * 215f).toInt().coerceIn(0, 255)
+                c.drawCircle(i * gx, height - j * gy, d * (0.8f + 1.7f * a), p)
             }
         }
         postInvalidateOnAnimation()
