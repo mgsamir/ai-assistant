@@ -118,10 +118,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
 
     init {
         Usage.p = prefs
-        // ek chat = ek file: app dobara khulne par bhi wahi chat jaari rahe, jab tak "New chat" na dabao
-        try {
-            Chats.get(prefs, Chats.cur(prefs))?.let { loadChat(it.log) }
-        } catch (e: Exception) { }
+        // app naya khulte hi fresh (khali) page; purani chats Chat history mein rehti hain
+        try { Chats.setCur(prefs, "") } catch (e: Exception) { }
         // Hamesha sunne wala mode band hai. Mic sirf button dabane par sunta hai.
         ambient = false
         prefs.edit().putBoolean("ambient", false).apply()

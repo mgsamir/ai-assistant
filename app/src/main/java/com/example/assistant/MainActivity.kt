@@ -244,6 +244,17 @@ class MainActivity : Activity() {
     private var pending: View? = null
     private var pendTitle: ShimmerText? = null
     private lateinit var barV: LinearLayout
+    private lateinit var composerV: LinearLayout
+    private lateinit var leftSlot: LinearLayout
+    private lateinit var rightSlot: LinearLayout
+    private lateinit var bottomRow: LinearLayout
+    private lateinit var plusBtn: View
+    private lateinit var micBtn: View
+    private var composerExpanded = false
+    private lateinit var greet: LinearLayout
+    private lateinit var glow: GlowView
+    private var stoppedAt = 0L
+    private var external = false
     private lateinit var recRow: LinearLayout
     private lateinit var recText: TextView
     private lateinit var recScroll: MaxHeightScroll
@@ -1024,6 +1035,7 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onActivityResult(rq: Int, rs: Int, d: Intent?) {
         super.onActivityResult(rq, rs, d)
+        external = false
         if (rs != RESULT_OK) {
             if (rq == 102) camUri?.let { try { contentResolver.delete(it, null, null) } catch (e: Exception) { } }
             return
@@ -2823,13 +2835,33 @@ class MainActivity : Activity() {
             isVerticalScrollBarEnabled = false
             addView(chatList, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
-        root.addView(chatScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val chatFrame = FrameLayout(this)
+        glow = GlowView(this)
+        chatFrame.addView(glow, FrameLayout.LayoutParams(-1, -1))
+        greet = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            visibility = View.GONE
+        }
+        greet.addView(SparkleView(this), LinearLayout.LayoutParams(dp(46), dp(46)))
+        greet.addView(TextView(this).apply {
+            text = "Hi, how can I help you?"
+            textSize = 26f
+            setTextColor(Color.parseColor("#ECECF0"))
+            gravity = Gravity.CENTER
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
+        chatFrame.addView(greet, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER).apply { bottomMargin = dp(40) })
+        chatFrame.addView(chatScroll, FrameLayout.LayoutParams(-1, -1))
+        chatList.setOnHierarchyChangeListener(object : ViewGroup.OnHierarchyChangeListener {
+            override fun onChildViewAdded(p: View?, c: View?) { updateGreet() }
+            override fun onChildViewRemoved(p: View?, c: View?) { updateGreet() }
+        })
+        root.addView(chatFrame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        chatFrame.post { updateGreet() }
 
         // ---------- neeche ka message bar ----------
-        val bar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
+        val bar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         barV = bar
         chipRow = LinearLayout(this).apply { visibility = View.GONE }
         pillRow = LinearLayout(this).apply { visibility = View.GONE }
@@ -2879,7 +2911,7 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { leftMargin = dp(8) })
         }
         composer.addView(recRow, LinearLayout.LayoutParams(-1, -2))
-        bar.addView(icon(1, 44) { showPlus() })
+        plusBtn = icon(1, 44) { showPlus() }
         input = EditText(this).apply {
             hint = "Ask AI"
             setHintTextColor(Color.parseColor("#9A9AA2"))
@@ -2896,18 +2928,31 @@ class MainActivity : Activity() {
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun afterTextChanged(s: Editable?) {
                     refreshVoiceBtn()
+                    input.post { updateComposerMode() }
                 }
             })
         }
-        bar.addView(input, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        bar.addView(icon(2, 44) { startRec() })
+        micBtn = icon(2, 44) { startRec() }
         voiceBtn = icon(3, 48) { if (Act.running) AssistantService.engine?.cancelRequest() else sendInput() }
         voiceBtn.tint = Color.WHITE
         voiceBtn.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.parseColor("#4F8BFF"))
         }
-        bar.addView(voiceBtn)
+        // input apni jagah par rehta hai (keyboard nahi hilta); plus / mic / send ek hi jagah: ek line mein side par, lambe text mein neeche ki patti mein
+        leftSlot = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        rightSlot = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        bottomRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; visibility = View.GONE }
+        val inputRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        inputRow.addView(leftSlot, LinearLayout.LayoutParams(-2, -2))
+        inputRow.addView(input, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        inputRow.addView(rightSlot, LinearLayout.LayoutParams(-2, -2))
+        bar.addView(inputRow, LinearLayout.LayoutParams(-1, -2))
+        bar.addView(bottomRow, LinearLayout.LayoutParams(-1, -2))
+        leftSlot.addView(plusBtn)
+        rightSlot.addView(micBtn)
+        rightSlot.addView(voiceBtn)
+        composerV = composer
         root.addView(composer, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = dp(14)
             topMargin = dp(10)
@@ -3003,6 +3048,10 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        // kuch der baad app dobara kholo to fresh page (purani chat history mein rehti hai)
+        if (stoppedAt > 0L && !external && !Act.running && !recOn && ::chatList.isInitialized && chatList.childCount > 0 &&
+            android.os.SystemClock.elapsedRealtime() - stoppedAt > 120_000L) newChat()
+        stoppedAt = 0L
         attach(15)
         autoSecurity()
     }
@@ -3062,7 +3111,13 @@ class MainActivity : Activity() {
 
     override fun onStop() {
         AssistantService.engine?.listeners?.remove(cb)
+        stoppedAt = android.os.SystemClock.elapsedRealtime()
         super.onStop()
+    }
+
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        external = true
+        super.startActivityForResult(intent, requestCode, options)
     }
 
     override fun onDestroy() {
@@ -3417,6 +3472,52 @@ class MainActivity : Activity() {
 
     override fun onBackPressed() {
         if (orbScreen.visibility == View.VISIBLE) closeOrb() else super.onBackPressed()
+    }
+
+    // ---------- likhne ka bar: lamba text hone par plus / mic / send neeche ki patti mein (ChatGPT jaisa) ----------
+    private fun updateComposerMode() {
+        if (!::input.isInitialized || !::bottomRow.isInitialized) return
+        val blank = input.text.isNullOrBlank()
+        if (!composerExpanded && input.lineCount >= 2) setComposerExpanded(true)
+        else if (composerExpanded && blank) setComposerExpanded(false)
+    }
+
+    private fun setComposerExpanded(on: Boolean) {
+        if (on == composerExpanded) return
+        composerExpanded = on
+        try {
+            android.transition.TransitionManager.beginDelayedTransition(composerV, android.transition.AutoTransition().setDuration(150))
+        } catch (e: Throwable) { }
+        leftSlot.removeAllViews(); rightSlot.removeAllViews(); bottomRow.removeAllViews()
+        if (on) {
+            bottomRow.addView(plusBtn)
+            bottomRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+            bottomRow.addView(micBtn)
+            bottomRow.addView(voiceBtn)
+            bottomRow.visibility = View.VISIBLE
+        } else {
+            bottomRow.visibility = View.GONE
+            leftSlot.addView(plusBtn)
+            rightSlot.addView(micBtn)
+            rightSlot.addView(voiceBtn)
+        }
+    }
+
+    // khali chat par taara + salaam, aur neeche se uthti rangeen lehar
+    private fun updateGreet() {
+        if (!::greet.isInitialized) return
+        val empty = chatList.childCount == 0
+        if (empty && greet.visibility != View.VISIBLE) {
+            greet.animate().cancel()
+            greet.alpha = 0f
+            greet.translationY = dp(16).toFloat()
+            greet.visibility = View.VISIBLE
+            greet.animate().alpha(1f).translationY(0f).setStartDelay(450).setDuration(650).start()
+            glow.start()
+        } else if (!empty && greet.visibility == View.VISIBLE) {
+            greet.animate().cancel()
+            greet.animate().alpha(0f).setStartDelay(0).setDuration(150).withEndAction { greet.visibility = View.GONE }.start()
+        }
     }
 
     // ---------- mic se likhwana ----------
