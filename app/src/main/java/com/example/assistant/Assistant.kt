@@ -702,6 +702,24 @@ The user is an adult. Answer questions about the human body, sex education, repr
         }
     }
 
+    // Groq / OpenRouter / free models ke paas functions nahi hote: unhe saaf bolo ki tool_call mat likhna
+    private fun systemNoTools(): String = systemText() +
+        "\n\nIMPORTANT: In this mode you have NO tools or functions. Never write <tool_call>, <arg_key>, function-call markup or any tags. " +
+        "Answer directly in plain text. If you are not sure about live facts (prices, scores, market, news), say that briefly instead of calling a tool."
+
+    // phir bhi kisi model ne <tool_call> text likh diya to: web_search ho to khud search karke jawab do, warna tag hata do
+    private fun toolFix(raw: String, q: String): Reply? {
+        if (!raw.contains("tool_call", true) && !raw.contains("<arg_value>", true)) return null
+        val name = Regex("<tool_call>\\s*([A-Za-z_]+)").find(raw)?.groupValues?.get(1) ?: ""
+        val arg = Regex("<arg_value>(.*?)</arg_value>", RegexOption.DOT_MATCHES_ALL).find(raw)?.groupValues?.get(1)?.trim() ?: ""
+        if (name == "web_search" || name.isEmpty()) {
+            val query = if (arg.isNotBlank()) arg else q
+            return webAnswer(Keys.get(prefs), query)
+        }
+        val clean = raw.replace(Regex("<tool_call>.*?</tool_call>", RegexOption.DOT_MATCHES_ALL), "").replace(Regex("</?[A-Za-z_]+>"), "").trim()
+        return if (clean.isNotBlank()) parseReply(clean) else Reply("Ye kaam is mode mein nahi ho sakta.", "यह काम इस मोड में नहीं हो सकता।")
+    }
+
     private fun systemText(): String {
         val mem = if (personal) loadMem() else emptyList()
         val now = java.text.SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", Locale.ENGLISH).format(java.util.Date())
@@ -1033,11 +1051,12 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 if (lock.isNotEmpty() && lock != "gemini" && att == null) {
                     var txtL: String? = null
                     val stL = Act.begin(3, "Asking " + Models.provName(lock) + " models", "Only " + Models.provName(lock) + " is allowed (chosen in Models)\n\nPrompt:\n" + q.take(400))
-                    if (pick != null) txtL = Providers.chatWith(pick.prov, pick.id, systemText(), history.takeLast(6), q)?.also { answeredBy = pick.name }
-                    if (txtL == null) txtL = Providers.fallback(systemText(), history.takeLast(6), q, lock)?.also { answeredBy = Models.list(prefs).firstOrNull { m -> m.id == Providers.lastModel }?.name ?: Providers.lastModel }
+                    if (pick != null) txtL = Providers.chatWith(pick.prov, pick.id, systemNoTools(), history.takeLast(6), q)?.also { answeredBy = pick.name }
+                    if (txtL == null) txtL = Providers.fallback(systemNoTools(), history.takeLast(6), q, lock)?.also { answeredBy = Models.list(prefs).firstOrNull { m -> m.id == Providers.lastModel }?.name ?: Providers.lastModel }
                     if (txtL != null) Act.ok(stL, "Answered by " + answeredBy, txtL.take(700)) else Act.fail(stL, "No answer", "")
                     if (txtL != null) {
-                        postG(g) { deliver(parseReply(txtL), q, true) }
+                        val repL = toolFix(txtL, q) ?: parseReply(txtL)
+                        postG(g) { deliver(repL, q, true) }
                     } else {
                         postG(g) {
                             mode(0)
@@ -1051,11 +1070,12 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 fun nameOf(id: String) = Models.list(prefs).firstOrNull { it.id == id }?.name ?: id
                 if (pick != null && pick.prov != "gemini" && att == null) {
                     val stP = Act.begin(3, "Asking " + pick.name, "Provider: " + pick.prov + "\nModel: " + pick.id + "\n\nPrompt:\n" + q.take(400))
-                    val txt = Providers.chatWith(pick.prov, pick.id, systemText(), history.takeLast(6), q)
+                    val txt = Providers.chatWith(pick.prov, pick.id, systemNoTools(), history.takeLast(6), q)
                     if (txt != null) Act.ok(stP, "Answered", txt.take(700)) else Act.fail(stP, "No answer, trying the next model", "")
                     if (txt != null) {
                         answeredBy = pick.name
-                        postG(g) { deliver(parseReply(txt), q, true) }
+                        val repP = toolFix(txt, q) ?: parseReply(txt)
+                        postG(g) { deliver(repP, q, true) }
                         return@thread
                     }
                 }
@@ -1114,11 +1134,12 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 if (code != 200) {
                     // photo ke saath sawal ho to dusra (photo na dekh sakne wala) model jawab na de
                     val stF = if (lock == "gemini" || att != null) null else Act.begin(3, "Trying backup models", "Groq and OpenRouter free models\n\nPrompt:\n" + q.take(400))
-                    val fb = if (lock == "gemini" || att != null) null else Providers.fallback(systemText(), history.takeLast(6), q)
+                    val fb = if (lock == "gemini" || att != null) null else Providers.fallback(systemNoTools(), history.takeLast(6), q)
                     if (stF != null) { if (fb != null) Act.ok(stF, "Answered by " + Providers.lastModel, fb.take(700)) else Act.fail(stF, "No backup model answered", "") }
                     if (fb != null) {
                         answeredBy = nameOf(Providers.lastModel)
-                        postG(g) { deliver(parseReply(fb), q, true) }
+                        val repF = toolFix(fb, q) ?: parseReply(fb)
+                        postG(g) { deliver(repF, q, true) }
                         return@thread
                     }
                     val er = apiError(code, resp)

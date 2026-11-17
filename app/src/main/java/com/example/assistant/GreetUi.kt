@@ -41,6 +41,11 @@ class SparkleView(ctx: Context) : View(ctx) {
     }
 }
 
+// glow kab chale: sirf phone mein app ke naye khulne par ya "New chat" dabane par, baar-baar nahi
+object GlowGate {
+    @Volatile var armed = true
+}
+
 // Khulte hi neeche se uthti rangeen bindiyon ki lehar (Gemini jaisi), kuch second mein ghul jaati hai
 class GlowView(ctx: Context) : View(ctx) {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)

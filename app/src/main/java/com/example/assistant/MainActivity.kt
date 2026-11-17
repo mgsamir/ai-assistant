@@ -657,6 +657,7 @@ class MainActivity : Activity() {
     // naya chat shuru: purana chat history mein pehle se save hai
     private fun newChat() {
         val eng = AssistantService.engine ?: return
+        GlowGate.armed = true
         Chats.setCur(getSharedPreferences("p", Context.MODE_PRIVATE), "")
         eng.loadChat("")
         rebuildChat("")
@@ -2795,8 +2796,7 @@ class MainActivity : Activity() {
             if (Build.VERSION.SDK_INT >= 30) WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
             else WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val mainBg = View(this).apply {
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(
@@ -2806,6 +2806,7 @@ class MainActivity : Activity() {
                     Color.parseColor("#030624"),
                     Color.parseColor("#0A1650")))
         }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         // ---------- upar ki patti ----------
         val header = LinearLayout(this).apply {
@@ -2893,7 +2894,7 @@ class MainActivity : Activity() {
             override fun onChildViewRemoved(p: View?, c: View?) { updateGreet(); chatScroll.post { updateJump() } }
         })
         root.addView(chatFrame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        chatFrame.post { updateGreet() }
+        chatFrame.postDelayed({ updateGreet() }, 180)
 
         // ---------- neeche ka message bar ----------
         val bar = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -2990,10 +2991,10 @@ class MainActivity : Activity() {
             setColor(Color.parseColor("#4F8BFF"))
         }
         // input apni jagah par rehta hai (keyboard nahi hilta); plus / mic / send ek hi jagah: ek line mein side par, lambe text mein neeche ki patti mein
-        leftSlot = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        rightSlot = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        leftSlot = LinearLayout(this).apply { gravity = Gravity.BOTTOM }
+        rightSlot = LinearLayout(this).apply { gravity = Gravity.BOTTOM }
         bottomRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; visibility = View.GONE }
-        val inputRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        val inputRow = LinearLayout(this).apply { gravity = Gravity.BOTTOM }
         inputRow.addView(leftSlot, LinearLayout.LayoutParams(-2, -2))
         inputRow.addView(input, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         inputRow.addView(rightSlot, LinearLayout.LayoutParams(-2, -2))
@@ -3033,10 +3034,12 @@ class MainActivity : Activity() {
         }
 
         Act.onChange = { onActChange() }
+        // peeche se aage: rang, glow (sabse peeche chalta hai), phir chat / likhne ka bar, phir orb
         setContentView(FrameLayout(this).apply {
+            addView(mainBg, FrameLayout.LayoutParams(-1, -1))
+            addView(glow, FrameLayout.LayoutParams(-1, -1))
             addView(root, FrameLayout.LayoutParams(-1, -1))
             addView(buildOrbScreen(), FrameLayout.LayoutParams(-1, -1))
-            addView(glow, FrameLayout.LayoutParams(-1, -1))
         })
         root.requestApplyInsets()
 
@@ -3532,6 +3535,8 @@ class MainActivity : Activity() {
 
     // ---------- likhne ka bar: lamba text hone par plus / mic / send neeche ki patti mein (ChatGPT jaisa) ----------
     private fun updateComposerMode() {
+        // bar ab hilta nahi: plus / mic / send hamesha neeche ki line mein, text upar ki taraf badhta hai
+        if (true) return
         if (!::input.isInitialized || !::bottomRow.isInitialized) return
         val blank = input.text.isNullOrBlank()
         if (!composerExpanded && input.lineCount >= 2) setComposerExpanded(true)
@@ -3603,7 +3608,7 @@ class MainActivity : Activity() {
             greet.translationY = dp(16).toFloat()
             greet.visibility = View.VISIBLE
             greet.animate().alpha(1f).translationY(0f).setStartDelay(450).setDuration(650).start()
-            glow.start()
+            if (GlowGate.armed) { GlowGate.armed = false; glow.start() }
         } else if (!empty && greet.visibility == View.VISIBLE) {
             greet.animate().cancel()
             greet.animate().alpha(0f).setStartDelay(0).setDuration(150).withEndAction { greet.visibility = View.GONE }.start()
