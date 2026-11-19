@@ -708,12 +708,39 @@ The user is an adult. Answer questions about the human body, sex education, repr
         "Answer directly in plain text. If you are not sure about live facts (prices, scores, market, news), say that briefly instead of calling a tool."
 
     // phir bhi kisi model ne <tool_call> text likh diya to: web_search ho to khud search karke jawab do, warna tag hata do
+    private fun hasToolMarkup(s: String) =
+        s.contains("tool_call", true) || s.contains("<arg_key>", true) || s.contains("<arg_value>", true)
+
+    // model ne jo tool-call ka markup likha use hatao; kuch bacha na ho to null
+    private fun stripToolMarkup(s: String): String = s
+        .replace(Regex("<tool_call>.*?(</tool_call>|$)", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), "")
+        .replace(Regex("</?(arg_key|arg_value|tool_call|tool_response|function_call)>", RegexOption.IGNORE_CASE), "")
+        .trim()
+
+    // model ka jawab tabhi lo jab usme tool-call text na ho
+    private fun safeReply(t: String?): Reply? {
+        if (t == null) return null
+        if (!hasToolMarkup(t)) return parseReply(t)
+        return null
+    }
+
+    private fun todayStr(): String = java.text.SimpleDateFormat("d MMMM yyyy", Locale.ENGLISH).format(java.util.Date())
+
+    // model apne andaze se purani/galat tareekh daal deta hai: search query mein aaj ki asli tareekh lagao
+    private fun fixQueryDate(qy: String): String {
+        val months = "January|February|March|April|May|June|July|August|September|October|November|December"
+        val d1 = Regex("\\b\\d{1,2}\\s+($months)\\s+\\d{4}\\b", RegexOption.IGNORE_CASE)
+        val d2 = Regex("\\b($months)\\s+\\d{1,2},?\\s+\\d{4}\\b", RegexOption.IGNORE_CASE)
+        if (!d1.containsMatchIn(qy) && !d2.containsMatchIn(qy)) return qy
+        return qy.replace(d1, todayStr()).replace(d2, todayStr())
+    }
+
     private fun toolFix(raw: String, q: String): Reply? {
         if (!raw.contains("tool_call", true) && !raw.contains("<arg_value>", true)) return null
         val name = Regex("<tool_call>\\s*([A-Za-z_]+)").find(raw)?.groupValues?.get(1) ?: ""
         val arg = Regex("<arg_value>(.*?)</arg_value>", RegexOption.DOT_MATCHES_ALL).find(raw)?.groupValues?.get(1)?.trim() ?: ""
         if (name == "web_search" || name.isEmpty()) {
-            val query = if (arg.isNotBlank()) arg else q
+            val query = if (arg.isNotBlank()) fixQueryDate(arg) else q
             return webAnswer(Keys.get(prefs), query)
         }
         val clean = raw.replace(Regex("<tool_call>.*?</tool_call>", RegexOption.DOT_MATCHES_ALL), "").replace(Regex("</?[A-Za-z_]+>"), "").trim()
@@ -840,24 +867,25 @@ The user is an adult. Answer questions about the human body, sex education, repr
         if (lockW.isNotEmpty() && lockW != "gemini") {
             // sirf chuna hua provider: Brave ke natije us provider ko do
             if (brave != null) {
-                val sysL = "Answer the question using ONLY these search results. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences." 
-                Providers.fallback(sysL, emptyList(), q + "\n\nSearch results:\n" + brave, lockW)?.let { return fin(sW, parseReply(it)) }
+                val sysL = "Answer the question using ONLY these search results. Today's date is " + todayStr() + ". You have no tools: never write <tool_call> or any tags. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences."
+                safeReply(Providers.fallback(sysL, emptyList(), q + "\n\nSearch results:\n" + brave, lockW))?.let { return fin(sW, it) }
             }
             return fin(sW, Reply("Search nahi chala (" + Models.provName(lockW) + "). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।"), false)
         }
         val ws = Models.sel(prefs, "web")
         if (ws != null && ws.prov != "gemini") {
-            val t = Providers.chatWith(ws.prov, ws.id,
-                "Search the internet and answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 2 to 6 short sentences.",
-                emptyList(), q)
-            if (t != null) return fin(sW, parseReply(t))
+            val noTools = " Today's date is " + todayStr() + ". You have no tools or internet access here: never write <tool_call> or any tags. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 2 to 6 short sentences."
+            val t = if (brave != null)
+                Providers.chatWith(ws.prov, ws.id, "Answer the question using ONLY these search results." + noTools, emptyList(), q + "\n\nSearch results:\n" + brave)
+            else
+                Providers.chatWith(ws.prov, ws.id, "Answer the question. If you are not sure about live facts (market, scores, news), say so briefly." + noTools, emptyList(), q)
+            safeReply(t)?.let { return fin(sW, it) }
         }
         val raw = WebSearch.ask(key, q, if (ws != null && ws.prov == "gemini") listOf(ws.id) else emptyList(), brave)
-        if (raw != null) return fin(sW, parseReply(raw))
+        safeReply(raw)?.let { return fin(sW, it) }
         if (brave != null && lockW != "gemini") {
-            val sys = "Answer the question using ONLY these search results. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences." 
-            val fb = Providers.fallback(sys, emptyList(), q + "\n\nSearch results:\n" + brave)
-            if (fb != null) return fin(sW, parseReply(fb))
+            val sys = "Answer the question using ONLY these search results. Today's date is " + todayStr() + ". You have no tools: never write <tool_call> or any tags. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences."
+            safeReply(Providers.fallback(sys, emptyList(), q + "\n\nSearch results:\n" + brave))?.let { return fin(sW, it) }
         }
         val why = WebSearch.lastErr.ifBlank { "pata nahi" }
         return fin(sW, Reply("Search nahi chala ($why). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।"), false)
