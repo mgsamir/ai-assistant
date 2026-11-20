@@ -34,8 +34,10 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.net.Uri
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -258,6 +260,8 @@ class MainActivity : Activity() {
     private lateinit var glow: GlowView
     // khulte waqt ek ke baad ek ubharne wala intro (Gemini jaisa)
     private var headerV: View? = null
+    private var avatarImg: ImageView? = null
+    private var avatarTxtV: TextView? = null
     private var mainBgV: View? = null
     private var introHidden = false
     private var stoppedAt = 0L
@@ -1020,7 +1024,7 @@ class MainActivity : Activity() {
     private fun pick(code: Int) {
         try {
             val i = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE)
-                .setType(if (code == 101) "image/*" else "*/*")
+                .setType(if (code == 101 || code == 105) "image/*" else "*/*")
             startActivityForResult(i, code)
         } catch (e: Exception) {
             Toast.makeText(this, "Ye khul nahi paaya", Toast.LENGTH_SHORT).show()
@@ -1058,6 +1062,7 @@ class MainActivity : Activity() {
             try {
                 when (rq) {
                     101, 103 -> d?.data?.let { readPicked(it) }
+                    105 -> d?.data?.let { saveProfile(it) }
                     104 -> d?.data?.let { u ->
                         var nm = "app"
                         contentResolver.query(u, null, null, null, null)?.use { c ->
@@ -1077,6 +1082,41 @@ class MainActivity : Activity() {
             } catch (e: Exception) {
                 runOnUiThread { Toast.makeText(this, "Ye file nahi khul paayi", Toast.LENGTH_SHORT).show() }
             }
+        }
+    }
+
+    // gallery se chuni photo: chhoti karke vargakar kaato aur ek file mein rakho
+    private fun saveProfile(u: Uri) {
+        var bm: android.graphics.Bitmap? = null
+        if (Build.VERSION.SDK_INT >= 28) {
+            bm = android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(contentResolver, u)) { dec, info, _ ->
+                dec.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+                val m = maxOf(info.size.width, info.size.height)
+                if (m > 1024) dec.setTargetSampleSize((m / 1024).coerceAtLeast(1))
+            }
+        } else {
+            val o = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
+            contentResolver.openInputStream(u)?.use { bm = android.graphics.BitmapFactory.decodeStream(it, null, o) }
+        }
+        val src = bm ?: return
+        val side = minOf(src.width, src.height)
+        val sq = android.graphics.Bitmap.createBitmap(src, (src.width - side) / 2, (src.height - side) / 2, side, side)
+        val out = android.graphics.Bitmap.createScaledBitmap(sq, 512, 512, true)
+        java.io.File(filesDir, "profile.jpg").outputStream().use { out.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+        runOnUiThread { showProfile() }
+    }
+
+    private fun showProfile() {
+        val f = java.io.File(filesDir, "profile.jpg")
+        val img = avatarImg ?: return
+        if (f.exists()) {
+            img.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.absolutePath))
+            img.visibility = View.VISIBLE
+            avatarTxtV?.visibility = View.GONE
+        } else {
+            img.setImageDrawable(null)
+            img.visibility = View.GONE
+            avatarTxtV?.visibility = View.VISIBLE
         }
     }
 
@@ -2823,18 +2863,43 @@ class MainActivity : Activity() {
         header.addView(title, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(12) })
         header.addView(IconView(this).apply { kind = 43; tint = Color.parseColor("#B0B0B8"); setOnClickListener { showModelMenu() } }, LinearLayout.LayoutParams(dp(30), dp(30)))
         header.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        val avatar = TextView(this).apply {
+        // profile gol: photo ho to photo, warna "S"; dabane par sirf gallery se photo chunna (camera nahi)
+        val avatarTxt = TextView(this).apply {
             text = "S"
             textSize = 15f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
+        }
+        avatarImg = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            visibility = View.GONE
+        }
+        val avatar = FrameLayout(this).apply {
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
                 intArrayOf(Color.parseColor("#4F8BFF"), Color.parseColor("#7C5CFF"))).apply {
                 shape = GradientDrawable.OVAL
             }
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(v: View, o: android.graphics.Outline) { o.setOval(0, 0, v.width, v.height) }
+            }
+            clipToOutline = true
+            addView(avatarTxt, FrameLayout.LayoutParams(-1, -1))
+            addView(avatarImg, FrameLayout.LayoutParams(-1, -1))
+            setOnClickListener {
+                val pm = android.widget.PopupMenu(this@MainActivity, this)
+                pm.menu.add(0, 1, 0, "Gallery se photo chuno")
+                if (java.io.File(filesDir, "profile.jpg").exists()) pm.menu.add(0, 2, 1, "Photo hatao")
+                pm.setOnMenuItemClickListener {
+                    if (it.itemId == 1) pick(105)
+                    else { java.io.File(filesDir, "profile.jpg").delete(); showProfile() }
+                    true
+                }
+                pm.show()
+            }
         }
+        avatarTxtV = avatarTxt
         header.addView(avatar, LinearLayout.LayoutParams(dp(36), dp(36)))
         root.addView(header, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(60)))
 
@@ -3036,6 +3101,7 @@ class MainActivity : Activity() {
 
         Act.onChange = { onActChange() }
         headerV = header
+        showProfile()
         mainBgV = mainBg
         // app naya khula ho to pehli jhalak se pehle sab chhupa do, intro unhe kram se laayega
         if (GlowGate.armed) {
