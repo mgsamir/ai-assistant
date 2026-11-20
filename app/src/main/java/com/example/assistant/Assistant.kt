@@ -1024,7 +1024,14 @@ The user is an adult. Answer questions about the human body, sex education, repr
         while (history.size > 12) history.removeAt(0)
     }
 
-    private fun deliver(r: Reply, q: String, save: Boolean) {
+    private fun deliver(r0: Reply, q: String, save: Boolean) {
+        // aakhri bachav: kisi bhi raaste se tool-call markup aaya to screen/awaaz tak na pahunche
+        val r = if (hasToolMarkup(r0.text) || hasToolMarkup(r0.voice)) {
+            val t = stripToolMarkup(r0.text)
+            val v = stripToolMarkup(r0.voice)
+            if (t.isNotBlank()) Reply(t, if (v.isNotBlank()) v else speechClean(t))
+            else Reply("Jawab nahi ban paya, dobara poochho.", "जवाब नहीं बन पाया, दोबारा पूछो।")
+        } else r0
         Act.end()
         val who = answeredBy
         answeredBy = ""
