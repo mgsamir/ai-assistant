@@ -256,6 +256,10 @@ class MainActivity : Activity() {
     private var composerExpanded = false
     private lateinit var greet: LinearLayout
     private lateinit var glow: GlowView
+    // khulte waqt ek ke baad ek ubharne wala intro (Gemini jaisa)
+    private var headerV: View? = null
+    private var mainBgV: View? = null
+    private var introHidden = false
     private var stoppedAt = 0L
     private var imeVisible = false
     private var kbWasOpen = false
@@ -3034,6 +3038,15 @@ class MainActivity : Activity() {
         }
 
         Act.onChange = { onActChange() }
+        headerV = header
+        mainBgV = mainBg
+        // app naya khula ho to pehli jhalak se pehle sab chhupa do, intro unhe kram se laayega
+        if (GlowGate.armed) {
+            introHidden = true
+            header.alpha = 0f
+            composer.alpha = 0f
+            mainBg.alpha = 0f
+        }
         // peeche se aage: rang, glow (sabse peeche chalta hai), phir chat / likhne ka bar, phir orb
         setContentView(FrameLayout(this).apply {
             addView(mainBg, FrameLayout.LayoutParams(-1, -1))
@@ -3602,17 +3615,46 @@ class MainActivity : Activity() {
     private fun updateGreet() {
         if (!::greet.isInitialized) return
         val empty = chatList.childCount == 0
+        if (!empty && introHidden) showIntroViews()
         if (empty && greet.visibility != View.VISIBLE) {
-            greet.animate().cancel()
-            greet.alpha = 0f
-            greet.translationY = dp(16).toFloat()
-            greet.visibility = View.VISIBLE
-            greet.animate().alpha(1f).translationY(0f).setStartDelay(450).setDuration(650).start()
-            if (GlowGate.armed) { GlowGate.armed = false; glow.start() }
+            if (GlowGate.armed) { GlowGate.armed = false; playIntro() }
+            else {
+                greet.animate().cancel()
+                greet.alpha = 0f
+                greet.translationY = dp(16).toFloat()
+                greet.visibility = View.VISIBLE
+                greet.animate().alpha(1f).translationY(0f).setStartDelay(450).setDuration(650).start()
+            }
         } else if (!empty && greet.visibility == View.VISIBLE) {
             greet.animate().cancel()
             greet.animate().alpha(0f).setStartDelay(0).setDuration(150).withEndAction { greet.visibility = View.GONE }.start()
         }
+    }
+
+    // chat bhara ho to intro chhodo: sab seedha dikha do
+    private fun showIntroViews() {
+        introHidden = false
+        for (v in listOf(headerV, mainBgV, composerV)) { v?.animate()?.cancel(); v?.alpha = 1f; v?.translationY = 0f }
+    }
+
+    // Gemini jaisa intro: neeli chamak neeche se, phir upar ki patti, likhne ka bar, bindiyon ki lehar, aakhir mein taara + salaam
+    private fun playIntro() {
+        introHidden = false
+        val ease = android.view.animation.DecelerateInterpolator(1.8f)
+        fun rise(v: View?, dy: Float, delay: Long, dur: Long) {
+            v ?: return
+            v.animate().cancel()
+            v.alpha = 0f
+            v.translationY = dy
+            v.animate().alpha(1f).translationY(0f).setStartDelay(delay).setDuration(dur).setInterpolator(ease).start()
+        }
+        mainBgV?.let { it.animate().cancel(); it.alpha = 0f; it.animate().alpha(1f).setStartDelay(0).setDuration(1200).setInterpolator(ease).start() }
+        rise(headerV, -dp(10).toFloat(), 250, 650)
+        rise(composerV, dp(30).toFloat(), 150, 800)
+        glow.postDelayed({ glow.start() }, 550)
+        greet.animate().cancel()
+        greet.visibility = View.VISIBLE
+        rise(greet, dp(18).toFloat(), 1000, 850)
     }
 
     // ---------- mic se likhwana ----------
