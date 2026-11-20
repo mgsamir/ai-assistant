@@ -77,6 +77,7 @@ class IconView(ctx: Context) : View(ctx) {
             }
             31 -> { c.drawCircle(11f, 11f, 7f, p); c.drawLine(16f, 16f, 21f, 21f, p); c.drawLine(11f, 8f, 11f, 14f, p); c.drawLine(8f, 11f, 14f, 11f, p) }
             32 -> { c.drawLine(4f, 20f, 8f, 19f, p); c.drawLine(8f, 19f, 19f, 8f, p); c.drawLine(16f, 5f, 19f, 8f, p); c.drawLine(16f, 5f, 18f, 3f, p); c.drawLine(18f, 3f, 21f, 6f, p); c.drawLine(21f, 6f, 19f, 8f, p); c.drawLine(4f, 20f, 5f, 16f, p); c.drawLine(5f, 16f, 8f, 19f, p) }
+            44 -> { c.drawLine(4f, 7f, 20f, 7f, p); c.drawCircle(9f, 7f, 2.2f, p); c.drawLine(4f, 12f, 20f, 12f, p); c.drawCircle(15f, 12f, 2.2f, p); c.drawLine(4f, 17f, 20f, 17f, p); c.drawCircle(8f, 17f, 2.2f, p) }
             40 -> { c.drawRoundRect(RectF(4f, 4f, 10.5f, 10.5f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(13.5f, 4f, 20f, 10.5f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(4f, 13.5f, 10.5f, 20f), 1.5f, 1.5f, p); c.drawRoundRect(RectF(13.5f, 13.5f, 20f, 20f), 1.5f, 1.5f, p) }
             42 -> { c.drawLine(5f, 12.5f, 10f, 17.5f, p); c.drawLine(10f, 17.5f, 19f, 7f, p) }
             43 -> { c.drawLine(6f, 9f, 12f, 15f, p); c.drawLine(12f, 15f, 18f, 9f, p) }
@@ -1476,6 +1477,14 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r6.setOnClickListener { dlg.dismiss(); showVoices() }
         col.addView(r6, 2)
+        val r7 = LinearLayout(this)
+        r7.gravity = Gravity.CENTER_VERTICAL
+        r7.setPadding(0, dp(14), 0, dp(14))
+        r7.addView(IconView(this).apply { kind = 44 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        r7.addView(TextView(this).apply { text = "Settings"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        r7.setOnClickListener { dlg.dismiss(); showSettings() }
+        col.addView(r7)
         dlg.setContentView(col)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -2442,6 +2451,85 @@ class MainActivity : Activity() {
     }
 
     // left menu ka "Voice" page: ladki / ladke ki awaaz chuno, dabate hi namuna sunao
+    private fun showSettings() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val dlg = fullDlg()
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
+        val top = FrameLayout(this)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#1A1A1A")
+        top.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.CENTER_VERTICAL))
+        top.addView(TextView(this).apply { text = "Settings"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        lateinit var draw: () -> Unit
+        fun header(t: String) = list.addView(TextView(this).apply { text = t; textSize = 13f; setTextColor(Color.parseColor("#8E8E96")); setPadding(dp(4), dp(22), 0, dp(6)) })
+        fun row(title: String, value: String, onTap: () -> Unit) {
+            val r = LinearLayout(this)
+            r.orientation = LinearLayout.VERTICAL
+            r.setPadding(dp(4), dp(12), dp(4), dp(12))
+            r.addView(TextView(this).apply { text = title; textSize = 17f; setTextColor(Color.WHITE) })
+            r.addView(TextView(this).apply { text = value; textSize = 14f; setTextColor(Color.parseColor("#8E8E96")) })
+            r.setOnClickListener { onTap() }
+            list.addView(r)
+        }
+        fun keyRow(title: String, pref: String, built: String) {
+            val own = p.getString(pref, "") ?: ""
+            val state = if (own.isNotBlank()) "Custom key set" else if (built.isNotBlank()) "Built-in key" else "Not set"
+            row(title, state) {
+                val et = EditText(this)
+                et.hint = "Paste API key"
+                et.setSingleLine()
+                val b = android.app.AlertDialog.Builder(this).setTitle(title).setView(et)
+                    .setPositiveButton("Save") { _, _ ->
+                        val v = et.text.toString().trim()
+                        if (v.isNotEmpty()) p.edit().putString(pref, v).apply()
+                        draw()
+                    }
+                    .setNegativeButton("Cancel", null)
+                if (own.isNotBlank()) b.setNeutralButton("Remove") { _, _ -> p.edit().remove(pref).apply(); draw() }
+                b.show()
+            }
+        }
+        draw = {
+            list.removeAllViews()
+            header("API KEYS")
+            keyRow("Gemini", "key", BuildConfig.GEMINI_API_KEY)
+            keyRow("Groq", "k_groq", BuildConfig.GROQ_KEY)
+            keyRow("OpenRouter", "k_openrouter", BuildConfig.OPENROUTER_KEY)
+            keyRow("Brave Search", "k_brave", BuildConfig.BRAVE_KEY)
+            header("LANGUAGE")
+            val langs = listOf("" to "Auto", "English" to "English", "Hindi" to "Hindi")
+            row("Reply language", langs.first { it.first == (p.getString("lang", "") ?: "") }.second) {
+                android.app.AlertDialog.Builder(this).setTitle("Reply language")
+                    .setItems(langs.map { it.second }.toTypedArray()) { _, i -> p.edit().putString("lang", langs[i].first).apply(); draw() }
+                    .show()
+            }
+            header("VOICE")
+            val rate = p.getFloat("tts_rate", 1f)
+            row("Speech speed", String.format(java.util.Locale.US, "%.1fx", rate)) {
+                val sb = android.widget.SeekBar(this)
+                sb.max = 15
+                sb.progress = Math.round((rate - 0.5f) * 10f).coerceIn(0, 15)
+                val lbl = TextView(this).apply { text = String.format(java.util.Locale.US, "%.1fx", rate); textSize = 16f; gravity = Gravity.CENTER; setTextColor(Color.WHITE) }
+                sb.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: android.widget.SeekBar?, v: Int, u: Boolean) { lbl.text = String.format(java.util.Locale.US, "%.1fx", 0.5f + v / 10f) }
+                    override fun onStartTrackingTouch(s: android.widget.SeekBar?) {}
+                    override fun onStopTrackingTouch(s: android.widget.SeekBar?) {}
+                })
+                val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(16), dp(24), dp(8)); addView(lbl); addView(sb) }
+                android.app.AlertDialog.Builder(this).setTitle("Speech speed").setView(box)
+                    .setPositiveButton("Save") { _, _ -> p.edit().putFloat("tts_rate", 0.5f + sb.progress / 10f).apply(); draw() }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
+        draw()
+        root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        dlg.setContentView(root)
+        dlg.show()
+    }
+
     private fun showVoices() {
         val p = getSharedPreferences("p", Context.MODE_PRIVATE)
         val dlg = fullDlg()

@@ -254,7 +254,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
     private fun speak(v: String): Boolean {
         spokenText = v
         setSpeak(1)
-        try { val cv = Voice.cur(Usage.p); deviceVoice(cv.girl); tts.setPitch(cv.pitch) } catch (e: Exception) { }
+        try { val cv = Voice.cur(Usage.p); deviceVoice(cv.girl); tts.setPitch(cv.pitch); tts.setSpeechRate(prefs.getFloat("tts_rate", 1f)) } catch (e: Exception) { }
         val gen = ++speakGen
         thread {
             val bytes = Providers.geminiTts(Keys.get(prefs), v, Voice.cur(Usage.p).gemini) ?: Providers.eleven(v)
@@ -271,7 +271,14 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     val m = android.media.MediaPlayer()
                     mp = m
                     m.setDataSource(f.absolutePath)
-                    m.setOnPreparedListener { if (speakState != 2) it.start(); mode(3) }
+                    m.setOnPreparedListener {
+                        if (speakState != 2) {
+                            val rt = prefs.getFloat("tts_rate", 1f)
+                            if (rt != 1f && android.os.Build.VERSION.SDK_INT >= 23) { try { it.playbackParams = android.media.PlaybackParams().setSpeed(rt) } catch (e: Exception) { } }
+                            it.start()
+                        }
+                        mode(3)
+                    }
                     m.setOnCompletionListener { main.post { if (mp === it) speakDone() } }
                     m.setOnErrorListener { _, _, _ -> main.post { speakDone() }; true }
                     m.prepareAsync()
@@ -755,6 +762,10 @@ The user is an adult. Answer questions about the human body, sex education, repr
         if (apps.isNotEmpty()) base += "\n\nApps installed on the user's phone right now (${apps.size}): " +
             apps.take(250).joinToString(", ") { it.first } +
             ". To open one use open_app with its exact name from this list (the user may say it in Hindi or with a spelling difference; pick the closest). If the app is not in this list it is not installed (or was deleted): say so and do not call open_app."
+        when (prefs.getString("lang", "")) {
+            "English" -> base += "\n\nAlways reply in English, whatever language the user speaks."
+            "Hindi" -> base += "\n\nAlways reply in Hindi (Devanagari script), whatever language the user speaks."
+        }
         if (learn) base += "\n\nGUIDED LEARNING MODE is ON. Act like a patient teacher: teach step by step in small easy steps, use simple examples from daily life in India, give only one step at a time (3 to 5 sentences), then ask the user one short question to check understanding or ask if he wants the next step. Do not dump the whole answer at once. This overrides the rule to give complete long answers."
         if (mem.isEmpty()) return base
         return base + "\n\nFacts remembered about the user:\n" + mem.joinToString("\n") { "- $it" }
