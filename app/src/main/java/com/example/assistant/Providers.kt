@@ -52,6 +52,7 @@ object Providers {
     fun brave(q: String): String? {
         val key = Extra.brave
         if (key.isEmpty() || q.isBlank()) return null
+        if (Usage.p?.getBoolean("brave_on", true) == false) return null
         val web = braveGet("web/search", q, "&count=6", key)
         val arr = web?.optJSONObject("web")?.optJSONArray("results")
         val news = if (FRESH.containsMatchIn(q)) braveGet("news/search", q, "&count=5&freshness=pd", key)?.optJSONArray("results") else null
@@ -223,6 +224,11 @@ object Providers {
     }
 
     // ElevenLabs: text se natural awaaz (mp3)
+    // Voice screen mein dikhane ke liye: ElevenLabs sach mein chal raha hai ya nahi
+    @Volatile var elevenOk: Boolean? = null
+    @Volatile var elevenAt = 0L
+    @Volatile var elevenErr = ""
+
     fun eleven(text: String): ByteArray? {
         val key = Extra.eleven
         if (key.isEmpty() || text.isBlank()) return null
@@ -238,8 +244,17 @@ object Providers {
             c.doOutput = true
             val body = JSONObject().put("text", text).put("model_id", "eleven_multilingual_v2")
             c.outputStream.use { it.write(body.toString().toByteArray()) }
-            if (c.responseCode != 200) return null
-            c.inputStream.readBytes()
-        } catch (e: Exception) { null }
+            val code = c.responseCode
+            if (code != 200) {
+                val why = try { JSONObject(c.errorStream?.bufferedReader()?.readText() ?: "").optJSONObject("detail")?.optString("status").orEmpty() } catch (e: Exception) { "" }
+                elevenOk = false
+                elevenErr = if (why.isNotBlank()) "HTTP $code ($why)" else "HTTP $code"
+                return null
+            }
+            val bytes = c.inputStream.readBytes()
+            elevenOk = true
+            elevenAt = System.currentTimeMillis()
+            bytes
+        } catch (e: Exception) { elevenOk = false; elevenErr = "Network error"; null }
     }
 }
