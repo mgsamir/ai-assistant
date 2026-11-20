@@ -2495,11 +2495,6 @@ class MainActivity : Activity() {
         }
         draw = {
             list.removeAllViews()
-            header("API KEYS")
-            keyRow("Gemini", "key", BuildConfig.GEMINI_API_KEY)
-            keyRow("Groq", "k_groq", BuildConfig.GROQ_KEY)
-            keyRow("OpenRouter", "k_openrouter", BuildConfig.OPENROUTER_KEY)
-            keyRow("Brave Search", "k_brave", BuildConfig.BRAVE_KEY)
             header("LANGUAGE")
             val langs = listOf("" to "Auto", "English" to "English", "Hindi" to "Hindi")
             row("Reply language", langs.first { it.first == (p.getString("lang", "") ?: "") }.second) {
@@ -2556,7 +2551,7 @@ class MainActivity : Activity() {
                     !hasKey -> "Key missing"
                     testing -> "Testing..."
                     ok == true -> "Working \u00b7 last used " + java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(Providers.elevenAt))
-                    ok == false -> "Not working \u00b7 " + Providers.elevenErr
+                    ok == false -> if (Providers.elevenErr.contains("api_key_id_used_as_api_key")) "Not working \u00b7 the saved value is the key ID, not the secret key" else "Not working \u00b7 " + Providers.elevenErr
                     else -> "Key found \u00b7 tap to test"
                 }
                 val color = when { !hasKey || ok == false -> "#F87171"; ok == true -> "#34D399"; else -> "#B0B0B8" }
