@@ -1419,14 +1419,7 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r3.setOnClickListener { dlg.dismiss(); showChatHistory() }
         col.addView(r3)
-        val r4 = LinearLayout(this)
-        r4.gravity = Gravity.CENTER_VERTICAL
-        r4.setPadding(0, dp(14), 0, dp(14))
-        r4.addView(IconView(this).apply { kind = 30 }, LinearLayout.LayoutParams(dp(48), dp(40)))
-        r4.addView(TextView(this).apply { text = "Smali"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
-            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
-        r4.setOnClickListener { dlg.dismiss(); showAppPicker() }
-        col.addView(r4)
+        // Smali ki entry menu se hata di (code showAppPicker() mein maujood hai, chahe to ek line mein wapas aa jaayegi)
         val r5 = LinearLayout(this)
         r5.gravity = Gravity.CENTER_VERTICAL
         r5.setPadding(0, dp(14), 0, dp(14))
