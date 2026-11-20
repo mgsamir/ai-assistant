@@ -2932,23 +2932,24 @@ class MainActivity : Activity() {
         }
         composer.addView(recScroll, 0, LinearLayout.LayoutParams(-1, -2))
         wave = WaveView(this)
+        // recording ki patti: bar ki ussi jagah par, buttons ka wahi size (plus -> X, mic -> stop, send wahi), ChatGPT jaisa
         recRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.BOTTOM
             visibility = View.GONE
             addView(IconView(this@MainActivity).apply {
-                kind = 1; rotation = 45f; tint = Color.parseColor("#C8C8CC"); background = oval("#232323")
+                kind = 1; rotation = 45f; tint = Color.parseColor("#C8C8CC")
                 setOnClickListener { cancelRec() }
-            }, LinearLayout.LayoutParams(dp(34), dp(34)))
-            addView(wave, LinearLayout.LayoutParams(0, dp(26), 1f).apply { leftMargin = dp(12); rightMargin = dp(12) })
+            }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { bottomMargin = dp(2) })
+            addView(wave, LinearLayout.LayoutParams(0, dp(28), 1f).apply { leftMargin = dp(8); rightMargin = dp(8); bottomMargin = dp(10) })
             addView(IconView(this@MainActivity).apply {
-                kind = 46; tint = Color.WHITE; background = oval("#232323")
+                kind = 46; tint = Color.WHITE
                 setOnClickListener { stopRec(false) }
-            }, LinearLayout.LayoutParams(dp(34), dp(34)))
+            }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { bottomMargin = dp(2) })
             addView(IconView(this@MainActivity).apply {
                 kind = 4; tint = Color.WHITE; background = oval("#4F8BFF")
                 setOnClickListener { stopRec(true) }
-            }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { leftMargin = dp(8) })
+            }, LinearLayout.LayoutParams(dp(48), dp(48)))
         }
         composer.addView(recRow, LinearLayout.LayoutParams(-1, -2))
         // bolte samay keyboard khula rakhne ke liye ek anokha chhota dabba (dikhta nahi) jis par focus tik jaata hai
@@ -3659,6 +3660,8 @@ class MainActivity : Activity() {
 
     // ---------- mic se likhwana ----------
     private fun showRec(on: Boolean) {
+        // patti ki unchai wahi rakho jo likhne wale bar ki thi, taaki kuch bada-chhota na ho
+        if (on && barV.height > 0) recRow.minimumHeight = barV.height
         barV.visibility = if (on) View.GONE else View.VISIBLE
         recRow.visibility = if (on) View.VISIBLE else View.GONE
         recScroll.visibility = View.GONE
