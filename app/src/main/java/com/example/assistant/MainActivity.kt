@@ -2543,36 +2543,6 @@ class MainActivity : Activity() {
         draw = {
             list.removeAllViews()
             val cur = Voice.cur(p)
-            // ElevenLabs ka haal: key hai, chal raha hai ya nahi (dabane par ek chhota test)
-            run {
-                val hasKey = Extra.eleven.isNotBlank()
-                val ok = Providers.elevenOk
-                val status = when {
-                    !hasKey -> "Key missing"
-                    testing -> "Testing..."
-                    ok == true -> "Working \u00b7 last used " + java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(Providers.elevenAt))
-                    ok == false -> if (Providers.elevenErr.contains("api_key_id_used_as_api_key")) "Not working \u00b7 the saved value is the key ID, not the secret key" else "Not working \u00b7 " + Providers.elevenErr
-                    else -> "Key found \u00b7 tap to test"
-                }
-                val color = when { !hasKey || ok == false -> "#F87171"; ok == true -> "#34D399"; else -> "#B0B0B8" }
-                val r = LinearLayout(this).apply {
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(4), dp(10), dp(4), dp(10))
-                    background = ActUi.ripple(this@MainActivity, dp(18))
-                }
-                provLogo("elevenlabs", 40)?.let { r.addView(it, LinearLayout.LayoutParams(dp(40), dp(40))) }
-                val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-                tx.addView(TextView(this).apply { text = "ElevenLabs"; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-                tx.addView(TextView(this).apply { text = status; textSize = 13.5f; setTextColor(Color.parseColor(color)) })
-                r.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
-                r.setOnClickListener {
-                    if (hasKey && !testing) {
-                        testing = true; draw()
-                        kotlin.concurrent.thread { Providers.eleven("Hello"); runOnUiThread { testing = false; draw() } }
-                    }
-                }
-                list.addView(r)
-            }
             for (girl in listOf(true, false)) {
                 list.addView(TextView(this).apply {
                     text = if (girl) "GIRL" else "BOY"; textSize = 13f; typeface = Typeface.DEFAULT_BOLD
@@ -2813,7 +2783,6 @@ class MainActivity : Activity() {
                 col.addView(r)
             }
             svc("brave", "Brave Search", "Web search and sources", Extra.brave.isNotBlank() && p.getBoolean("brave_on", true))
-            svc("elevenlabs", "ElevenLabs", "Natural awaaz (voice)", Extra.eleven.isNotBlank())
             svc("virustotal", "VirusTotal", "App security scan", Extra.vt.isNotBlank())
             // sirf free models dikhte hain, paid sab hata diye
             for ((k, _) in Models.CATS) Models.sel(p, k)?.let { if (!it.free || Usage.paidOnly(it)) Models.setSel(p, k, null) }

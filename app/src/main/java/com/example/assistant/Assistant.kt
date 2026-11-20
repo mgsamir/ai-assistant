@@ -277,7 +277,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         thread {
             for (i in chunks.indices) {
                 if (gen != speakGen) return@thread
-                val b = Providers.geminiTts(Keys.get(prefs), chunks[i], Voice.cur(Usage.p).gemini) ?: Providers.eleven(chunks[i])
+                val b = Providers.geminiTts(Keys.get(prefs), chunks[i], Voice.cur(Usage.p).gemini)
                 got[i] = b
                 state[i] = if (b == null) 2 else 1
             }
