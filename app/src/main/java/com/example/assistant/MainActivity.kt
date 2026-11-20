@@ -3008,6 +3008,9 @@ class MainActivity : Activity() {
         rightSlot.addView(composerMic)
         rightSlot.addView(voiceBtn)
         composerV = composer
+        composer.layoutTransition = null
+        // plus / mic / send hamesha neeche ki ek hi patti mein: text badhe ya ghate, ye apni jagah se nahi hilte
+        setComposerExpanded(true)
         root.addView(composer, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = dp(14)
             topMargin = dp(10)
@@ -3559,9 +3562,6 @@ class MainActivity : Activity() {
     private fun setComposerExpanded(on: Boolean) {
         if (on == composerExpanded) return
         composerExpanded = on
-        try {
-            android.transition.TransitionManager.beginDelayedTransition(composerV, android.transition.AutoTransition().setDuration(150))
-        } catch (e: Throwable) { }
         leftSlot.removeAllViews(); rightSlot.removeAllViews(); bottomRow.removeAllViews()
         if (on) {
             bottomRow.addView(plusBtn)
