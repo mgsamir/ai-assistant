@@ -880,31 +880,69 @@ class MainActivity : Activity() {
     private fun styled(t: String): CharSequence {
         val sb = android.text.SpannableStringBuilder()
         val lines = t.split("\n")
-        for ((i, raw) in lines.withIndex()) {
-            var l = raw.trimEnd()
+        val inlineRe = Regex("\\*\\*(.+?)\\*\\*|`([^`]+)`")
+        var inCode = false
+        var first = true
+        fun nl() { if (!first) sb.append("\n") }
+        for (raw in lines) {
+            val l0 = raw.trimEnd()
+            // ``` se shuru / khatam hone wala code ka dabba
+            if (l0.trimStart().startsWith("```")) { inCode = !inCode; continue }
+            if (inCode) {
+                nl(); first = false
+                val st = sb.length
+                sb.append(l0.ifEmpty { " " })
+                sb.setSpan(android.text.style.TypefaceSpan("monospace"), st, sb.length, 0)
+                sb.setSpan(android.text.style.BackgroundColorSpan(Color.parseColor("#1A1A1F")), st, sb.length, 0)
+                sb.setSpan(android.text.style.RelativeSizeSpan(0.92f), st, sb.length, 0)
+                sb.setSpan(android.text.style.ForegroundColorSpan(Color.parseColor("#D6E2FF")), st, sb.length, 0)
+                continue
+            }
+            if (Regex("^\\s*([-*_]\\s*){3,}$").matches(l0)) { nl(); first = false; continue }
+            nl(); first = false
+            var l = l0
             val st = sb.length
             var kind = 0 // 1 heading, 2 bullet, 3 numbered
-            val h = Regex("^\\s*#{1,6}\\s+(.*)$").find(l)
-            if (h != null) { l = h.groupValues[1]; kind = 1 }
-            else if (Regex("^\\s*[-*\u2022]\\s+").containsMatchIn(l)) { l = "\u2022 " + l.replace(Regex("^\\s*[-*\u2022]\\s+"), ""); kind = 2 }
-            else if (Regex("^\\s*\\d+[.)]\\s").containsMatchIn(l)) { l = l.trimStart(); kind = 3 }
-            // inline **bold**
-            val parts = l.replace("`", "").split("**")
-            for ((pi, seg) in parts.withIndex()) {
-                val ss = sb.length
-                sb.append(if (pi % 2 == 1 || pi == parts.size - 1) seg.replace("*", "") else seg.replace("*", ""))
-                if (pi % 2 == 1) sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), ss, sb.length, 0)
+            var level = 0
+            var hLevel = 2
+            val h = Regex("^\\s*(#{1,6})\\s+(.*)$").find(l)
+            if (h != null) { l = h.groupValues[2]; kind = 1; hLevel = h.groupValues[1].length }
+            else if (Regex("^\\s*[-*\u2022]\\s+").containsMatchIn(l)) {
+                level = (l.length - l.trimStart().length) / 2
+                level = level.coerceIn(0, 2)
+                l = (if (level == 0) "\u2022 " else "\u25E6 ") + l.replace(Regex("^\\s*[-*\u2022]\\s+"), "")
+                kind = 2
             }
+            else if (Regex("^\\s*\\d+[.)]\\s").containsMatchIn(l)) { l = l.trimStart(); kind = 3 }
+            // inline **bold** aur `code`
+            var pos = 0
+            for (m in inlineRe.findAll(l)) {
+                sb.append(l.substring(pos, m.range.first).replace("*", ""))
+                val ss = sb.length
+                if (m.groupValues[1].isNotEmpty()) {
+                    sb.append(m.groupValues[1].replace("*", ""))
+                    sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), ss, sb.length, 0)
+                } else {
+                    sb.append(" " + m.groupValues[2] + " ")
+                    sb.setSpan(android.text.style.TypefaceSpan("monospace"), ss, sb.length, 0)
+                    sb.setSpan(android.text.style.BackgroundColorSpan(Color.parseColor("#1F1F26")), ss, sb.length, 0)
+                    sb.setSpan(android.text.style.RelativeSizeSpan(0.92f), ss, sb.length, 0)
+                }
+                pos = m.range.last + 1
+            }
+            sb.append(l.substring(pos).replace("*", ""))
             val head = kind == 1 || (kind == 0 && l.isNotBlank() && l.endsWith(":") && l.length < 70 && !l[0].isDigit())
             if (head) {
                 sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), st, sb.length, 0)
-                sb.setSpan(android.text.style.RelativeSizeSpan(1.12f), st, sb.length, 0)
-            } else if (kind == 2 || kind == 3) {
+                val size = if (kind == 1) (when (hLevel) { 1 -> 1.3f; 2 -> 1.2f; else -> 1.1f }) else 1.1f
+                sb.setSpan(android.text.style.RelativeSizeSpan(size), st, sb.length, 0)
+            } else if (kind == 2) {
+                sb.setSpan(android.text.style.LeadingMarginSpan.Standard(dp(6) + level * dp(18), dp(6) + level * dp(18) + dp(18)), st, sb.length, 0)
+            } else if (kind == 3) {
                 val n = l.indexOf(' ')
-                if (kind == 3 && n > 0) sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), st, st + n, 0)
-                sb.setSpan(android.text.style.LeadingMarginSpan.Standard(0, dp(22)), st, sb.length, 0)
+                if (n > 0) sb.setSpan(android.text.style.StyleSpan(Typeface.BOLD), st, st + n, 0)
+                sb.setSpan(android.text.style.LeadingMarginSpan.Standard(dp(2), dp(2) + dp(26)), st, sb.length, 0)
             }
-            if (i < lines.size - 1) sb.append("\n")
         }
         return sb
     }
