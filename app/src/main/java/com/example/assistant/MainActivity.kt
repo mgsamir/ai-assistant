@@ -3107,21 +3107,21 @@ class MainActivity : Activity() {
         // recording ki patti: bar ki ussi jagah par, buttons ka wahi size (plus -> X, mic -> stop, send wahi), ChatGPT jaisa
         recRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.BOTTOM
+            gravity = Gravity.CENTER_VERTICAL
             visibility = View.GONE
             addView(IconView(this@MainActivity).apply {
                 kind = 1; rotation = 45f; tint = Color.parseColor("#C8C8CC")
                 setOnClickListener { cancelRec() }
-            }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { bottomMargin = dp(2) })
-            addView(wave, LinearLayout.LayoutParams(0, dp(28), 1f).apply { leftMargin = dp(8); rightMargin = dp(8); bottomMargin = dp(10) })
+            }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            addView(wave, LinearLayout.LayoutParams(0, dp(28), 1f).apply { leftMargin = dp(8); rightMargin = dp(8) })
             addView(IconView(this@MainActivity).apply {
                 kind = 46; tint = Color.WHITE
                 setOnClickListener { stopRec(false) }
-            }, LinearLayout.LayoutParams(dp(44), dp(44)).apply { bottomMargin = dp(2) })
+            }, LinearLayout.LayoutParams(dp(44), dp(44)))
             addView(IconView(this@MainActivity).apply {
                 kind = 4; tint = Color.WHITE; background = oval("#4F8BFF")
                 setOnClickListener { stopRec(true) }
-            }, LinearLayout.LayoutParams(dp(48), dp(48)))
+            }, LinearLayout.LayoutParams(dp(44), dp(44)))
         }
         composer.addView(recRow, LinearLayout.LayoutParams(-1, -2))
         // bolte samay keyboard khula rakhne ke liye ek anokha chhota dabba (dikhta nahi) jis par focus tik jaata hai
@@ -3729,7 +3729,7 @@ class MainActivity : Activity() {
         val blank = input.text.isNullOrBlank()
         val multi = input.lineCount >= 2 || (input.text?.contains('\n') == true)
         if (!composerExpanded && multi) setComposerExpanded(true)
-        else if (composerExpanded && blank) setComposerExpanded(false)
+        else if (composerExpanded && input.text.isNullOrEmpty()) setComposerExpanded(false)
     }
 
     private fun setComposerExpanded(on: Boolean) {
