@@ -528,9 +528,14 @@ class MainActivity : Activity() {
     }
 
     // AI ka jawab: baayin taraf, bina bubble, neeche chhote buttons
+    private var lastRetryPill: View? = null
+    private val ERR_RE = Regex("^(No response\\.|Invalid API key|Bad request|This key doesn't|Free limit reached|The model is busy|Error \\d+\\.|Search failed|Couldn't generate)")
+
     private fun addAi(text: String, who: String = "") {
         lastExtraViews?.let { it.first.visibility = View.GONE; it.second.visibility = View.GONE }
         lastExtraViews = null
+        lastRetryPill?.visibility = View.GONE
+        lastRetryPill = null
         val myIdx = aiCount++
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val tv = TextView(this).apply {
@@ -543,6 +548,19 @@ class MainActivity : Activity() {
             isFocusableInTouchMode = false
         }
         box.addView(tv)
+        // jawab ki jagah gadbadi (network / limit / busy) aayi ho to saaf Retry button
+        if (ERR_RE.containsMatchIn(text.trim())) {
+            val pill = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(8), dp(16), dp(8))
+                background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#1B2A4A")) }
+                setOnClickListener { visibility = View.GONE; retryLast(null) }
+            }
+            pill.addView(IconView(this).apply { kind = 25; tint = Color.parseColor("#8FB4FF") }, LinearLayout.LayoutParams(dp(30), dp(24)))
+            pill.addView(TextView(this).apply { this.text = "Retry"; textSize = 14.5f; setTextColor(Color.parseColor("#8FB4FF")); typeface = Typeface.DEFAULT_BOLD })
+            box.addView(pill, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(10) })
+            lastRetryPill = pill
+        }
 
         val acts = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val like = icon(5, 44) { }

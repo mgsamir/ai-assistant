@@ -987,15 +987,15 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         code == 0 ->
                 Reply("No response. The network or the model is slow. Try again.", "No response. The network or the model is slow. Try again.")
             code == 400 && body.contains("API key", ignoreCase = true) ->
-                Reply("Invalid API key. Open Settings and enter a new key.", "Invalid API key. Open Settings and enter a new key.")
+                Reply("Invalid API key. Update the key in your GitHub secrets and rebuild the app.", "Invalid API key. Update the key in your GitHub secrets and rebuild the app.")
             code == 400 ->
                 Reply("Bad request.", "Bad request.")
             code == 403 ->
                 Reply("This key doesn't have permission. Create a new key in AI Studio.", "This key doesn't have permission. Create a new key in AI Studio.")
             code == 429 ->
-                Reply("Free limit reached or too many requests. Try again later.", "Free limit reached or too many requests. Try again later.")
+                Reply("Free limit reached or too many requests. Try again later, or pick another model from the top menu.", "Free limit reached or too many requests. Try again later, or pick another model from the top menu.")
             code == 503 ->
-                Reply("The model is busy right now. Try again later.", "The model is busy right now. Try again later.")
+                Reply("The model is busy right now. Retry, or pick another model from the top menu.", "The model is busy right now. Retry, or pick another model from the top menu.")
             else ->
                 Reply("Error $code. Try again later.", "Error $code. Try again later.")
         }
