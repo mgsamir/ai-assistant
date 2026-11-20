@@ -710,7 +710,6 @@ class MainActivity : Activity() {
 
     private fun showChatHistory() {
         val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
-        val arr = Chats.all(sp)
         val dlg = fullDlg()
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
         val top = FrameLayout(this)
@@ -719,43 +718,103 @@ class MainActivity : Activity() {
         top.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.CENTER_VERTICAL))
         top.addView(TextView(this).apply { text = "Chat history"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
-        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        for (o in arr) {
-            val row = LinearLayout(this).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(14), dp(14), dp(8), dp(14))
-                background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")) }
-            }
-            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            tx.addView(TextView(this).apply { text = o.title; textSize = 16f; setTextColor(Color.WHITE); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
-            tx.addView(TextView(this).apply {
-                text = java.text.SimpleDateFormat("d MMM, h:mm a", java.util.Locale.ENGLISH).format(java.util.Date(o.time))
-                textSize = 13f; setTextColor(Color.parseColor("#B0B0B8"))
-            })
-            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(TextView(this).apply {
-                text = "Delete"; textSize = 14f; setTextColor(Color.parseColor("#FF8A8A")); setPadding(dp(12), dp(8), dp(12), dp(8))
-                setOnClickListener {
-                    android.app.AlertDialog.Builder(this@MainActivity).setTitle("Delete this chat?")
-                        .setPositiveButton("Delete") { _, _ ->
-                            val wasCur = Chats.cur(sp) == o.id
-                            Chats.delete(sp, o.id)
-                            if (wasCur) newChat()
-                            dlg.dismiss(); showChatHistory()
-                        }.setNegativeButton("Cancel", null).show()
-                }
-            })
-            row.setOnClickListener {
-                val e = AssistantService.engine
-                if (e != null) {
-                    Chats.setCur(sp, o.id)
-                    e.loadChat(o.log)
-                    rebuildChat(o.log)
-                }
-                dlg.dismiss()
-            }
-            list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        val search = EditText(this).apply {
+            hint = "Search chats"
+            setHintTextColor(Color.parseColor("#9A9AA2")); setTextColor(Color.WHITE); textSize = 16f
+            setSingleLine(true)
+            imeOptions = EditorInfo.IME_ACTION_SEARCH
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            background = GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(Color.parseColor("#141414")) }
         }
+        root.addView(search, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(12) })
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        lateinit var draw: () -> Unit
+        draw = {
+            list.removeAllViews()
+            val q = search.text.toString().trim()
+            val arr = Chats.all(sp).filter { q.isEmpty() || it.title.contains(q, true) || it.log.contains(q, true) }
+            if (arr.isEmpty()) {
+                list.addView(TextView(this).apply {
+                    text = if (q.isEmpty()) "No chats yet" else "No chats found"
+                    textSize = 15f; setTextColor(Color.parseColor("#9A9AA2")); gravity = Gravity.CENTER; setPadding(0, dp(40), 0, 0)
+                })
+            }
+            for (o in arr) {
+                val row = LinearLayout(this).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(14), dp(14), dp(8), dp(14))
+                    background = GradientDrawable().apply { cornerRadius = dp(18).toFloat(); setColor(Color.parseColor("#101010")) }
+                }
+                val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                tx.addView(TextView(this).apply { text = o.title; textSize = 16f; setTextColor(Color.WHITE); maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                val date = java.text.SimpleDateFormat("d MMM, h:mm a", java.util.Locale.ENGLISH).format(java.util.Date(o.time))
+                tx.addView(TextView(this).apply {
+                    text = (if (o.pin) "Pinned \u00b7 " else "") + date
+                    textSize = 13f; setTextColor(Color.parseColor("#B0B0B8"))
+                })
+                // khoj ka match chat ke andar mile to uska ek tukda dikhao
+                if (q.isNotEmpty() && !o.title.contains(q, true)) {
+                    val at = o.log.indexOf(q, 0, true)
+                    if (at >= 0) {
+                        val snip = o.log.substring(maxOf(0, at - 24), minOf(o.log.length, at + q.length + 40)).replace(Regex("\\s+"), " ").trim()
+                        tx.addView(TextView(this).apply {
+                            text = "\u2026$snip\u2026"; textSize = 13f; setTextColor(Color.parseColor("#8F9BB3")); maxLines = 2
+                            ellipsize = android.text.TextUtils.TruncateAt.END
+                        })
+                    }
+                }
+                row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f))
+                val more = TextView(this).apply {
+                    text = "\u22EE"; textSize = 22f; setTextColor(Color.parseColor("#C8C8CC")); setPadding(dp(14), dp(4), dp(14), dp(4))
+                }
+                more.setOnClickListener {
+                    val pm = PopupMenu(this@MainActivity, more)
+                    pm.menu.add(0, 1, 0, "Rename")
+                    pm.menu.add(0, 2, 1, if (o.pin) "Unpin" else "Pin")
+                    pm.menu.add(0, 3, 2, "Delete")
+                    pm.setOnMenuItemClickListener { mi ->
+                        when (mi.itemId) {
+                            1 -> {
+                                val et = EditText(this@MainActivity).apply {
+                                    setText(o.title); setSelection(text.length); setTextColor(Color.WHITE); setSingleLine(true)
+                                    setPadding(dp(24), dp(16), dp(24), dp(16))
+                                }
+                                android.app.AlertDialog.Builder(this@MainActivity, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("Rename chat").setView(et)
+                                    .setPositiveButton("Save") { _, _ -> Chats.rename(sp, o.id, et.text.toString()); draw() }
+                                    .setNegativeButton("Cancel", null).show()
+                            }
+                            2 -> { Chats.setPin(sp, o.id, !o.pin); draw() }
+                            3 -> android.app.AlertDialog.Builder(this@MainActivity, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("Delete this chat?")
+                                .setPositiveButton("Delete") { _, _ ->
+                                    val wasCur = Chats.cur(sp) == o.id
+                                    Chats.delete(sp, o.id)
+                                    if (wasCur) newChat()
+                                    draw()
+                                }.setNegativeButton("Cancel", null).show()
+                        }
+                        true
+                    }
+                    pm.show()
+                }
+                row.addView(more)
+                row.setOnClickListener {
+                    val e = AssistantService.engine
+                    if (e != null) {
+                        Chats.setCur(sp, o.id)
+                        e.loadChat(o.log)
+                        rebuildChat(o.log)
+                    }
+                    dlg.dismiss()
+                }
+                list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+            }
+        }
+        search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) { draw() }
+        })
+        draw()
         root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
         dlg.setContentView(root)
         dlg.show()
