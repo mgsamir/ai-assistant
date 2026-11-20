@@ -251,42 +251,72 @@ The user is an adult. Answer questions about the human body, sex education, repr
         } catch (e: Exception) { }
     }
 
+    // lamba jawab ek saath bhejne se awaaz der se aati thi: pehla tukda chhota rakho taaki jaldi bajne lage, baaki peeche se aate rahen
+    private fun splitForTts(t: String): List<String> {
+        val parts = Regex("(?<=[.!?\u0964\\n])\\s+").split(t.trim()).filter { it.isNotBlank() }
+        val out = ArrayList<String>()
+        var cur = StringBuilder()
+        for (p in parts) {
+            val limit = if (out.isEmpty()) 110 else 260
+            if (cur.isNotEmpty() && cur.length + p.length + 1 > limit) { out.add(cur.toString()); cur = StringBuilder() }
+            if (cur.isNotEmpty()) cur.append(' ')
+            cur.append(p)
+        }
+        if (cur.isNotEmpty()) out.add(cur.toString())
+        return out
+    }
+
     private fun speak(v: String): Boolean {
         spokenText = v
         setSpeak(1)
         try { val cv = Voice.cur(Usage.p); deviceVoice(cv.girl); tts.setPitch(cv.pitch); tts.setSpeechRate(prefs.getFloat("tts_rate", 1f)) } catch (e: Exception) { }
         val gen = ++speakGen
+        val chunks = splitForTts(v).ifEmpty { listOf(v) }
+        val got = arrayOfNulls<ByteArray>(chunks.size)
+        val state = IntArray(chunks.size)   // 0 intezaar, 1 aa gaya, 2 nahi bana
         thread {
-            val bytes = Providers.geminiTts(Keys.get(prefs), v, Voice.cur(Usage.p).gemini) ?: Providers.eleven(v)
-            main.post {
-                if (gen != speakGen) return@post
-                if (bytes == null) {
-                    if (tts.speak(v, TextToSpeech.QUEUE_FLUSH, null, "r") != TextToSpeech.SUCCESS) speakDone()
-                    return@post
-                }
-                try {
-                    val f = java.io.File(app.cacheDir, if (bytes.size > 4 && String(bytes, 0, 4) == "RIFF") "say.wav" else "say.mp3")
-                    f.writeBytes(bytes)
-                    try { mp?.release() } catch (e: Exception) { }
-                    val m = android.media.MediaPlayer()
-                    mp = m
-                    m.setDataSource(f.absolutePath)
-                    m.setOnPreparedListener {
-                        if (speakState != 2) {
-                            val rt = prefs.getFloat("tts_rate", 1f)
-                            if (rt != 1f && android.os.Build.VERSION.SDK_INT >= 23) { try { it.playbackParams = android.media.PlaybackParams().setSpeed(rt) } catch (e: Exception) { } }
-                            it.start()
-                        }
-                        mode(3)
-                    }
-                    m.setOnCompletionListener { main.post { if (mp === it) speakDone() } }
-                    m.setOnErrorListener { _, _, _ -> main.post { speakDone() }; true }
-                    m.prepareAsync()
-                } catch (e: Exception) {
-                    speakDone()
-                }
+            for (i in chunks.indices) {
+                if (gen != speakGen) return@thread
+                val b = Providers.geminiTts(Keys.get(prefs), chunks[i], Voice.cur(Usage.p).gemini) ?: Providers.eleven(chunks[i])
+                got[i] = b
+                state[i] = if (b == null) 2 else 1
             }
         }
+        fun deviceFrom(i: Int) {
+            val rest = chunks.drop(i).joinToString(" ")
+            if (tts.speak(rest, TextToSpeech.QUEUE_FLUSH, null, "r") != TextToSpeech.SUCCESS) speakDone()
+        }
+        fun playNext(i: Int) {
+            if (gen != speakGen) return
+            if (i >= chunks.size) { speakDone(); return }
+            when (state[i]) {
+                0 -> { main.postDelayed({ playNext(i) }, 120); return }
+                2 -> { mp = null; deviceFrom(i); return }
+            }
+            val bytes = got[i] ?: run { deviceFrom(i); return }
+            try {
+                val f = java.io.File(app.cacheDir, if (bytes.size > 4 && String(bytes, 0, 4) == "RIFF") "say.wav" else "say.mp3")
+                f.writeBytes(bytes)
+                try { mp?.release() } catch (e: Exception) { }
+                val m = android.media.MediaPlayer()
+                mp = m
+                m.setDataSource(f.absolutePath)
+                m.setOnPreparedListener {
+                    if (speakState != 2) {
+                        val rt = prefs.getFloat("tts_rate", 1f)
+                        if (rt != 1f && android.os.Build.VERSION.SDK_INT >= 23) { try { it.playbackParams = android.media.PlaybackParams().setSpeed(rt) } catch (e: Exception) { } }
+                        it.start()
+                    }
+                    mode(3)
+                }
+                m.setOnCompletionListener { main.post { if (mp === it) playNext(i + 1) } }
+                m.setOnErrorListener { _, _, _ -> main.post { speakDone() }; true }
+                m.prepareAsync()
+            } catch (e: Exception) {
+                speakDone()
+            }
+        }
+        playNext(0)
         return true
     }
 
