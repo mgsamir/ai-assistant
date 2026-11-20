@@ -3182,8 +3182,7 @@ class MainActivity : Activity() {
         rightSlot.addView(voiceBtn)
         composerV = composer
         composer.layoutTransition = null
-        // plus / mic / send hamesha neeche ki ek hi patti mein: text badhe ya ghate, ye apni jagah se nahi hilte
-        setComposerExpanded(true)
+        input.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> input.post { updateComposerMode() } }
         root.addView(composer, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = dp(14)
             topMargin = dp(10)
@@ -3725,11 +3724,11 @@ class MainActivity : Activity() {
 
     // ---------- likhne ka bar: lamba text hone par plus / mic / send neeche ki patti mein (ChatGPT jaisa) ----------
     private fun updateComposerMode() {
-        // bar ab hilta nahi: plus / mic / send hamesha neeche ki line mein, text upar ki taraf badhta hai
-        if (true) return
+        // ChatGPT jaisa: chhota text ek hi line mein (plus | text | mic | send); doosri line ya Enter par text upar, buttons neeche
         if (!::input.isInitialized || !::bottomRow.isInitialized) return
         val blank = input.text.isNullOrBlank()
-        if (!composerExpanded && input.lineCount >= 2) setComposerExpanded(true)
+        val multi = input.lineCount >= 2 || (input.text?.contains('\n') == true)
+        if (!composerExpanded && multi) setComposerExpanded(true)
         else if (composerExpanded && blank) setComposerExpanded(false)
     }
 
