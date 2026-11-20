@@ -30,13 +30,13 @@ object AppReport {
         val pi = try {
             pm.getPackageInfo(pkg, PackageManager.GET_PERMISSIONS or PackageManager.GET_ACTIVITIES or PackageManager.GET_SERVICES or
                 PackageManager.GET_RECEIVERS or PackageManager.GET_PROVIDERS)
-        } catch (e: Exception) { return "Ye app ab phone mein nahi hai: $pkg" }
+        } catch (e: Exception) { return "This app is no longer installed: $pkg" }
         val ai = pi.applicationInfo
         val apk = ai?.sourceDir
-        sb.append("APP REPORT (asli antivirus nahi, sirf saboot)\n")
+        sb.append("APP REPORT (not an antivirus, evidence only)\n")
         sb.append("Naam: ").append(ai?.loadLabel(pm)).append("\nPackage: ").append(pkg)
         sb.append("\nVersion: ").append(pi.versionName).append("\nTarget SDK: ").append(ai?.targetSdkVersion)
-        sb.append("\nInstall source: ").append(try { if (Build.VERSION.SDK_INT >= 30) pm.getInstallSourceInfo(pkg).installingPackageName else pm.getInstallerPackageName(pkg) } catch (e: Exception) { null } ?: "koi nahi (bahar se install)")
+        sb.append("\nInstall source: ").append(try { if (Build.VERSION.SDK_INT >= 30) pm.getInstallSourceInfo(pkg).installingPackageName else pm.getInstallerPackageName(pkg) } catch (e: Exception) { null } ?: "none (sideloaded)")
         val df = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.ENGLISH)
         sb.append("\nInstall: ").append(df.format(java.util.Date(pi.firstInstallTime))).append("  Update: ").append(df.format(java.util.Date(pi.lastUpdateTime)))
         if (apk != null) {
@@ -55,11 +55,11 @@ object AppReport {
             sigs?.forEach { sb.append("\nSigning cert SHA-256: ").append(sha(it.toByteArray())) }
         } catch (e: Exception) { }
         val vt = VtScan.cached(c, pkg, pi.lastUpdateTime)
-        sb.append("\nVirusTotal: ").append(if (vt == null) "abhi jaanch nahi hui" else if (!vt.known) "file VirusTotal ke paas nahi (naya / alag)" else "${vt.mal} antivirus virus, ${vt.susp} shak" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
+        sb.append("\nVirusTotal: ").append(if (vt == null) "not scanned yet" else if (!vt.known) "file not found on VirusTotal (new / unique)" else "${vt.mal} antivirus virus, ${vt.susp} shak" + (if (vt.label.isNotBlank()) " (${vt.label})" else ""))
 
         val p = c.getSharedPreferences("p", Context.MODE_PRIVATE)
         val log = Security.logs(p).firstOrNull { it.pkg == pkg }
-        if (log != null) { h("Scanner ne ye paaya"); sb.append(log.text.substringAfter(" — ")).append("\n") }
+        if (log != null) { h("Scanner findings"); sb.append(log.text.substringAfter(" — ")).append("\n") }
 
         h("Permissions (" + (pi.requestedPermissions?.size ?: 0) + ")")
         pi.requestedPermissions?.forEach { sb.append(it.removePrefix("android.permission.")).append("\n") }
@@ -112,13 +112,13 @@ object AppReport {
                     }
                 }
             }
-            if (ev.isNotEmpty()) { h("Code ke saboot (dex ke andar milne wale shabd)"); sb.append(ev) }
-            if (classes.isNotEmpty()) { h("Shak wale naam wali classes"); classes.forEach { sb.append(it).append("\n") } }
-            if (hosts.isNotEmpty()) { h("Internet par ye websites (code mein likhi)"); hosts.entries.sortedByDescending { it.value }.take(80).forEach { sb.append(it.key).append("  x").append(it.value).append("\n") } }
-            if (pkgs.isNotEmpty()) { h("Code kis library / package ka (class ginti)"); pkgs.entries.sortedByDescending { it.value }.take(45).forEach { sb.append(it.key).append("  ").append(it.value).append("\n") } }
+            if (ev.isNotEmpty()) { h("Code evidence (strings found inside dex)"); sb.append(ev) }
+            if (classes.isNotEmpty()) { h("Suspiciously named classes"); classes.forEach { sb.append(it).append("\n") } }
+            if (hosts.isNotEmpty()) { h("Websites referenced in code"); hosts.entries.sortedByDescending { it.value }.take(80).forEach { sb.append(it.key).append("  x").append(it.value).append("\n") } }
+            if (pkgs.isNotEmpty()) { h("Code by library / package (class count)"); pkgs.entries.sortedByDescending { it.value }.take(45).forEach { sb.append(it.key).append("  ").append(it.value).append("\n") } }
             if (libs.isNotEmpty()) { h("Native libs"); libs.distinct().take(60).forEach { sb.append(it).append("\n") } }
-            if (files.isNotEmpty()) { h("APK ki files"); sb.append(files) }
-        } catch (e: Throwable) { sb.append("\n(APK padhne mein dikkat: ").append(e.message).append(")\n") }
+            if (files.isNotEmpty()) { h("APK files"); sb.append(files) }
+        } catch (e: Throwable) { sb.append("\n(Couldn't read APK: ").append(e.message).append(")\n") }
 
         var out = sb.toString()
         if (out.length > MAX) out = out.take(MAX) + "\n...(chhota kiya)"

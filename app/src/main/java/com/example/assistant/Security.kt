@@ -86,10 +86,10 @@ object Security {
         val sens = SENS.count { it in perms }
         val risky = pkg in acc || pkg in ad || pkg in nl
         // sirf asli khatre ginte hain: aam baatein (Play Store ke bahar se aana, bahut ijazatein, SMS ki ijazat) ab warning nahi banati
-        if (soft && !hasLauncher(pm, pkg) && risky) { s += 3; why.add("Icon chhupa hua") }
+        if (soft && !hasLauncher(pm, pkg) && risky) { s += 3; why.add("Icon hidden") }
         if (pkg in acc) { s += 4; why.add("Accessibility access (screen padhna / tap)") }
         if (pkg in ad) { s += 4; why.add("Device admin (hatana mushkil)") }
-        if (pkg in nl) { s += 2; why.add("Notification access (OTP padh sakta hai)") }
+        if (pkg in nl) { s += 2; why.add("Notification access (can read OTPs)") }
         for ((nm, real) in REAL) {
             if ((low == nm || low.replace(" ", "") == nm.replace(" ", "")) && pkg != real) {
                 s += 5; why.add("Fake app (naam '$label' jaisa, package alag)")
@@ -141,7 +141,7 @@ object Security {
         val hi = f.filter { it.score >= 5 }
         val mid = f.filter { it.score in 3..4 }
         val sb = StringBuilder()
-        if (hi.isEmpty() && mid.isEmpty()) sb.append("Jaanch poori: koi bada khatra nahi mila. ")
+        if (hi.isEmpty() && mid.isEmpty()) sb.append("Scan complete: no major threats found. ")
         if (hi.isNotEmpty()) {
             sb.append("ZYADA SHAK wale app:\n")
             hi.take(6).forEach { sb.append("• ${it.label} — ${it.reasons.joinToString(", ")}\n") }
@@ -150,7 +150,7 @@ object Security {
             sb.append("\nThoda shak wale app:\n")
             mid.take(6).forEach { sb.append("• ${it.label} — ${it.reasons.joinToString(", ")}\n") }
         }
-        if (rooted()) sb.append("\nPhone ke system mein badlaav (root / test-keys) dikh raha hai, ye khatarnak ho sakta hai.\n")
+        if (rooted()) sb.append("\nSystem modification detected (root / test-keys). This may be unsafe.\n")
         return sb.toString().trim()
     }
 

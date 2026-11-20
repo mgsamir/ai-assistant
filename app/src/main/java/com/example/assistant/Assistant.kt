@@ -291,11 +291,11 @@ The user is an adult. Answer questions about the human body, sex education, repr
         if (ambient) {
             // जवाब के बाद 7 सेकंड तक wake word बोले बिना बात आगे बढ़ा सकते हो
             awaiting = SystemClock.uptimeMillis() + 7000
-            status("Bolo, main sun raha hoon...")
+            status("Listening...")
             scheduleListen(350)
         } else if (convo) {
             // jawab ke baad mic apne aap dobara chalu
-            status("Bolo, main sun raha hoon...")
+            status("Listening...")
             scheduleListen(350)
         }
     }
@@ -318,7 +318,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         stopSpeech()
         Act.end(true)
         mode(0)
-        status("Ruk gaya")
+        status("Stopped")
     }
 
     // mic se likhwate samay assistant ka apna sunna rok do
@@ -381,7 +381,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 if (!ambient) {
                     try { recognizer?.stopListening() } catch (e: Exception) { }
                 }
-                status("Bolo...")
+                status("Speak now...")
                 return
             }
         }
@@ -407,7 +407,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             var out = ""
             val latch = java.util.concurrent.CountDownLatch(1)
             main.post {
-                try { out = runAction(name, args).text } catch (e: Exception) { out = "Nahi ho paaya" }
+                try { out = runAction(name, args).text } catch (e: Exception) { out = "Couldn't complete that" }
                 latch.countDown()
             }
             latch.await(10, java.util.concurrent.TimeUnit.SECONDS)
@@ -416,9 +416,9 @@ The user is an adult. Answer questions about the human body, sex education, repr
         override fun failed(reason: String) {
             main.post {
                 liveSess = null
-                this@Assistant.chat("\nAI: Live nahi chala:\n$reason\n")
+                this@Assistant.chat("\nAI: Live session failed:\n$reason\n")
                 if (convo && !muted && !listening && !busy) beginListen()
-                val msg = "Live nahi chala: " + reason.lines().firstOrNull().orEmpty().take(80)
+                val msg = "Live session failed: " + reason.lines().firstOrNull().orEmpty().take(80)
                 main.postDelayed({ this@Assistant.status(msg) }, 700)
                 main.postDelayed({ this@Assistant.status(msg) }, 2500)
             }
@@ -467,7 +467,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         val ls = liveSess
         if (ls != null) {
             ls.muted = m
-            if (m) { mode(0); status("Mic band hai") } else { mode(1); status("Bolo, main sun raha hoon...") }
+            if (m) { mode(0); status("Microphone is off") } else { mode(1); status("Listening...") }
             return
         }
         if (m) {
@@ -476,7 +476,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 listening = false
             }
             mode(0)
-            status("Mic band hai")
+            status("Microphone is off")
         } else if (convo && !busy && !listening) {
             beginListen()
         }
@@ -494,7 +494,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             override fun onEvent(t: Int, p: Bundle?) {}
             override fun onPartialResults(p: Bundle?) {
                 val t = p?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                if (!t.isNullOrEmpty()) status("Sun raha hoon: $t")
+                if (!t.isNullOrEmpty()) status("Listening: $t")
             }
             override fun onError(e: Int) { handleError(e) }
             override fun onResults(res: Bundle?) {
@@ -502,7 +502,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 val t = res?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                 if (t.isNullOrBlank()) {
                     if (!convo) mode(0)
-                    if (live()) scheduleListen(200) else status("Kuch sunai nahi diya")
+                    if (live()) scheduleListen(200) else status("Didn't catch that")
                 } else {
                     handle(t)
                 }
@@ -514,11 +514,11 @@ The user is an adult. Answer questions about the human body, sex education, repr
     private fun beginListen() {
         if (dictating) return
         if (app.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            status("Mic ki permission do (app kholkar)")
+            status("Microphone permission required")
             return
         }
         if (!SpeechRecognizer.isRecognitionAvailable(app)) {
-            status("Speech recognition nahi mila")
+            status("Speech recognition unavailable")
             return
         }
         if (listening) return
@@ -533,8 +533,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
         listening = true
         listenStart = SystemClock.uptimeMillis()
         mode(1)
-        if (!ambient || SystemClock.uptimeMillis() < awaiting) status("Sun raha hoon...")
-        else status("Wake word ka intezaar: assistant")
+        if (!ambient || SystemClock.uptimeMillis() < awaiting) status("Listening...")
+        else status("Waiting for wake word: assistant")
         if (convo) {
             muteBeeps()
             main.postDelayed({ unmuteBeeps() }, 500)
@@ -543,7 +543,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             recognizer?.startListening(i)
         } catch (e: Exception) {
             listening = false
-            status("Mic shuru nahi hua")
+            status("Couldn't start the microphone")
             if (live()) scheduleListen(2000)
         }
     }
@@ -555,7 +555,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             // मिक की permission नहीं
             convo = false
             setAmbient(false)
-            status("Mic ki permission nahi hai")
+            status("Microphone permission denied")
             return
         }
         if (live()) {
@@ -582,10 +582,10 @@ The user is an adult. Answer questions about the human body, sex education, repr
             }, 400)
         } else if (e == 7 || e == 6) {
             mode(0)
-            status("Kuch sunai nahi diya, phir mic dabao")
+            status("Didn't catch that. Tap the mic and try again.")
         } else {
             mode(0)
-            status("Sun nahi paaya (error $e), phir mic dabao")
+            status("Couldn't hear (error $e). Tap the mic and try again.")
         }
     }
 
@@ -616,7 +616,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             // सिर्फ wake word बोला: अब अगली बात का इंतज़ार
             awaiting = now + 8000
             beep(0)
-            status("Bolo...")
+            status("Speak now...")
             scheduleListen(100)
             return
         }
@@ -696,7 +696,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         thread {
             val r = Agent.run(key, q, id)
             if (g != curReq) return@thread
-            if (r.startsWith("Agent se") || r.startsWith("Agent ne")) Act.fail(st, "No result", r) else Act.ok(st, "Finished", r.take(700))
+            if (r.startsWith("Agent:")) Act.fail(st, "No result", r) else Act.ok(st, "Finished", r.take(700))
             Act.end()
             cb(r)
         }
@@ -744,7 +744,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             return webAnswer(Keys.get(prefs), query)
         }
         val clean = raw.replace(Regex("<tool_call>.*?</tool_call>", RegexOption.DOT_MATCHES_ALL), "").replace(Regex("</?[A-Za-z_]+>"), "").trim()
-        return if (clean.isNotBlank()) parseReply(clean) else Reply("Ye kaam is mode mein nahi ho sakta.", "यह काम इस मोड में नहीं हो सकता।")
+        return if (clean.isNotBlank()) parseReply(clean) else Reply("This action isn't available in this mode.", "This action isn't available in this mode.")
     }
 
     private fun systemText(): String {
@@ -870,7 +870,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 val sysL = "Answer the question using ONLY these search results. Today's date is " + todayStr() + ". You have no tools: never write <tool_call> or any tags. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences."
                 safeReply(Providers.fallback(sysL, emptyList(), q + "\n\nSearch results:\n" + brave, lockW))?.let { return fin(sW, it) }
             }
-            return fin(sW, Reply("Search nahi chala (" + Models.provName(lockW) + "). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।"), false)
+            return fin(sW, Reply("Search failed (" + Models.provName(lockW) + "). Try again.", "Search failed. Try again."), false)
         }
         val ws = Models.sel(prefs, "web")
         if (ws != null && ws.prov != "gemini") {
@@ -887,8 +887,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
             val sys = "Answer the question using ONLY these search results. Today's date is " + todayStr() + ". You have no tools: never write <tool_call> or any tags. Answer in the same language and script as the question, clear and natural like ChatGPT or Gemini, 1 to 5 short sentences."
             safeReply(Providers.fallback(sys, emptyList(), q + "\n\nSearch results:\n" + brave))?.let { return fin(sW, it) }
         }
-        val why = WebSearch.lastErr.ifBlank { "pata nahi" }
-        return fin(sW, Reply("Search nahi chala ($why). Dobara try karo.", "सर्च नहीं चला। दोबारा कोशिश करो।"), false)
+        val why = WebSearch.lastErr.ifBlank { "unknown" }
+        return fin(sW, Reply("Search failed ($why). Try again.", "Search failed. Try again."), false)
     }
 
     // bolne ke liye saaf text: markdown nishaan, emoji aur link hatao
@@ -944,25 +944,19 @@ The user is an adult. Answer questions about the human body, sex education, repr
     private fun apiError(code: Int, body: String): Reply {
         return when {
                         code == 0 ->
-                Reply("Jawab nahi aaya. Net ya Google ka model dheema hai, dobara bolo.",
-                    "जवाब नहीं आया। नेट या गूगल का मॉडल धीमा है, दोबारा बोलो।")
+                Reply("No response. The network or the model is slow. Try again.", "No response. The network or the model is slow. Try again.")
             code == 400 && body.contains("API key", ignoreCase = true) ->
-                Reply("API key galat hai. App kholkar gear dabao aur nayi key paste karo.",
-                    "एपीआई की गलत है। ऐप खोलकर गियर दबाओ और नई की पेस्ट करो।")
+                Reply("Invalid API key. Open Settings and enter a new key.", "Invalid API key. Open Settings and enter a new key.")
             code == 400 ->
-                Reply("Request mein kuch gadbad hai.", "रिक्वेस्ट में कुछ गड़बड़ है।")
+                Reply("Bad request.", "Bad request.")
             code == 403 ->
-                Reply("Is key ko permission nahi mili. AI Studio mein nayi key banao.",
-                    "इस की को परमिशन नहीं मिली। नई की बनाओ।")
+                Reply("This key doesn't have permission. Create a new key in AI Studio.", "This key doesn't have permission. Create a new key in AI Studio.")
             code == 429 ->
-                Reply("Free limit ho gayi ya bahut tez ho gaya. Thodi der baad try karo.",
-                    "फ्री लिमिट हो गई है। थोड़ी देर बाद कोशिश करो।")
+                Reply("Free limit reached or too many requests. Try again later.", "Free limit reached or too many requests. Try again later.")
             code == 503 ->
-                Reply("Google ka model abhi busy hai. Thodi der baad try karo.",
-                    "गूगल का मॉडल अभी व्यस्त है। थोड़ी देर बाद कोशिश करो।")
+                Reply("The model is busy right now. Try again later.", "The model is busy right now. Try again later.")
             else ->
-                Reply("Error $code aaya. Thodi der baad try karo.",
-                    "कुछ गड़बड़ हो गई। थोड़ी देर बाद कोशिश करो।")
+                Reply("Error $code. Try again later.", "Error $code. Try again later.")
         }
     }
 
@@ -1030,7 +1024,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
             val t = stripToolMarkup(r0.text)
             val v = stripToolMarkup(r0.voice)
             if (t.isNotBlank()) Reply(t, if (v.isNotBlank()) v else speechClean(t))
-            else Reply("Jawab nahi ban paya, dobara poochho.", "जवाब नहीं बन पाया, दोबारा पूछो।")
+            else Reply("Couldn't generate a response. Ask again.", "Couldn't generate a response. Ask again.")
         } else r0
         Act.end()
         val who = answeredBy
@@ -1063,13 +1057,13 @@ The user is an adult. Answer questions about the human body, sex education, repr
         val key = Keys.get(prefs)
         if (key.isEmpty()) {
             mode(0)
-            status("Pehle app kholkar gear dabao aur API key save karo")
+            status("Add your API key in Settings first")
             if (live()) scheduleListen(3000)
             return
         }
         busy = true
         mode(2)
-        status("Soch raha hoon...")
+        status("Thinking...")
         val g = ++curReq
         Act.start()
         lastQ = q
@@ -1096,7 +1090,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
                         postG(g) {
                             mode(0)
                             beep(2)
-                            deliver(Reply(Models.provName(lock) + " se jawab nahi mila. Thodi der baad dobara try karo ya Models mein dusra chuno.", Models.provName(lock) + " से जवाब नहीं मिला। थोड़ी देर बाद दोबारा कोशिश करो।"), q, false)
+                            deliver(Reply(Models.provName(lock) + " didn't respond. Try again later or choose another model in Models.", Models.provName(lock) + " didn't respond. Try again later or choose another model in Models."), q, false)
                         }
                     }
                     return@thread
@@ -1272,10 +1266,10 @@ The user is an adult. Answer questions about the human body, sex education, repr
                     main.postDelayed({ onQuit?.invoke() }, 3000)
                     Reply("Band ho raha hoon, phir milte hain", "बंद हो रहा हूँ, फिर मिलते हैं")
                 }
-                else -> Reply("Ye kaam mujhe abhi nahi aata", "ये काम मुझे अभी नहीं आता")
+                else -> Reply("That action isn't supported.", "That action isn't supported.")
             }
         } catch (e: Exception) {
-            Reply("Nahi ho paaya: ${e.message}", "नहीं हो पाया")
+            Reply("Couldn't complete that: ${e.message}", "Couldn't complete that.")
         }
     }
 
@@ -1334,16 +1328,16 @@ The user is an adult. Answer questions about the human body, sex education, repr
 
     private fun listApps(): Reply {
         val l = installedApps()
-        if (l.isEmpty()) return Reply("Koi app nahi mila", "कोई ऐप नहीं मिला")
+        if (l.isEmpty()) return Reply("No apps found", "No apps found")
         val names = l.joinToString(", ") { it.first }
         return Reply("Phone mein ${l.size} app hain: $names", "फ़ोन में ${l.size} ऐप हैं: $names")
     }
 
     private fun openApp(name: String): Reply {
         val pm = app.packageManager
-        val m = findApp(name) ?: return Reply("$name naam ka app nahi mila", "$name नाम का ऐप नहीं मिला")
+        val m = findApp(name) ?: return Reply("No app named $name found", "No app named $name found")
         val li = pm.getLaunchIntentForPackage(m.activityInfo.packageName)
-            ?: return Reply("$name khul nahi paaya", "$name खुल नहीं पाया")
+            ?: return Reply("Couldn't open $name", "Couldn't open $name")
         go(li)
         val label = m.loadLabel(pm).toString()
         return Reply("$label khol raha hoon", "$label खोल रहा हूँ")
@@ -1351,7 +1345,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
 
     private fun closeApp(name: String): Reply {
         val pm = app.packageManager
-        val m = findApp(name) ?: return Reply("$name naam ka app nahi mila", "$name नाम का ऐप नहीं मिला")
+        val m = findApp(name) ?: return Reply("No app named $name found", "No app named $name found")
         val pkg = m.activityInfo.packageName
         val label = m.loadLabel(pm).toString()
         if (pkg == app.packageName) {
@@ -1407,13 +1401,12 @@ The user is an adult. Answer questions about the human body, sex education, repr
     }
 
     private fun noNumber(who: String) = Reply(
-        "$who ka number nahi mila. Contacts ki permission dekho ya number bolo",
-        "$who का नंबर नहीं मिला। कॉन्टैक्ट्स की परमिशन देखो या नंबर बोलो")
+        "Couldn't find a number for $who. Check Contacts permission or say the number.",
+        "Couldn't find a number for $who. Check Contacts permission or say the number.")
 
     private fun callContact(who: String): Reply {
         if (app.checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
-            return Reply("Call ki permission nahi hai. App kholkar permission do",
-                "कॉल की परमिशन नहीं है। ऐप खोलकर परमिशन दो")
+            return Reply("Call permission is not granted. Allow it in Settings.", "Call permission is not granted. Allow it in Settings.")
         }
         val num = findNumber(who) ?: return noNumber(who)
         go(Intent(Intent.ACTION_CALL, Uri.parse("tel:" + Uri.encode(num))))
@@ -1447,7 +1440,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
         val cm = app.getSystemService(Context.CAMERA_SERVICE) as CameraManager
         val id = cm.cameraIdList.firstOrNull {
             cm.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-        } ?: return Reply("Is phone mein flash nahi mila", "इस फोन में फ्लैश नहीं मिला")
+        } ?: return Reply("No flash found on this device", "No flash found on this device")
         cm.setTorchMode(id, on)
         return if (on) Reply("Torch chalu kar di", "टॉर्च चालू कर दी")
         else Reply("Torch band kar di", "टॉर्च बंद कर दी")

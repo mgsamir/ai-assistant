@@ -76,9 +76,9 @@ class WhisperDictation(private val ctx: Context) : Dict {
 
     override fun start(existing: String, callback: Dictation.Cb): Boolean {
         if (active) return true
-        if (Extra.groq.isBlank()) { callback.failed("Groq key nahi mili"); return false }
+        if (Extra.groq.isBlank()) { callback.failed("Groq key not found"); return false }
         val minBuf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        if (minBuf <= 0) { callback.failed("Mic nahi khula"); return false }
+        if (minBuf <= 0) { callback.failed("Couldn't open the microphone"); return false }
         cb = callback
         base = existing.trim()
         texts.clear()
@@ -124,14 +124,14 @@ class WhisperDictation(private val ctx: Context) : Dict {
         var rec: AudioRecord? = null
         try {
             rec = AudioRecord(MediaRecorder.AudioSource.MIC, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuf, FRAME * 16))
-            if (rec.state != AudioRecord.STATE_INITIALIZED) throw RuntimeException("mic nahi khula")
+            if (rec.state != AudioRecord.STATE_INITIALIZED) throw RuntimeException("Couldn't open the microphone")
             rec.startRecording()
         } catch (e: Exception) {
             try { rec?.release() } catch (x: Exception) { }
             main.post {
                 if (g == gen) {
                     active = false
-                    cb?.failed("Mic nahi khul paaya")
+                    cb?.failed("Couldn't open the microphone")
                     cb?.ended(full())
                 }
             }
@@ -212,7 +212,7 @@ class WhisperDictation(private val ctx: Context) : Dict {
                 pending.decrementAndGet()
                 if (g == gen) {
                     if (result != null) texts[seq] = clean(result, voicedFrames)
-                    else if (!failedOnce) { failedOnce = true; cb?.failed("Text nahi ban paaya: " + err.take(80)) }
+                    else if (!failedOnce) { failedOnce = true; cb?.failed("Couldn't transcribe: " + err.take(80)) }
                     emit()
                 }
             }

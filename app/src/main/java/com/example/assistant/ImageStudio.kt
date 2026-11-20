@@ -64,7 +64,7 @@ object Studio {
     private fun ai(act: Activity, bmp: Bitmap, prompt: String, dir: File, done: (File?, String) -> Unit) {
         val sp = act.getSharedPreferences("p", Context.MODE_PRIVATE)
         val key = Keys.get(sp)
-        if (key.isEmpty()) { done(null, "API key nahi mili"); return }
+        if (key.isEmpty()) { done(null, "API key not found"); return }
         thread {
             val out = try { Media.image(key, prompt, Pair("image/jpeg", b64(bmp)), Models.sel(sp, "photo")) } catch (e: Throwable) { null }
             val err = Media.lastErr
@@ -76,7 +76,7 @@ object Studio {
                     f = File(dir, "img_" + System.currentTimeMillis() + "." + ext).also { it.writeBytes(out.bytes) }
                 } catch (e: Exception) { }
             }
-            act.runOnUiThread { done(f, if (f == null) err.ifBlank { "Image nahi bani, dobara try karo" } else "") }
+            act.runOnUiThread { done(f, if (f == null) err.ifBlank { "Image generation failed. Try again." } else "") }
         }
     }
 
@@ -129,7 +129,7 @@ object Studio {
         val pins = FrameLayout(act)
         box.addView(iv, FrameLayout.LayoutParams(-1, -1)); box.addView(pins, FrameLayout.LayoutParams(-1, -1))
         col.addView(box, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(act, 10) })
-        col.addView(TextView(act).apply { text = "Photo par chhoo kar khaas edit note likho"; textSize = 14f; setTextColor(Color.parseColor("#B0B0B8")); gravity = Gravity.CENTER; setPadding(0, dp(act, 8), 0, dp(act, 8)) })
+        col.addView(TextView(act).apply { text = "Tap the photo to add an edit note"; textSize = 14f; setTextColor(Color.parseColor("#B0B0B8")); gravity = Gravity.CENTER; setPadding(0, dp(act, 8), 0, dp(act, 8)) })
         val notes = ArrayList<Triple<Float, Float, String>>()
         fun redraw() {
             pins.removeAllViews()
@@ -149,7 +149,7 @@ object Studio {
                 val dx = (vw - bmp.width * s) / 2; val dy = (vh - bmp.height * s) / 2
                 val px = (ev.x - dx) / (bmp.width * s); val py = (ev.y - dy) / (bmp.height * s)
                 if (px in 0f..1f && py in 0f..1f) {
-                    val et = EditText(act); et.hint = "Yahan kya badalna hai?"
+                    val et = EditText(act); et.hint = "What would you like to change?"
                     android.app.AlertDialog.Builder(act).setTitle("Note ${notes.size + 1}").setView(et)
                         .setPositiveButton("Add") { _, _ -> val t = et.text.toString().trim(); if (t.isNotEmpty()) { notes.add(Triple(px, py, t)); redraw() } }
                         .setNegativeButton("Cancel", null).show()
@@ -165,7 +165,7 @@ object Studio {
         val send = IconView(act).apply { kind = 4; tint = Color.WHITE; background = oval(Color.parseColor("#2F6BFF")) }
         send.setOnClickListener {
             val g = et.text.toString().trim()
-            if (g.isEmpty() && notes.isEmpty()) { Toast.makeText(act, "Pehle likho kya badalna hai", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+            if (g.isEmpty() && notes.isEmpty()) { Toast.makeText(act, "Describe the change first", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
             val sb = StringBuilder("Edit this image as asked and keep everything else unchanged. Return only the edited image.")
             if (g.isNotEmpty()) sb.append("\nGeneral edit: ").append(g)
             if (notes.isNotEmpty()) {
@@ -201,13 +201,13 @@ object Studio {
         top.addView(TextView(act).apply { text = "Remove"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         col.addView(top, LinearLayout.LayoutParams(-1, dp(act, 48)))
         col.addView(dv, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(act, 10) })
-        col.addView(TextView(act).apply { text = "Jo cheez mitani hai uske upar ungli phero"; textSize = 14f; setTextColor(Color.parseColor("#B0B0B8")); gravity = Gravity.CENTER; setPadding(0, dp(act, 8), 0, dp(act, 8)) })
+        col.addView(TextView(act).apply { text = "Brush over what you want to remove"; textSize = 14f; setTextColor(Color.parseColor("#B0B0B8")); gravity = Gravity.CENTER; setPadding(0, dp(act, 8), 0, dp(act, 8)) })
         val busy = busyOverlay(act, root)
         val row = LinearLayout(act); row.gravity = Gravity.CENTER_VERTICAL
         row.addView(IconView(act).apply { kind = 36; background = oval(Color.parseColor("#1A1A1A")); setOnClickListener { dv.undo() } }, LinearLayout.LayoutParams(dp(act, 48), dp(act, 48)))
         row.addView(View(act), LinearLayout.LayoutParams(0, 1, 1f))
         row.addView(pill(act, "Remove", "#2F6BFF") {
-            if (dv.strokes.isEmpty()) { Toast.makeText(act, "Pehle mitane wali cheez par brush phero", Toast.LENGTH_SHORT).show(); return@pill }
+            if (dv.strokes.isEmpty()) { Toast.makeText(act, "Brush over the object to remove first", Toast.LENGTH_SHORT).show(); return@pill }
             busy.visibility = View.VISIBLE
             ai(act, dv.render(), "The areas painted in red mark objects or people to remove. Remove everything under the red paint and fill the area naturally so it matches the surrounding background. Do not leave any red color. Keep everything else in the image exactly unchanged. Return only the edited image.", dir) { nf, err ->
                 busy.visibility = View.GONE
@@ -244,7 +244,7 @@ object Studio {
         txt.setOnClickListener { dv.tool = "text"; sel(txt) }
         dv.onTextTap = { x, y ->
             val et = android.widget.EditText(act)
-            et.hint = "Text likho"
+            et.hint = "Enter text"
             et.setTextColor(Color.WHITE); et.setHintTextColor(Color.parseColor("#9A9AA2"))
             android.app.AlertDialog.Builder(act).setView(et)
                 .setPositiveButton("OK") { _, _ -> val tx = et.text.toString().trim(); if (tx.isNotEmpty()) dv.addText(tx, x, y) }
@@ -283,7 +283,7 @@ object Studio {
         wheel.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA)).apply { shape = GradientDrawable.OVAL }
         wheel.setOnClickListener {
             val sb = SeekBar(act); sb.max = 360
-            android.app.AlertDialog.Builder(act).setTitle("Rang chuno").setView(sb)
+            android.app.AlertDialog.Builder(act).setTitle("Choose color").setView(sb)
                 .setPositiveButton("OK") { _, _ -> dv.color = Color.HSVToColor(floatArrayOf(sb.progress.toFloat(), 1f, 1f)); mark() }
                 .setNegativeButton("Cancel", null).show()
         }

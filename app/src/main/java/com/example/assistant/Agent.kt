@@ -40,15 +40,15 @@ object Agent {
     }
 
     fun run(key: String, q: String, agent: String): String {
-        if (key.isEmpty()) return "Gemini key nahi mili."
+        if (key.isEmpty()) return "Agent: Gemini API key not found."
         try {
             val sys = "Reply in the same language as the task, clear and natural. Give the final result clearly and briefly."
             val body = JSONObject().put("agent", agent).put("input", sys + "\n\nTask: " + q).put("background", true)
             var (code, resp) = call(BASE, key, body)
             if (code !in 200..299) {
                 val m = try { JSONObject(resp).optJSONObject("error")?.optString("message") ?: "" } catch (e: Exception) { "" }
-                return if (code == 429) "Agent ki free limit khatam ho gayi (roz 100). Kal Pacific time se dubara chalegi."
-                else "Agent nahi chala: " + (m.ifBlank { "code $code" }).take(120)
+                return if (code == 429) "Agent: free limit reached (100 per day). Resets tomorrow (Pacific time)."
+                else "Agent: request failed: " + (m.ifBlank { "code $code" }).take(120)
             }
             var j = JSONObject(resp)
             val id = j.optString("id")
@@ -62,9 +62,9 @@ object Agent {
             }
             val out = text(j)
             if (out.isNotBlank()) return out
-            return if (j.optString("status") == "failed") "Agent se kaam poora nahi hua." else "Agent ne abhi tak jawab nahi diya, thodi der baad try karo."
+            return if (j.optString("status") == "failed") "Agent: task could not be completed." else "Agent: no response yet. Try again later."
         } catch (e: Exception) {
-            return "Agent tak pahunch nahi paye, net check karo."
+            return "Agent: couldn't connect. Check your internet connection."
         }
     }
 }

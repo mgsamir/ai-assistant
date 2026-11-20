@@ -237,16 +237,16 @@ class ApkSource(private val apk: String) {
     fun read(path: String): String {
         val seg = path.split("/").filter { it.isNotEmpty() }
         if (seg.isNotEmpty() && isDex(seg[0])) {
-            val d = dex(seg[0]) ?: return "Dex padh nahi paya"
+            val d = dex(seg[0]) ?: return "Couldn't read dex"
             val want = seg.drop(1).joinToString("/")
-            val c = classes(seg[0]).firstOrNull { it.first == want } ?: return "Class nahi mili"
-            return smali(seg[0], want) ?: ("(smali nahi ban paya, sirf dhancha)\n\n" + d.describe(c.second))
+            val c = classes(seg[0]).firstOrNull { it.first == want } ?: return "Class not found"
+            return smali(seg[0], want) ?: ("(couldn't generate smali, outline only)\n\n" + d.describe(c.second))
         }
         if (path == "resources.arsc") return JadxView.resourceOf(apk, path)
         return try {
             ZipFile(apk).use { z ->
-                val e = z.getEntry(path) ?: return "File nahi mili"
-                if (e.size > 3_000_000L) return "File badi hai (${e.size / 1024} KB), yahan nahi dikhayi"
+                val e = z.getEntry(path) ?: return "File not found"
+                if (e.size > 3_000_000L) return "File is too large (${e.size / 1024} KB) to display"
                 val bytes = z.getInputStream(e).use { it.readBytes() }
                 if (Axml.isAxml(bytes)) return Axml.decode(bytes)
                 val n = minOf(bytes.size, 2000)
@@ -254,11 +254,11 @@ class ApkSource(private val apk: String) {
                 for (i in 0 until n) { val x = bytes[i].toInt() and 0xff; if (x < 9 || (x in 14..31) ) bad++ }
                 if (bad > n / 20) hex(bytes) else String(bytes, Charsets.UTF_8)
             }
-        } catch (e: Throwable) { "Padh nahi paya: ${e.message}" }
+        } catch (e: Throwable) { "Couldn't read: ${e.message}" }
     }
 
     private fun hex(b: ByteArray): String {
-        val sb = StringBuilder("(binary file, ${b.size} bytes) pehle 1024 bytes:\n\n")
+        val sb = StringBuilder("(binary file, ${b.size} bytes) first 1024 bytes:\n\n")
         for (i in 0 until minOf(1024, b.size) step 16) {
             sb.append("%06x  ".format(i))
             for (j in i until minOf(i + 16, b.size)) sb.append("%02x ".format(b[j].toInt() and 0xff))
@@ -304,7 +304,7 @@ class ApkSource(private val apk: String) {
                     put(MediaStore.Downloads.DISPLAY_NAME, name); put(MediaStore.Downloads.MIME_TYPE, mime)
                     put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/AppCode")
                 }
-                val uri = c.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v) ?: throw RuntimeException("file nahi bani")
+                val uri = c.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v) ?: throw RuntimeException("file not created")
                 c.contentResolver.openOutputStream(uri)!!.use(writer)
                 return "Downloads/AppCode/$name"
             }

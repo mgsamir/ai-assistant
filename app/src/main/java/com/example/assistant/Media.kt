@@ -32,8 +32,8 @@ object Media {
     private fun why(code: Int, resp: String): String {
         val m = try { JSONObject(resp).optJSONObject("error")?.optString("message") ?: "" } catch (e: Exception) { "" }
         return when {
-            code == 429 || m.contains("quota", true) -> "Free limit khatam ya is model ke liye paid plan chahiye"
-            code == 403 || code == 404 -> "Ye model tumhari key par nahi chalta"
+            code == 429 || m.contains("quota", true) -> "Free limit reached or this model needs a paid plan"
+            code == 403 || code == 404 -> "This model isn't available for your key"
             m.isNotBlank() -> m.take(90)
             else -> "code $code"
         }
@@ -59,9 +59,9 @@ object Media {
                     }
                 }
             }
-            lastErr = "$model: kuch bana nahi"
+            lastErr = "$model: nothing generated"
         } catch (e: Exception) {
-            lastErr = "$model: " + (e.message ?: "net nahi chala").take(60)
+            lastErr = "$model: " + (e.message ?: "network error").take(60)
         }
         return null
     }
@@ -130,9 +130,9 @@ object Media {
                         return Out(Base64.decode(data, Base64.DEFAULT), d.optString("mimeType").ifBlank { d.optString("mime_type").ifBlank { "image/png" } })
                     }
                 }
-                lastErr = "$m: image nahi aayi"
+                lastErr = "$m: no image returned"
             } catch (e: Exception) {
-                lastErr = "$m: " + (e.message ?: "net nahi chala").take(60)
+                lastErr = "$m: " + (e.message ?: "network error").take(60)
             }
         }
         // Google se na bane to OpenAI se

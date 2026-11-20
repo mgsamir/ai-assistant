@@ -72,7 +72,7 @@ class Dictation(private val ctx: Context) : Dict {
     override fun start(existing: String, callback: Cb): Boolean {
         if (active) return true
         if (!SpeechRecognizer.isRecognitionAvailable(ctx)) {
-            callback.failed("Speech recognition nahi mila")
+            callback.failed("Speech recognition unavailable")
             return false
         }
         cb = callback
@@ -128,7 +128,7 @@ class Dictation(private val ctx: Context) : Dict {
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
                         val d = full()
                         shutdown()
-                        cb?.failed("Mic ki permission nahi hai")
+                        cb?.failed("Microphone permission denied")
                         if (d.isNotBlank()) cb?.ended(d)
                     }
                     SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
@@ -147,7 +147,7 @@ class Dictation(private val ctx: Context) : Dict {
                         if (misses > 5) {
                             val d = full()
                             shutdown()
-                            cb?.failed("Awaaz sun nahi paaya (error $e)")
+                            cb?.failed("Couldn't hear (error $e)")
                             if (d.isNotBlank()) cb?.ended(d)
                         } else again(400, true)
                     }

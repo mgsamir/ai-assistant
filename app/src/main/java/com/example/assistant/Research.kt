@@ -62,6 +62,6 @@ object Research {
             "Use short ## heading lines, **bold** for key words, short paragraphs, 350 to 600 words. Include exact dates, numbers and names from the findings. " +
             "Start with a 2 line summary, then the details, then what it means for the user. If findings disagree or are missing, say so honestly. " + personal,
             "Topic: $q\n\nFindings:\n$notes")
-        return rep ?: "Report nahi ban paayi. Dobara try karo."
+        return rep ?: "Couldn't create report. Try again."
     }
 }

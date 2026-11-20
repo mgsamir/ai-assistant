@@ -69,23 +69,23 @@ object CodeScan {
         var s = 0
         val strong = ArrayList<String>()
         val weak = ArrayList<String>()
-        if ("tg" in flags) { s += 3; strong.add("Telegram bot se data bhejna") }
-        if ("dc" in flags) { s += 3; strong.add("Discord webhook se data bhejna") }
+        if ("tg" in flags) { s += 3; strong.add("Sends data via Telegram bot") }
+        if ("dc" in flags) { s += 3; strong.add("Sends data via Discord webhook") }
         val banks = flags.count { it.startsWith("bank:") }
         if (banks >= 4) {
-            s += 3; strong.add("Bank / UPI app ki nakal")
+            s += 3; strong.add("Impersonates a bank / UPI app")
             if ("overlay" in flags) { s += 1; strong.add("Fake login screen (overlay)") }
         }
         if ("smssend" in flags) {
-            if ("READ_SMS" in perms || "RECEIVE_SMS" in perms) { s += 3; strong.add("SMS padhna aur bhejna (OTP chori)") }
-            else { s += 1; strong.add("Chupke se SMS bhejna") }
+            if ("READ_SMS" in perms || "RECEIVE_SMS" in perms) { s += 3; strong.add("Reads and sends SMS (OTP theft)") }
+            else { s += 1; strong.add("Sends SMS silently") }
         }
-        if (embedded) { s += 3; strong.add("Chhupa hua dusra app / code") }
+        if (embedded) { s += 3; strong.add("Hidden secondary app / code") }
         if ("screen" in flags) { s += 2; strong.add("Screen recording") }
         if ("keylog" in flags) { s += 2; strong.add("Keyboard keylogger") }
         if ("callrec" in flags) { s += 2; strong.add("Call recording") }
         if ("gesture" in flags) { s += 1; strong.add("Auto tap / swipe control") }
-        if ("install" in flags) { s += 2; strong.add("Chupke se app install karna") }
+        if ("install" in flags) { s += 2; strong.add("Installs apps silently") }
         if ("admin" in flags) { s += 2; strong.add("Phone lock / wipe") }
         if (strong.isEmpty()) return R(0, emptyList())
         if ("dyn" in flags) { s += 1; weak.add("Chhupa code load karna") }

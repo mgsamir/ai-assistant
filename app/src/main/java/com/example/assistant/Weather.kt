@@ -107,7 +107,7 @@ object Weather {
                 "$nameHi में अभी $t डिग्री है और ${d.second}। महसूस $feels डिग्री जैसा हो रहा है, उमस $hum% और हवा $wind किमी प्रति घंटा। " +
                     "आज कम से कम $mn और ज़्यादा से ज़्यादा $mx डिग्री रहेगा, बारिश की संभावना $rain%।")
         } catch (e: Exception) {
-            Reply("Mausam nahi mil paaya, internet check karo", "मौसम नहीं मिल पाया, इंटरनेट चेक करो")
+            Reply("Couldn't get the weather. Check your internet connection.", "Couldn't get the weather. Check your internet connection.")
         }
     }
 }

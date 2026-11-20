@@ -55,7 +55,7 @@ object WebSearch {
                     if (code == 200) {
                         val parts = JSONObject(resp).optJSONArray("candidates")?.optJSONObject(0)
                             ?.optJSONObject("content")?.optJSONArray("parts")
-                        if (parts == null) { lastErr = "$m: khaali jawab"; continue }
+                        if (parts == null) { lastErr = "$m: empty response"; continue }
                         val sb = StringBuilder()
                         for (i in 0 until parts.length()) sb.append(parts.getJSONObject(i).optString("text", ""))
                         if (sb.isNotBlank()) {

@@ -32,10 +32,10 @@ object JadxView {
     fun javaOf(apk: String, dotted: String): String = try {
         val d = open(apk)
         val cls = d.searchJavaClassByOrigFullName(dotted)
-        if (cls == null) "(Java mein ye class nahi mili: $dotted)"
+        if (cls == null) "(Class not found in Java: $dotted)"
         else cls.topParentClass.code
     } catch (e: Throwable) {
-        "Java nahi ban paya (" + e.javaClass.simpleName + ": " + (e.message ?: "") + ")\nSmali dekho."
+        "Couldn't generate Java (" + e.javaClass.simpleName + ": " + (e.message ?: "") + ")\nSee Smali."
     }
 
     private fun collect(rc: ResContainer, sb: StringBuilder) {
@@ -49,13 +49,13 @@ object JadxView {
     fun resourceOf(apk: String, name: String): String = try {
         val d = open(apk)
         val rf = d.resources.firstOrNull { it.originalName == name }
-        if (rf == null) "(Resource nahi mila: $name)" else {
+        if (rf == null) "(Resource not found: $name)" else {
             val sb = StringBuilder()
             collect(rf.loadContent(), sb)
-            if (sb.isEmpty()) "(khali ya padhne layak nahi)" else sb.toString()
+            if (sb.isEmpty()) "(empty or unreadable)" else sb.toString()
         }
     } catch (e: Throwable) {
-        "Decode nahi ho paya (" + e.javaClass.simpleName + ": " + (e.message ?: "") + ")"
+        "Couldn't decode (" + e.javaClass.simpleName + ": " + (e.message ?: "") + ")"
     }
 
     // poore ऐप ka saara Java source (aur resources) folder mein

@@ -1004,7 +1004,7 @@ class MainActivity : Activity() {
         val url = if (place.isNullOrBlank()) "https://earth.google.com/web/@10.59,92.55,0a,60000d,35y,0h,0t,0r"
             else "https://earth.google.com/web/search/" + android.net.Uri.encode(place)
         try { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
-        catch (e: Exception) { Toast.makeText(this, "Browser nahi mila", Toast.LENGTH_SHORT).show() }
+        catch (e: Exception) { Toast.makeText(this, "No browser found", Toast.LENGTH_SHORT).show() }
     }
 
     private fun openEarthDirect() = showEarth(null)
@@ -1027,7 +1027,7 @@ class MainActivity : Activity() {
                 .setType(if (code == 101 || code == 105) "image/*" else "*/*")
             startActivityForResult(i, code)
         } catch (e: Exception) {
-            Toast.makeText(this, "Ye khul nahi paaya", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Couldn't open this", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1046,7 +1046,7 @@ class MainActivity : Activity() {
             } else camUri = null
             startActivityForResult(i, 102)
         } catch (e: Exception) {
-            Toast.makeText(this, "Camera khul nahi paaya", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Couldn't open camera", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1080,7 +1080,7 @@ class MainActivity : Activity() {
                     }
                 }
             } catch (e: Exception) {
-                runOnUiThread { Toast.makeText(this, "Ye file nahi khul paayi", Toast.LENGTH_SHORT).show() }
+                runOnUiThread { Toast.makeText(this, "Couldn't open this file", Toast.LENGTH_SHORT).show() }
             }
         }
     }
@@ -1163,7 +1163,7 @@ class MainActivity : Activity() {
         }
         val bytes = contentResolver.openInputStream(u)?.use { it.readBytes() } ?: return
         if (bytes.size > 8_000_000) {
-            runOnUiThread { Toast.makeText(this, "File bahut badi hai (8 MB se chhoti chahiye)", Toast.LENGTH_LONG).show() }
+            runOnUiThread { Toast.makeText(this, "File is too large (max 8 MB)", Toast.LENGTH_LONG).show() }
             return
         }
         val ok = mime == "application/pdf" || mime.startsWith("audio/") || mime.startsWith("video/") || mime.startsWith("text/")
@@ -1184,13 +1184,13 @@ class MainActivity : Activity() {
             refreshHints()
             showChat("Tum: $t")
             removePending()
-            val msg = "Maps mein khol raha hoon."
+            val msg = "Opening Maps."
             addAi(msg)
             if (::orbList.isInitialized) orbAdd(false, msg)
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(t))))
             } catch (e: Exception) {
-                Toast.makeText(this, "Maps app nahi mila", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Maps app not found", Toast.LENGTH_SHORT).show()
             }
             return true
         }
@@ -1199,7 +1199,7 @@ class MainActivity : Activity() {
             refreshHints()
             showChat("Tum: $t")
             removePending()
-            val msg = "Google Earth browser mein khol raha hoon."
+            val msg = "Opening Google Earth in browser."
             addAi(msg)
             if (::orbList.isInitialized) orbAdd(false, msg)
             AssistantService.engine?.openEarth(t)
@@ -1247,7 +1247,7 @@ class MainActivity : Activity() {
         refreshHints()
         if (orbScreen.visibility == View.VISIBLE && !orbChat) toggleOrbChat()
         showChat("Tum: $tag0$t")
-        if (key.isEmpty()) { finishMedia(null, mode, "API key nahi mili"); return true }
+        if (key.isEmpty()) { finishMedia(null, mode, "API key not found"); return true }
         kotlin.concurrent.thread {
             var note = ""
             var out = when (mode) {
@@ -1259,7 +1259,7 @@ class MainActivity : Activity() {
             // Gemini ka image model nahi chala, aur photo ko HD / saaf karna hai: phone par hi bada aur saaf karo
             if (out == null && mode == "image" && att != null && ENH_RE.containsMatchIn(t)) {
                 val e2 = try { Enhance.run(att, t) } catch (x: Throwable) { null }
-                if (e2 != null) { out = e2.first; note = "Gemini ka image model abhi nahi chala, isliye photo phone par hi bada aur saaf kiya: " + e2.second }
+                if (e2 != null) { out = e2.first; note = "Gemini image model unavailable, so the photo was enhanced on-device: " + e2.second }
             }
             val fin = out
             runOnUiThread { finishMedia(fin, mode, err, note) }
@@ -1270,7 +1270,7 @@ class MainActivity : Activity() {
     private fun finishMedia(out: Media.Out?, kind: String, err: String, note: String = "") {
         removePending()
         if (out == null) {
-            val t = "Nahi ban paaya. " + err.ifBlank { "Dobara try karo." }
+            val t = "Couldn't complete. " + err.ifBlank { "Try again." }
             addAi(t)
             if (::orbList.isInitialized) orbAdd(false, t)
             return
@@ -1350,9 +1350,9 @@ class MainActivity : Activity() {
             "video" -> {
                 val b = btn("\u25B6  Video chalao")
                 b.setOnClickListener {
-                    if (uri == null) { Toast.makeText(this, "Video save nahi hua", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                    if (uri == null) { Toast.makeText(this, "Couldn't save video", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
                     try { startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, out.mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)) }
-                    catch (e: Exception) { Toast.makeText(this, "Video player nahi mila", Toast.LENGTH_SHORT).show() }
+                    catch (e: Exception) { Toast.makeText(this, "No video player found", Toast.LENGTH_SHORT).show() }
                 }
                 box.addView(b)
             }
@@ -1372,9 +1372,9 @@ class MainActivity : Activity() {
                                 prepare()
                                 start()
                             }
-                            b.text = "\u23F8  Rok do"
+                            b.text = "\u23F8  Pause"
                         }
-                    } catch (e: Exception) { Toast.makeText(this, "Gaana nahi chala", Toast.LENGTH_SHORT).show() }
+                    } catch (e: Exception) { Toast.makeText(this, "Couldn't play audio", Toast.LENGTH_SHORT).show() }
                 }
                 box.addView(b)
             }
@@ -1519,18 +1519,18 @@ class MainActivity : Activity() {
     private fun fullSource(apk: String, name: String, setLabel: (String) -> Unit) {
         if (exportingSrc) return
         exportingSrc = true
-        Toast.makeText(this, "Poora source ban raha hai. Bade app mein kai minute lagte hain, app khula rakho.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "Generating full source. This can take several minutes for large apps. Keep the app open.", Toast.LENGTH_LONG).show()
         Thread {
             try {
                 val tmp = java.io.File(cacheDir, "srcout")
                 tmp.deleteRecursively(); tmp.mkdirs()
                 JadxView.exportAll(apk, tmp) { p -> runOnUiThread { setLabel("Source $p%") } }
-                runOnUiThread { setLabel("Zip ban rahi hai...") }
+                runOnUiThread { setLabel("Creating zip...") }
                 val where = ApkSource.saveToDownloads(this, name + "_source.zip", "application/zip") { o -> JadxView.zipDir(tmp, o) }
                 tmp.deleteRecursively()
-                runOnUiThread { Toast.makeText(this, "Save hua: $where", Toast.LENGTH_LONG).show() }
+                runOnUiThread { Toast.makeText(this, "Saved: $where", Toast.LENGTH_LONG).show() }
             } catch (e: Throwable) {
-                runOnUiThread { Toast.makeText(this, "Source nahi ban paya: " + (e.message ?: e.javaClass.simpleName), Toast.LENGTH_LONG).show() }
+                runOnUiThread { Toast.makeText(this, "Couldn't generate source: " + (e.message ?: e.javaClass.simpleName), Toast.LENGTH_LONG).show() }
             } finally {
                 exportingSrc = false
                 runOnUiThread { setLabel("Full source") }
@@ -1596,7 +1596,7 @@ class MainActivity : Activity() {
         dlg.show()
         val stopDots = loadingDots(tv)
         Thread {
-            val r = try { AppReport.build(applicationContext, pkg) } catch (e: Throwable) { "Report nahi ban paya: ${e.message}" }
+            val r = try { AppReport.build(applicationContext, pkg) } catch (e: Throwable) { "Couldn't create report: ${e.message}" }
             runOnUiThread { stopDots(); tv.text = r }
         }.start()
     }
@@ -1660,7 +1660,7 @@ class MainActivity : Activity() {
     // GitHub jaisa file browser: folder, file, code. Save karne par Downloads/AppCode mein
     private fun showCodeBrowser(pkg: String, label: String, apkOverride: String? = null) {
         val apk = apkOverride ?: try { packageManager.getApplicationInfo(pkg, 0).sourceDir } catch (e: Exception) { null }
-        if (apk == null) { Toast.makeText(this, "Ye app phone mein nahi hai", Toast.LENGTH_SHORT).show(); return }
+        if (apk == null) { Toast.makeText(this, "This app is not installed", Toast.LENGTH_SHORT).show(); return }
         val dlg = fullDlg()
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
@@ -1724,7 +1724,7 @@ class MainActivity : Activity() {
                 }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(8) })
                 bar.addView(pill("Save") {
                     val txt = full.ifEmpty { tv.text.toString() }; val nm = v.replace('/', '_') + ".txt"
-                    Thread { try { toast("Save hua: " + ApkSource.saveToDownloads(this, nm, "text/plain") { it.write(txt.toByteArray()) }) } catch (e: Exception) { toast("Save nahi hua: ${e.message}") } }.start()
+                    Thread { try { toast("Saved: " + ApkSource.saveToDownloads(this, nm, "text/plain") { it.write(txt.toByteArray()) }) } catch (e: Exception) { toast("Couldn't save: ${e.message}") } }.start()
                 })
                 if (s.hasAlt(v)) {
                     val isCls = v.substringBefore("/").let { it.startsWith("classes") && it.endsWith(".dex") }
@@ -1732,12 +1732,12 @@ class MainActivity : Activity() {
                     bar.addView(pill(lab) { alt = !alt; render() }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
                 }
                 body.addView(bar, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(10) })
-                if (alt) tv.text = "Pehli baar 10-30 second lag sakte hain, ruko"
+                if (alt) tv.text = "First time may take 10-30 seconds"
                 body.addView(tv)
                 Thread {
-                    var r = try { if (alt) s.readAlt(v) else s.read(v) } catch (e: Throwable) { "Padh nahi paya: ${e.message}" }
+                    var r = try { if (alt) s.readAlt(v) else s.read(v) } catch (e: Throwable) { "Couldn't read: ${e.message}" }
                     full = r
-                    if (r.length > 200_000) r = r.take(200_000) + "\n...(aage ka chhota kiya, Save mein poora milega)"
+                    if (r.length > 200_000) r = r.take(200_000) + "\n...(truncated, full text available via Save)"
                     runOnUiThread { stopV(); tv.text = r }
                 }.start()
             } else {
@@ -1762,12 +1762,12 @@ class MainActivity : Activity() {
                         fullPill = pill("Full source") { fullSource(apk, pkg) { t -> fullPill?.text = t } }
                         head.addView(fullPill, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(8) })
                         head.addView(pill("Save all") {
-                            toast("Zip ban rahi hai, thoda ruko...")
+                            toast("Creating zip...")
                             Thread {
                                 try {
                                     val where = ApkSource.saveToDownloads(this, pkg + "_code.zip", "application/zip") { o -> s.exportZip(o) { } }
-                                    toast("Save hua: $where")
-                                } catch (e: Throwable) { toast("Save nahi hua: ${e.message}") }
+                                    toast("Saved: $where")
+                                } catch (e: Throwable) { toast("Couldn't save: ${e.message}") }
                             }.start()
                         })
                         c.addView(head)
@@ -1796,7 +1796,7 @@ class MainActivity : Activity() {
         Thread {
             val s = try { ApkSource(apk) } catch (e: Throwable) { null }
             runOnUiThread {
-                if (s == null) { Toast.makeText(this, "APK nahi khul paya", Toast.LENGTH_SHORT).show(); dlg.dismiss() }
+                if (s == null) { Toast.makeText(this, "Couldn't open APK", Toast.LENGTH_SHORT).show(); dlg.dismiss() }
                 else { src = s; render() }
             }
         }.start()
@@ -1826,7 +1826,7 @@ class MainActivity : Activity() {
         val list = Security.logs(getSharedPreferences("p", Context.MODE_PRIVATE))
         if (list.isEmpty()) {
             content.addView(TextView(this).apply {
-                text = "Abhi tak koi khatra nahi mila.\nAssistant har baar khulte hi phone ki jaanch karta hai, shak wala app milte hi yahan din ke hisaab se likh dega."
+                text = "No threats found yet.\nThe assistant scans your phone every time it opens and will list suspicious apps here by date."
                 textSize = 15f; setTextColor(Color.parseColor("#B0B0B8")); setPadding(0, dp(20), 0, 0)
             })
         }
@@ -1858,7 +1858,7 @@ class MainActivity : Activity() {
             val nameRow = LinearLayout(this)
             nameRow.gravity = Gravity.CENTER_VERTICAL
             nameRow.addView(TextView(this).apply {
-                text = e.label + (if (e.fresh) "  \u2022 naya app" else "")
+                text = e.label + (if (e.fresh) "  \u2022 new app" else "")
                 textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
                 setOnClickListener { showAppReport(e.pkg, e.label) }
             })
@@ -2023,7 +2023,7 @@ class MainActivity : Activity() {
 
         fun run(t: Turn) {
             val key = Keys.get(getSharedPreferences("p", Context.MODE_PRIVATE))
-            if (key.isEmpty()) { Toast.makeText(this, "API key nahi mili", Toast.LENGTH_SHORT).show(); t.busy = false; t.err = "API key nahi mili"; render(); return }
+            if (key.isEmpty()) { Toast.makeText(this, "API key not found", Toast.LENGTH_SHORT).show(); t.busy = false; t.err = "API key not found"; render(); return }
             t.busy = true; t.err = null; t.file = null
             busyImg = true
             val att = t.photo?.let { Pair("image/jpeg", it) }
@@ -2035,7 +2035,7 @@ class MainActivity : Activity() {
                 runOnUiThread {
                     busyImg = false
                     t.busy = false
-                    t.note = if (out != null && fb) "Google ka image model nahi chala" + (if (ge.isNotBlank()) " (" + ge.take(140) + ")" else "") + ". Free Pollinations se bani." else null
+                    t.note = if (out != null && fb) "Google image model unavailable" + (if (ge.isNotBlank()) " (" + ge.take(140) + ")" else "") + ". Generated with free Pollinations." else null
                     if (out != null) t.file = saveGenerated(out)
                     else t.err = "Could not create the image. " + err.ifBlank { "Please try again." }
                     render()
@@ -2236,7 +2236,7 @@ class MainActivity : Activity() {
                 setOnClickListener {
                     val u = galleryUri(f)
                     if (u != null) try { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("image/*").putExtra(Intent.EXTRA_STREAM, u).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Share")) } catch (e: Exception) { }
-                    else Toast.makeText(this@MainActivity, "Share nahi ho paya", Toast.LENGTH_SHORT).show()
+                    else Toast.makeText(this@MainActivity, "Couldn't share", Toast.LENGTH_SHORT).show()
                 }
             }, LinearLayout.LayoutParams(-2, dp(44)))
             frame.addView(topRow, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply { topMargin = dp(40); leftMargin = dp(16); rightMargin = dp(16) })
@@ -2260,7 +2260,7 @@ class MainActivity : Activity() {
                     val r = opts.first { it.first == mi.title.toString() }.second
                     kotlin.concurrent.thread {
                         val nf = try { Studio.resize(f, r, genDir) } catch (e: Throwable) { null }
-                        runOnUiThread { if (nf != null) show(nf) else Toast.makeText(this, "Resize nahi hua", Toast.LENGTH_SHORT).show() }
+                        runOnUiThread { if (nf != null) show(nf) else Toast.makeText(this, "Couldn't resize", Toast.LENGTH_SHORT).show() }
                     }
                     true
                 }
@@ -2394,14 +2394,14 @@ class MainActivity : Activity() {
     private fun askLimit(m: Models.M, done: () -> Unit) {
         val et = EditText(this)
         et.inputType = InputType.TYPE_CLASS_NUMBER
-        et.hint = "Roz ki requests, jaise 250"
+        et.hint = "Daily requests, e.g. 250"
         val cur = Usage.limitOf(m)
         if (cur > 0) et.setText(cur.toString())
         android.app.AlertDialog.Builder(this)
-            .setTitle(m.name + " ki roz ki limit")
+            .setTitle(m.name + " daily limit")
             .setView(et)
             .setPositiveButton("Save") { _, _ -> Usage.setLimit(m, et.text.toString().toIntOrNull() ?: 0); done() }
-            .setNegativeButton("Hatao") { _, _ -> Usage.setLimit(m, 0); done() }
+            .setNegativeButton("Remove") { _, _ -> Usage.setLimit(m, 0); done() }
             .show()
     }
 
@@ -2487,7 +2487,7 @@ class MainActivity : Activity() {
                 }
             }
             list.addView(TextView(this).apply {
-                text = "Live baat-cheet ki awaaz agli baar shuru karne par badlegi."
+                text = "Live voice will change the next time you start."
                 textSize = 12.5f; setTextColor(Color.parseColor("#9A9AA2")); setPadding(dp(4), dp(6), dp(4), dp(10))
             })
         }
@@ -2540,7 +2540,7 @@ class MainActivity : Activity() {
             }
             col.addView(row, LinearLayout.LayoutParams(-1, -2))
         }
-        item("", "Auto", "Gemini, Groq aur OpenRouter teeno")
+        item("", "Auto", "Gemini, Groq and OpenRouter")
         for (prov in listOf("gemini", "groq", "openrouter")) {
             val n = free.count { it.prov == prov }
             val only = if (cur == prov && single != null && single.prov == prov) "Only: " + single.name else "Auto \u00b7 $n free models"
@@ -2667,7 +2667,7 @@ class MainActivity : Activity() {
                 r.addView(TextView(this).apply { text = if (on) "On" else "Off"; textSize = 13f; setTextColor(Color.parseColor(if (on) "#34D399" else "#8A8A92")) })
                 col.addView(r)
             }
-            svc("brave", "Brave Search", "Web search aur sources", Extra.brave.isNotBlank())
+            svc("brave", "Brave Search", "Web search and sources", Extra.brave.isNotBlank())
             svc("elevenlabs", "ElevenLabs", "Natural awaaz (voice)", Extra.eleven.isNotBlank())
             svc("virustotal", "VirusTotal", "App security scan", Extra.vt.isNotBlank())
             // sirf free models dikhte hain, paid sab hata diye
@@ -2722,7 +2722,7 @@ class MainActivity : Activity() {
                     val on = cur != null && cur.key == mm.key
                     col.addView(row(mm.name, null, mm.prov, on, Usage.info(mm), if (mm.prov == "gemini" || mm.prov == "openai") ({ askLimit(mm) { render() } }) else null) {
                         if (Usage.paidOnly(mm)) {
-                            Toast.makeText(this, "Ye model free plan mein nahi chalta. Paid key ho to isko lamba dabakar apni limit daalo.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this, "This model isn't available on the free plan. With a paid key, long-press it to set your own limit.", Toast.LENGTH_LONG).show()
                         } else {
                             if (tab == "chat" || tab == "coding") Models.setLock(p, mm.prov)
                             Models.setSel(p, tab, if (on) null else mm)
@@ -2889,8 +2889,8 @@ class MainActivity : Activity() {
             addView(avatarImg, FrameLayout.LayoutParams(-1, -1))
             setOnClickListener {
                 val pm = android.widget.PopupMenu(this@MainActivity, this)
-                pm.menu.add(0, 1, 0, "Gallery se photo chuno")
-                if (java.io.File(filesDir, "profile.jpg").exists()) pm.menu.add(0, 2, 1, "Photo hatao")
+                pm.menu.add(0, 1, 0, "Choose photo")
+                if (java.io.File(filesDir, "profile.jpg").exists()) pm.menu.add(0, 2, 1, "Remove photo")
                 pm.setOnMenuItemClickListener {
                     if (it.itemId == 1) pick(105)
                     else { java.io.File(filesDir, "profile.jpg").delete(); showProfile() }
@@ -3140,7 +3140,7 @@ class MainActivity : Activity() {
             openOrb()
             return
         }
-        if (t.isEmpty()) t = "Isme kya hai? Aasaan shabdon mein batao."
+        if (t.isEmpty()) t = "What's in this? Explain in simple words."
         // photo ke saath "badlo / 4K / hatao" jaisa kaam ho to seedha photo-edit chalao
         if (pendMode.isEmpty() && pendAtt?.first?.startsWith("image/") == true && EDIT_RE.containsMatchIn(t)) pendMode = "image"
         if (runSpecial(t)) { input.text?.clear(); return }
@@ -3175,7 +3175,7 @@ class MainActivity : Activity() {
             startSvc()
             attach(15)
         } else {
-            Toast.makeText(this, "Mic ki permission ke bina assistant nahi chalega", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Microphone permission is required", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -3347,10 +3347,10 @@ class MainActivity : Activity() {
     }
 
     private fun orbLabel(m: Int) = when (m) {
-        1 -> "Sun raha hoon..."
-        2 -> "Soch raha hoon..."
-        3 -> "Bol raha hoon..."
-        else -> if (micMuted) "Mic band hai" else "Bolo, main sun raha hoon..."
+        1 -> "Listening..."
+        2 -> "Thinking..."
+        3 -> "Speaking..."
+        else -> if (micMuted) "Microphone is off" else "Listening..."
     }
 
     private fun oval(color: String) = GradientDrawable().apply {
@@ -3542,7 +3542,7 @@ class MainActivity : Activity() {
         if (runSpecial(t)) { orbInput.text?.clear(); return }
         val e = AssistantService.engine
         if (e == null) {
-            Toast.makeText(this, "Assistant shuru nahi hua", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Couldn't start the assistant", Toast.LENGTH_SHORT).show()
             return
         }
         val att = pendAtt

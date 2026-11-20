@@ -94,7 +94,7 @@ class LiveSession(private val ctx: Context, private val key: String, private val
                 sp.edit().putBoolean("vol_init", true).apply()
             }
         } catch (e: Exception) { }
-        cb.status("Gemini Live se jud raha hoon...")
+        cb.status("Connecting to Gemini Live...")
         initTrack()
         thread(name = "live-play") { playLoop() }
         connect()
@@ -192,7 +192,7 @@ class LiveSession(private val ctx: Context, private val key: String, private val
             // beech mein toot gaya: mic chalu rakho (beep na aaye), sirf jod dobara lagao
             everReady = false
             if (System.currentTimeMillis() - openedAt > 8000) {
-                cb.status("Dobara jud raha hoon...")
+                cb.status("Reconnecting...")
                 thread { Thread.sleep(500); connect() }
                 return
             }
@@ -213,7 +213,7 @@ class LiveSession(private val ctx: Context, private val key: String, private val
             ready = true
             everReady = true
             openedAt = System.currentTimeMillis()
-            cb.status("Bolo, main sun raha hoon...")
+            cb.status("Listening...")
             cb.mode(1)
             startMic()
             return
@@ -236,7 +236,7 @@ class LiveSession(private val ctx: Context, private val key: String, private val
                 for (i in 0 until calls.length()) {
                     val c = calls.getJSONObject(i)
                     val out = try { cb.tool(c.getString("name"), c.optJSONObject("args") ?: JSONObject()) }
-                    catch (e: Exception) { "Nahi ho paaya" }
+                    catch (e: Exception) { "Couldn't complete that" }
                     resp.put(JSONObject().put("id", c.optString("id"))
                         .put("name", c.getString("name"))
                         .put("response", JSONObject().put("result", out)))
@@ -293,7 +293,7 @@ class LiveSession(private val ctx: Context, private val key: String, private val
                     AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(min, frame * 4))
             } catch (e: Exception) { null }
             if (r == null || r.state != AudioRecord.STATE_INITIALIZED) {
-                cb.status("Mic chalu nahi ho paaya")
+                cb.status("Couldn't start the microphone")
                 try { r?.release() } catch (e: Exception) { }
                 return@thread
             }
