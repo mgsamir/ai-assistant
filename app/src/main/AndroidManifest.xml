@@ -28,7 +28,7 @@
     <application
         android:allowBackup="false"
         android:largeHeap="true"
-        android:label="AI Assistant"
+        android:label="Ai Assistant"
         android:theme="@style/AppTheme">
 
         <activity
