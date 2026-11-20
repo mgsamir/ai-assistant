@@ -2784,35 +2784,6 @@ class MainActivity : Activity() {
             val only = if (cur == prov && single != null && single.prov == prov) "Only: " + single.name else "Auto \u00b7 $n free models"
             item(prov, Models.provName(prov), only)
         }
-        // Brave Search: model nahi, search ka zariya; yahin se On/Off
-        run {
-            val hasKey = Extra.brave.isNotBlank()
-            var on = p.getBoolean("brave_on", true)
-            val st = TextView(this).apply { textSize = 13f; typeface = Typeface.DEFAULT_BOLD }
-            val sb = TextView(this).apply { textSize = 13f; setTextColor(Color.parseColor("#B0B0B8")) }
-            fun paint() {
-                val live = hasKey && on
-                st.text = if (!hasKey) "No key" else if (on) "On" else "Off"
-                st.setTextColor(Color.parseColor(if (live) "#34D399" else "#8A8A92"))
-                sb.text = "Web search and sources"
-            }
-            paint()
-            val row = LinearLayout(this).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(12), dp(12), dp(14), dp(12))
-                background = ActUi.ripple(this@MainActivity, dp(18))
-            }
-            provLogo("brave", 40)?.let { row.addView(it, LinearLayout.LayoutParams(dp(40), dp(40))) }
-            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            tx.addView(TextView(this).apply { text = "Brave Search"; textSize = 17f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-            tx.addView(sb)
-            row.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(14) })
-            row.addView(st)
-            row.setOnClickListener {
-                if (hasKey) { on = !on; p.edit().putBoolean("brave_on", on).apply(); paint() }
-            }
-            col.addView(row, LinearLayout.LayoutParams(-1, -2))
-        }
         dlg.setContentView(sv)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -2934,7 +2905,7 @@ class MainActivity : Activity() {
                 r.addView(TextView(this).apply { text = if (on) "On" else "Off"; textSize = 13f; setTextColor(Color.parseColor(if (on) "#34D399" else "#8A8A92")) })
                 col.addView(r)
             }
-            svc("brave", "Brave Search", "Web search and sources", Extra.brave.isNotBlank() && p.getBoolean("brave_on", true))
+            svc("brave", "Brave Search", "Web search and sources", Extra.brave.isNotBlank())
             svc("virustotal", "VirusTotal", "App security scan", Extra.vt.isNotBlank())
             // sirf free models dikhte hain, paid sab hata diye
             for ((k, _) in Models.CATS) Models.sel(p, k)?.let { if (!it.free || Usage.paidOnly(it)) Models.setSel(p, k, null) }
