@@ -416,11 +416,48 @@ class MainActivity : Activity() {
         }
         colU.addView(tv)
         row.addView(colU)
+        row.tag = "user"
+        // laga rehne par: Copy / Edit
+        tv.setOnLongClickListener {
+            val pm = android.widget.PopupMenu(this, tv)
+            pm.menu.add(0, 1, 0, "Copy")
+            pm.menu.add(0, 2, 1, "Edit")
+            pm.setOnMenuItemClickListener { mi ->
+                if (mi.itemId == 1) {
+                    (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("message", text))
+                } else editMessage(row, text)
+                true
+            }
+            pm.show()
+            true
+        }
         chatList.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dp(18)
             bottomMargin = dp(10)
         })
         scrollDown()
+    }
+
+    // apna bheja sandesh badlo: ye sandesh aur uske baad ka sab hat jaata hai, text box mein wapas aa jaata hai
+    private fun editMessage(row: View, text: String) {
+        val e = AssistantService.engine ?: return
+        if (Act.running) return
+        var n = 0
+        for (i in 0 until chatList.indexOfChild(row)) if (chatList.getChildAt(i).tag == "user") n++
+        val parts = e.full.toString().split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.filter { it.isNotEmpty() }
+        val keep = ArrayList<String>()
+        var seen = -1
+        for (p in parts) {
+            if (p.startsWith("Tum:")) { seen++; if (seen == n) break }
+            keep.add(p)
+        }
+        val sub = keep.joinToString("") { "\n$it\n" }
+        e.loadChat(sub)
+        rebuildChat(sub)
+        input.setText(text)
+        input.setSelection(input.text.length)
+        input.requestFocus()
+        input.post { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(input, 0) }
     }
 
     private fun addPending() {
