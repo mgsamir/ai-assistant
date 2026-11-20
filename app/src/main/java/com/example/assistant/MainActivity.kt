@@ -3161,7 +3161,7 @@ class MainActivity : Activity() {
             })
         }
         composerMic = icon(2, 44) { startRec() }
-        voiceBtn = icon(3, 48) { if (Act.running) AssistantService.engine?.cancelRequest() else sendInput() }
+        voiceBtn = icon(3, 44) { if (Act.running) AssistantService.engine?.cancelRequest() else sendInput() }
         voiceBtn.tint = Color.WHITE
         voiceBtn.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
