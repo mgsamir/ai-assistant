@@ -768,7 +768,7 @@ class MainActivity : Activity() {
                     text = "\u22EE"; textSize = 22f; setTextColor(Color.parseColor("#C8C8CC")); setPadding(dp(14), dp(4), dp(14), dp(4))
                 }
                 more.setOnClickListener {
-                    val pm = PopupMenu(this@MainActivity, more)
+                    val pm = android.widget.PopupMenu(this@MainActivity, more)
                     pm.menu.add(0, 1, 0, "Rename")
                     pm.menu.add(0, 2, 1, if (o.pin) "Unpin" else "Pin")
                     pm.menu.add(0, 3, 2, "Delete")
