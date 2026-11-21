@@ -94,3 +94,46 @@ class GlowView(ctx: Context) : View(ctx) {
         postInvalidateOnAnimation()
     }
 }
+
+// Naye chat mein pehla sandesh bhejne par upar se utarti rangeen roshni (Gemini jaisa);
+// jawab aate hi ghul jaati hai, uske baad background wahi saada kaala
+class AuroraView(ctx: Context) : View(ctx) {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var t0 = 0L
+    private var offAt = 0L
+    private var on = false
+    private var running = false
+
+    fun start() {
+        if (running && on) return
+        t0 = SystemClock.uptimeMillis(); on = true; running = true; invalidate()
+    }
+
+    fun stop() { if (running && on) { on = false; offAt = SystemClock.uptimeMillis() } }
+
+    fun stopNow() { on = false; running = false; invalidate() }
+
+    override fun onDraw(c: Canvas) {
+        if (!running) return
+        val now = SystemClock.uptimeMillis()
+        val t = (now - t0) / 1000f
+        if (t > 40f && on) { on = false; offAt = now }
+        val inA = min(1f, t / 0.7f)
+        val outA = if (on) 1f else 1f - (now - offAt) / 800f
+        if (outA <= 0f) { running = false; return }
+        val a = inA * outA
+        val w = width.toFloat()
+        val r = w * 0.72f
+        for (i in 0..2) {
+            val cx = w * (0.1f + 0.4f * i) + w * 0.06f * sin(t * 0.9f + i * 2f)
+            val hue = (((220f - 36f * t + i * 55f) % 360f) + 360f) % 360f
+            val col = Color.HSVToColor((150f * a).toInt().coerceIn(0, 255), floatArrayOf(hue, 0.85f, 1f))
+            p.shader = android.graphics.RadialGradient(cx, 0f, r, col, Color.TRANSPARENT, Shader.TileMode.CLAMP)
+            c.save()
+            c.scale(1f, 1.4f, cx, 0f)
+            c.drawCircle(cx, 0f, r, p)
+            c.restore()
+        }
+        postInvalidateOnAnimation()
+    }
+}

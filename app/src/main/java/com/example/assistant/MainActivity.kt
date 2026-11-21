@@ -259,6 +259,8 @@ class MainActivity : Activity() {
     private var composerExpanded = false
     private lateinit var greet: LinearLayout
     private lateinit var glow: GlowView
+    private var aurora: AuroraView? = null
+    private var rebuilding = false
     // khulte waqt ek ke baad ek ubharne wala intro (Gemini jaisa)
     private var headerV: View? = null
     private var avatarImg: ImageView? = null
@@ -387,6 +389,8 @@ class MainActivity : Activity() {
 
     private fun addUser(raw: String) {
         val (text, img) = splitImg(raw)
+        // naye (khali) chat ka pehla sandesh: rangeen roshni, jawab aane tak
+        if (!rebuilding && chatList.childCount == 0) aurora?.start()
         lastUserText = text
         val row = LinearLayout(this).apply { gravity = Gravity.END }
         val colU = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.END }
@@ -536,6 +540,7 @@ class MainActivity : Activity() {
         lastExtraViews = null
         lastRetryPill?.visibility = View.GONE
         lastRetryPill = null
+        aurora?.stop()
         val myIdx = aiCount++
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val tv = TextView(this).apply {
@@ -949,6 +954,12 @@ class MainActivity : Activity() {
 
     // Purani baat-cheet dobara dikhao (ऐप wapas kholne par)
     private fun rebuildChat(log: String) {
+        aurora?.stopNow()
+        rebuilding = true
+        try { rebuildChatInner(log) } finally { rebuilding = false }
+    }
+
+    private fun rebuildChatInner(log: String) {
         chatList.removeAllViews()
         pending = null
         aiCount = 0
@@ -3348,6 +3359,7 @@ class MainActivity : Activity() {
         setContentView(FrameLayout(this).apply {
             addView(mainBg, FrameLayout.LayoutParams(-1, -1))
             addView(glow, FrameLayout.LayoutParams(-1, -1))
+            addView(AuroraView(this@MainActivity).also { aurora = it }, FrameLayout.LayoutParams(-1, -1))
             addView(root, FrameLayout.LayoutParams(-1, -1))
             addView(buildOrbScreen(), FrameLayout.LayoutParams(-1, -1))
         })
