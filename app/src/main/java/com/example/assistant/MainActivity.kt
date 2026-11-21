@@ -229,6 +229,7 @@ class IconView(ctx: Context) : View(ctx) {
             64 -> { c.drawLine(10f, 4f, 14f, 4f, p); c.drawLine(4.5f, 7f, 19.5f, 7f, p); c.drawRoundRect(RectF(6.5f, 7f, 17.5f, 20f), 2f, 2f, p); c.drawLine(10f, 10.5f, 10f, 16.5f, p); c.drawLine(14f, 10.5f, 14f, 16.5f, p) }
             65 -> { c.drawLine(12f, 15f, 12f, 4f, p); c.drawLine(7.5f, 8.5f, 12f, 4f, p); c.drawLine(16.5f, 8.5f, 12f, 4f, p); c.drawLine(5f, 14f, 5f, 19.5f, p); c.drawLine(5f, 19.5f, 19f, 19.5f, p); c.drawLine(19f, 19.5f, 19f, 14f, p) }
             66 -> { c.drawCircle(12f, 12f, 8.5f, p); c.drawLine(12f, 11f, 12f, 16.5f, p); c.drawCircle(12f, 7.8f, 0.4f, p) }
+            68 -> { val path = android.graphics.Path(); path.moveTo(12f, 3.5f); path.lineTo(19f, 6.5f); path.lineTo(19f, 11.5f); path.cubicTo(19f, 16f, 16f, 19.5f, 12f, 20.5f); path.cubicTo(8f, 19.5f, 5f, 16f, 5f, 11.5f); path.lineTo(5f, 6.5f); path.close(); c.drawPath(path, p); c.drawLine(9f, 12f, 11.2f, 14.2f, p); c.drawLine(11.2f, 14.2f, 15.3f, 10f, p) }
             23 -> { c.drawLine(19f, 12f, 5f, 12f, p); c.drawLine(11f, 6f, 5f, 12f, p); c.drawLine(5f, 12f, 11f, 18f, p) }
             else -> {
                 val t = Path()
@@ -1243,7 +1244,7 @@ class MainActivity : Activity() {
                         val f = java.io.File(cacheDir, "picked.apk")
                         contentResolver.openInputStream(u)?.use { ins -> f.outputStream().use { ins.copyTo(it) } }
                         val stem = nm.substringBeforeLast(".").ifBlank { "app" }
-                        runOnUiThread { showCodeBrowser(stem, stem, f.absolutePath) }
+                        runOnUiThread { showAppReport(stem, stem, true, f.absolutePath) }
                     }
                     102 -> {
                         val u = camUri
@@ -1626,6 +1627,14 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r2.setOnClickListener { dlg.dismiss(); showSecurityLog() }
         col.addView(r2)
+        val r2b = LinearLayout(this)
+        r2b.gravity = Gravity.CENTER_VERTICAL
+        r2b.setPadding(0, dp(14), 0, dp(14))
+        r2b.addView(IconView(this).apply { kind = 68 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        r2b.addView(TextView(this).apply { text = "Check an app"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        r2b.setOnClickListener { dlg.dismiss(); showAppPicker() }
+        col.addView(r2b)
         val r3 = LinearLayout(this)
         r3.gravity = Gravity.CENTER_VERTICAL
         r3.setPadding(0, dp(14), 0, dp(14))
@@ -1721,7 +1730,7 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    private fun showAppReport(pkg: String, label: String, reverse: Boolean = false) {
+    private fun showAppReport(pkg: String, label: String, reverse: Boolean = false, apkOverride: String? = null) {
         val dlg = fullDlg()
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
@@ -1746,13 +1755,13 @@ class MainActivity : Activity() {
         if (reverse) {
             var fsBtn: TextView? = null
             fsBtn = btn("Full source") {
-                val apkP = try { packageManager.getApplicationInfo(pkg, 0).sourceDir } catch (e: Exception) { null }
+                val apkP = apkOverride ?: try { packageManager.getApplicationInfo(pkg, 0).sourceDir } catch (e: Exception) { null }
                 if (apkP != null) fullSource(apkP, pkg) { t -> fsBtn?.text = t }
             }
             btns.addView(fsBtn, LinearLayout.LayoutParams(0, dp(46), 1f).apply { rightMargin = dp(4) })
-            btns.addView(btn("Code") { showCodeBrowser(pkg, label) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(4) })
+            btns.addView(btn("Code") { showCodeBrowser(pkg, label, apkOverride) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { leftMargin = dp(4) })
         }
-        if (!reverse) btns.addView(btn("Code") { showCodeBrowser(pkg, label) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { rightMargin = dp(4) })
+        if (!reverse) btns.addView(btn("Code") { showCodeBrowser(pkg, label, apkOverride) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { rightMargin = dp(4) })
         (if (reverse) btns2 else btns).addView(btn("Copy") {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("report", tv.text))
@@ -1779,7 +1788,7 @@ class MainActivity : Activity() {
         dlg.show()
         val stopDots = loadingDots(tv)
         Thread {
-            val r = try { AppReport.build(applicationContext, pkg) } catch (e: Throwable) { "Couldn't create report: ${e.message}" }
+            val r = try { if (apkOverride != null) AppReport.buildFromArchive(applicationContext, apkOverride) else AppReport.build(applicationContext, pkg) } catch (e: Throwable) { "Couldn't create report: ${e.message}" }
             runOnUiThread { stopDots(); tv.text = r }
         }.start()
     }
@@ -1802,7 +1811,7 @@ class MainActivity : Activity() {
         val back = icon(23, 40) { dlg.dismiss() }
         back.background = oval("#1A1A1A")
         topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
-        topBar.addView(TextView(this).apply { text = "Smali"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+        topBar.addView(TextView(this).apply { text = "Check an app"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
             FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
         root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
         val pm = packageManager
@@ -1816,8 +1825,8 @@ class MainActivity : Activity() {
             pr.orientation = LinearLayout.VERTICAL
             pr.setPadding(dp(14), dp(14), dp(14), dp(14))
             pr.background = GradientDrawable().apply { setColor(Color.parseColor("#12203D")); cornerRadius = dp(12).toFloat(); setStroke(dp(1), Color.parseColor("#2B3A67")) }
-            pr.addView(TextView(this).apply { text = "APK File"; textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
-            pr.addView(TextView(this).apply { text = "Open and analyze an APK from device storage"; textSize = 12f; setTextColor(Color.parseColor("#B8C4E0")) })
+            pr.addView(TextView(this).apply { text = "Check an APK file"; textSize = 16f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD })
+            pr.addView(TextView(this).apply { text = "Pick an APK (e.g. from a mod site) and compare it to your installed app"; textSize = 12f; setTextColor(Color.parseColor("#B8C4E0")) })
             pr.setOnClickListener {
                 val i = Intent(Intent.ACTION_OPEN_DOCUMENT)
                 i.addCategory(Intent.CATEGORY_OPENABLE)
