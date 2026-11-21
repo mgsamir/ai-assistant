@@ -12,6 +12,9 @@ object Providers {
     // "aaj / abhi / latest / bhav / score" jaise sawaalon par khabar wali khoj bhi chalegi
     private val FRESH = Regex("(?i)\\b(today|now|latest|live|news|price|rate|score|result|current|breaking|aaj|abhi|taaza|khabar|bhav|bhaav|kimat|nateeja|share|sensex|nifty|gold|silver|petrol|diesel)\\b|\u0906\u091C|\u0905\u092D\u0940|\u0924\u093E\u091C\u093C\u093E|\u0916\u092C\u0930|\u0916\u093C\u092C\u0930|\u092D\u093E\u0935|\u0915\u0940\u092E\u0924|\u0928\u0924\u0940\u091C\u093E|\u0938\u094D\u0915\u094B\u0930")
 
+    // live / taaza sawaal hai ya nahi (score, news, bhav, aaj...)
+    fun isLive(q: String): Boolean = FRESH.containsMatchIn(q)
+
     private fun braveGet(path: String, q: String, extra: String, key: String): JSONObject? {
         return try {
             val c = URL("https://api.search.brave.com/res/v1/$path?q=" + URLEncoder.encode(q, "UTF-8") + extra)

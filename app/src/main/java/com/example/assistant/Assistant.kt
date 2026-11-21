@@ -1113,6 +1113,12 @@ The user is an adult. Answer questions about the human body, sex education, repr
         thread {
             try {
                 val codeQ = Regex("(?i)\\b(code|coding|program|script|function|bug|error|kotlin|java|python|html|css|javascript|sql|api|app banao|website banao)\\b|कोड|प्रोग्राम").containsMatchIn(q)
+                // live sawaal + Brave ki key ho to pehle Brave search (model ka intezaar nahi), jawab wahi se
+                if (att == null && Extra.brave.isNotEmpty() && Providers.isLive(q)) {
+                    val rLive = webAnswer(key, q)
+                    postG(g) { deliver(rLive, q, true) }
+                    return@thread
+                }
                 val lock = Models.lock(prefs)
                 val pick00 = (if (codeQ) Models.sel(prefs, "coding") else null) ?: Models.sel(prefs, "chat")
                 val pick0 = pick00?.takeIf { lock.isEmpty() || it.prov == lock }
