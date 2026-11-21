@@ -59,6 +59,10 @@ object Chats {
     // ek chat ki poori file (nahi mili to null)
     @Synchronized fun get(p: SharedPreferences, id: String): C? = if (id.isEmpty()) null else read(p).firstOrNull { it.id == id }
 
+    @Synchronized fun clearAll(p: SharedPreferences) {
+        p.edit().putString("chats", "[]").apply()
+    }
+
     @Synchronized fun rename(p: SharedPreferences, id: String, name: String) {
         write(p, read(p).map { if (it.id == id) C(it.id, it.auto, it.time, it.log, name.trim().take(60), it.pin) else it })
     }

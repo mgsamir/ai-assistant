@@ -222,6 +222,13 @@ class IconView(ctx: Context) : View(ctx) {
             47 -> { c.drawLine(9f, 6f, 15f, 12f, p); c.drawLine(15f, 12f, 9f, 18f, p) }
             48 -> { c.drawCircle(12f, 12f, 8f, p); c.drawLine(4f, 12f, 20f, 12f, p); c.drawOval(RectF(8.5f, 4f, 15.5f, 20f), p) }
             49 -> { c.drawLine(6f, 8f, 11f, 12f, p); c.drawLine(11f, 12f, 6f, 16f, p); c.drawLine(13f, 17f, 18f, 17f, p) }
+            60 -> { c.drawCircle(12f, 12f, 3.2f, p); c.drawCircle(12f, 12f, 7f, p); for (i in 0 until 8) { val a = Math.toRadians(i * 45.0); c.drawLine(12f + 7f * Math.cos(a).toFloat(), 12f + 7f * Math.sin(a).toFloat(), 12f + 9.5f * Math.cos(a).toFloat(), 12f + 9.5f * Math.sin(a).toFloat(), p) } }
+            61 -> { c.drawCircle(12f, 10f, 5.5f, p); c.drawLine(9.5f, 17.5f, 14.5f, 17.5f, p); c.drawLine(10.5f, 20f, 13.5f, 20f, p) }
+            62 -> { c.drawCircle(12f, 12f, 8.5f, p); c.drawLine(12f, 7f, 12f, 12f, p); c.drawLine(12f, 12f, 15.5f, 14f, p) }
+            63 -> { c.drawRoundRect(RectF(5.5f, 11f, 18.5f, 20.5f), 2f, 2f, p); c.drawArc(RectF(8f, 3.5f, 16f, 13.5f), 180f, 180f, false, p) }
+            64 -> { c.drawLine(10f, 4f, 14f, 4f, p); c.drawLine(4.5f, 7f, 19.5f, 7f, p); c.drawRoundRect(RectF(6.5f, 7f, 17.5f, 20f), 2f, 2f, p); c.drawLine(10f, 10.5f, 10f, 16.5f, p); c.drawLine(14f, 10.5f, 14f, 16.5f, p) }
+            65 -> { c.drawLine(12f, 15f, 12f, 4f, p); c.drawLine(7.5f, 8.5f, 12f, 4f, p); c.drawLine(16.5f, 8.5f, 12f, 4f, p); c.drawLine(5f, 14f, 5f, 19.5f, p); c.drawLine(5f, 19.5f, 19f, 19.5f, p); c.drawLine(19f, 19.5f, 19f, 14f, p) }
+            66 -> { c.drawCircle(12f, 12f, 8.5f, p); c.drawLine(12f, 11f, 12f, 16.5f, p); c.drawCircle(12f, 7.8f, 0.4f, p) }
             23 -> { c.drawLine(19f, 12f, 5f, 12f, p); c.drawLine(11f, 6f, 5f, 12f, p); c.drawLine(5f, 12f, 11f, 18f, p) }
             else -> {
                 val t = Path()
@@ -1273,6 +1280,9 @@ class MainActivity : Activity() {
 
     private fun showProfile() {
         val f = java.io.File(filesDir, "profile.jpg")
+        accountRefresh?.invoke()
+        val nm = getSharedPreferences("p", Context.MODE_PRIVATE).getString("user_name", "") ?: ""
+        avatarTxtV?.text = if (nm.isNotBlank()) nm.trim().take(1).uppercase() else "S"
         val img = avatarImg ?: return
         if (f.exists()) {
             img.setImageBitmap(android.graphics.BitmapFactory.decodeFile(f.absolutePath))
@@ -2667,6 +2677,7 @@ class MainActivity : Activity() {
                     .show()
             }
             header("VOICE")
+            row("Voice", Voice.cur(p).name) { showVoices() }
             val rate = p.getFloat("tts_rate", 1f)
             row("Speech speed", String.format(java.util.Locale.US, "%.1fx", rate)) {
                 val sb = android.widget.SeekBar(this)
@@ -2689,6 +2700,269 @@ class MainActivity : Activity() {
         root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
         dlg.setContentView(root)
         dlg.show()
+    }
+
+    // ---------- profile panel (Gemini jaisa): photo + naam, phir kaam ke rows ----------
+    private var accountRefresh: (() -> Unit)? = null
+
+    private class AccRow(val kind: Int, val title: String, val sub: String, val tap: () -> Unit)
+
+    private fun selectable(): android.graphics.drawable.Drawable? {
+        val ta = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+        val d = ta.getDrawable(0)
+        ta.recycle()
+        return d
+    }
+
+    private fun accGroup(rows: List<AccRow>): LinearLayout {
+        val g = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply { cornerRadius = dp(28).toFloat(); setColor(Color.parseColor("#101010")) }
+            clipToOutline = true
+        }
+        for ((i, r) in rows.withIndex()) {
+            val v = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(18), dp(16), dp(14), dp(16))
+                foreground = selectable()
+                setOnClickListener { r.tap() }
+            }
+            v.addView(IconView(this).apply { kind = r.kind; tint = Color.parseColor("#E4E4E8") }, LinearLayout.LayoutParams(dp(40), dp(40)))
+            val tx = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            tx.addView(TextView(this).apply { text = r.title; textSize = 17f; setTextColor(Color.WHITE) })
+            if (r.sub.isNotEmpty()) tx.addView(TextView(this).apply { text = r.sub; textSize = 13.5f; setTextColor(Color.parseColor("#8E8E96")) })
+            v.addView(tx, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(10) })
+            v.addView(IconView(this).apply { kind = 47; tint = Color.parseColor("#8E8E96") }, LinearLayout.LayoutParams(dp(28), dp(28)))
+            g.addView(v)
+            if (i < rows.size - 1) g.addView(View(this).apply { setBackgroundColor(Color.parseColor("#1E1E22")) }, LinearLayout.LayoutParams(-1, dp(1)).apply { leftMargin = dp(18); rightMargin = dp(18) })
+        }
+        return g
+    }
+
+    private fun subScreen(title: String, build: (LinearLayout, android.app.Dialog) -> Unit): android.app.Dialog {
+        val dlg = fullDlg()
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
+        val top = FrameLayout(this)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#1A1A1A")
+        top.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.CENTER_VERTICAL))
+        top.addView(TextView(this).apply { text = title; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(12), 0, dp(24)) }
+        root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        build(list, dlg)
+        dlg.setContentView(root)
+        dlg.show()
+        return dlg
+    }
+
+    private fun showAccount() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val dlg = fullDlg()
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
+        val top = FrameLayout(this)
+        top.addView(icon(1, 40) { dlg.dismiss() }.apply { rotation = 45f }, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.END or Gravity.CENTER_VERTICAL))
+        root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        lateinit var draw: () -> Unit
+        draw = {
+            list.removeAllViews()
+            val name = p.getString("user_name", "") ?: ""
+            val card = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(18), dp(18), dp(18), dp(18))
+                background = GradientDrawable().apply { cornerRadius = dp(34).toFloat(); setColor(Color.parseColor("#101010")) }
+            }
+            val photo = java.io.File(filesDir, "profile.jpg")
+            val face = FrameLayout(this).apply {
+                background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.parseColor("#4F8BFF"), Color.parseColor("#7C5CFF"))).apply { shape = GradientDrawable.OVAL }
+                outlineProvider = object : android.view.ViewOutlineProvider() {
+                    override fun getOutline(v: View, o: android.graphics.Outline) { o.setOval(0, 0, v.width, v.height) }
+                }
+                clipToOutline = true
+            }
+            if (photo.exists()) face.addView(ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; setImageBitmap(android.graphics.BitmapFactory.decodeFile(photo.absolutePath)) }, FrameLayout.LayoutParams(-1, -1))
+            else face.addView(TextView(this).apply { text = if (name.isNotBlank()) name.trim().take(1).uppercase() else "S"; textSize = 28f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE) }, FrameLayout.LayoutParams(-1, -1))
+            val holder = FrameLayout(this)
+            holder.addView(face, FrameLayout.LayoutParams(dp(72), dp(72)))
+            val badge = FrameLayout(this).apply { background = oval("#2A2A2E") }
+            badge.addView(IconView(this).apply { kind = 32; tint = Color.WHITE }, FrameLayout.LayoutParams(-1, -1))
+            holder.addView(badge, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.END or Gravity.BOTTOM))
+            holder.setOnClickListener {
+                val pm = android.widget.PopupMenu(this@MainActivity, holder)
+                pm.menu.add(0, 1, 0, "Choose photo")
+                if (photo.exists()) pm.menu.add(0, 2, 1, "Remove photo")
+                pm.setOnMenuItemClickListener {
+                    if (it.itemId == 1) pick(105) else { photo.delete(); showProfile() }
+                    true
+                }
+                pm.show()
+            }
+            card.addView(holder, LinearLayout.LayoutParams(dp(76), dp(76)))
+            val nameV = TextView(this).apply {
+                text = if (name.isNotBlank()) name else "Your name"
+                textSize = 22f; typeface = Typeface.DEFAULT_BOLD
+                setTextColor(if (name.isNotBlank()) Color.WHITE else Color.parseColor("#8E8E96"))
+                setOnClickListener {
+                    val et = EditText(this@MainActivity).apply {
+                        setText(name); setSelection(text.length); setTextColor(Color.WHITE); setSingleLine(true)
+                        setPadding(dp(24), dp(16), dp(24), dp(16))
+                    }
+                    android.app.AlertDialog.Builder(this@MainActivity, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("Your name").setView(et)
+                        .setPositiveButton("Save") { _, _ -> p.edit().putString("user_name", et.text.toString().trim().take(30)).apply(); showProfile() }
+                        .setNegativeButton("Cancel", null).show()
+                }
+            }
+            card.addView(nameV, LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(16) })
+            list.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+
+            list.addView(accGroup(listOf(
+                AccRow(60, "Settings", "") { showSettings() },
+                AccRow(61, "Saved memory", "") { showMemory() },
+                AccRow(62, "Usage", "") { showUsage() },
+                AccRow(63, "Phone access", "") { showAccess() }
+            )), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+            list.addView(accGroup(listOf(
+                AccRow(64, "Delete all chats", "") {
+                    android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("Delete all chats?")
+                        .setMessage("This cannot be undone.")
+                        .setPositiveButton("Delete") { _, _ -> Chats.clearAll(p); newChat(); dlg.dismiss() }
+                        .setNegativeButton("Cancel", null).show()
+                },
+                AccRow(65, "Export chats", "") { exportChats() }
+            )), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+            list.addView(accGroup(listOf(
+                AccRow(66, "About", "") {
+                    val v = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (e: Exception) { "" }
+                    android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("Ai Assistant")
+                        .setMessage("Version $v").setPositiveButton("OK", null).show()
+                }
+            )), LinearLayout.LayoutParams(-1, -2))
+        }
+        accountRefresh = { if (dlg.isShowing) draw() }
+        dlg.setOnDismissListener { accountRefresh = null }
+        draw()
+        root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        dlg.setContentView(root)
+        dlg.show()
+    }
+
+    private fun showMemory() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        subScreen("Saved memory") { list, _ ->
+            lateinit var draw: () -> Unit
+            draw = {
+                list.removeAllViews()
+                val arr = try { org.json.JSONArray(p.getString("mem", "[]")) } catch (e: Exception) { org.json.JSONArray() }
+                if (arr.length() == 0) list.addView(TextView(this).apply {
+                    text = "Nothing saved yet"; textSize = 15f; setTextColor(Color.parseColor("#8E8E96")); gravity = Gravity.CENTER; setPadding(0, dp(40), 0, 0)
+                })
+                for (i in 0 until arr.length()) {
+                    val fact = arr.optString(i)
+                    val row = LinearLayout(this).apply {
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(dp(18), dp(12), dp(8), dp(12))
+                        background = GradientDrawable().apply { cornerRadius = dp(20).toFloat(); setColor(Color.parseColor("#101010")) }
+                    }
+                    row.addView(TextView(this).apply { text = fact; textSize = 15.5f; setTextColor(Color.WHITE); setLineSpacing(0f, 1.15f) }, LinearLayout.LayoutParams(0, -2, 1f))
+                    row.addView(icon(1, 44) {
+                        val cur = try { org.json.JSONArray(p.getString("mem", "[]")) } catch (e: Exception) { org.json.JSONArray() }
+                        val next = org.json.JSONArray()
+                        for (k in 0 until cur.length()) if (k != i) next.put(cur.optString(k))
+                        p.edit().putString("mem", next.toString()).apply()
+                        draw()
+                    }.apply { rotation = 45f }, LinearLayout.LayoutParams(dp(44), dp(44)))
+                    list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+                }
+            }
+            draw()
+        }
+    }
+
+    private fun showUsage() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        subScreen("Usage") { list, _ ->
+            val sum = Usage.summary()
+            fun tok(n: Int) = if (n >= 1000) (n / 1000).toString() + "k" else n.toString()
+            val rows = ArrayList<AccRow>()
+            for (prov in listOf("gemini", "groq", "openrouter")) {
+                val x = sum.firstOrNull { it.first == prov }
+                val line = if (x == null) "No requests today" else "${x.second} requests today \u00b7 ${tok(x.third)} tokens"
+                rows.add(AccRow(62, Models.provName(prov), line) { })
+            }
+            list.addView(accGroup(rows), LinearLayout.LayoutParams(-1, -2))
+            val spent = p.getFloat("or_used", -1f)
+            if (spent >= 0f) list.addView(TextView(this).apply {
+                text = "OpenRouter spent so far: \$" + String.format(java.util.Locale.US, "%.3f", spent)
+                textSize = 14f; setTextColor(Color.parseColor("#B0B0B8")); setPadding(dp(8), dp(16), dp(8), 0)
+            })
+            list.addView(TextView(this).apply {
+                text = "The Gemini day resets at midnight Pacific time."
+                textSize = 13f; setTextColor(Color.parseColor("#8E8E96")); setPadding(dp(8), dp(12), dp(8), 0)
+            })
+        }
+    }
+
+    private fun showAccess() {
+        val perms = ArrayList<Pair<String, String>>()
+        perms.add("Microphone" to android.Manifest.permission.RECORD_AUDIO)
+        perms.add("Contacts" to android.Manifest.permission.READ_CONTACTS)
+        perms.add("Phone calls" to android.Manifest.permission.CALL_PHONE)
+        if (Build.VERSION.SDK_INT >= 33) perms.add("Notifications" to android.Manifest.permission.POST_NOTIFICATIONS)
+        val dlg = subScreen("Phone access") { _, _ -> }
+        // subScreen ne list bana ke khaali chhoda; yahan alag se bharte hain, wapas aane par taaza karte hain
+        val sv = (dlg.window?.decorView?.findViewById<View>(android.R.id.content) as? ViewGroup)
+        val list = findLinear(sv) ?: return
+        lateinit var draw: () -> Unit
+        draw = {
+            list.removeAllViews()
+            val rows = perms.map { (label, perm) ->
+                val ok = checkSelfPermission(perm) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                AccRow(63, label, if (ok) "Allowed" else "Not allowed") {
+                    startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+                }
+            }
+            list.addView(accGroup(rows), LinearLayout.LayoutParams(-1, -2))
+        }
+        draw()
+        dlg.window?.decorView?.viewTreeObserver?.addOnWindowFocusChangeListener { if (it) draw() }
+    }
+
+    // subScreen ke andar ka scroll wala list dhundo
+    private fun findLinear(v: View?): LinearLayout? {
+        if (v is ScrollView) return v.getChildAt(0) as? LinearLayout
+        if (v is ViewGroup) for (i in 0 until v.childCount) findLinear(v.getChildAt(i))?.let { return it }
+        return null
+    }
+
+    private fun exportChats() {
+        val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val all = Chats.all(sp)
+        if (all.isEmpty()) { Toast.makeText(this, "No chats to export", Toast.LENGTH_SHORT).show(); return }
+        val df = java.text.SimpleDateFormat("d MMM yyyy, h:mm a", java.util.Locale.ENGLISH)
+        val sb = StringBuilder()
+        for (c in all) {
+            sb.append(c.title).append("\n").append(df.format(java.util.Date(c.time))).append("\n\n")
+            sb.append(c.log.replace(Regex("\u2060IMG:[^\u2060]*\u2060"), "[image]").replace("\u2063", " | ").trim())
+            sb.append("\n\n----------\n\n")
+        }
+        if (Build.VERSION.SDK_INT >= 29) {
+            try {
+                val v = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "Ai Assistant chats.txt")
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                }
+                val u = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v)
+                if (u != null) {
+                    contentResolver.openOutputStream(u)?.use { it.write(sb.toString().toByteArray()) }
+                    Toast.makeText(this, "Saved to Downloads", Toast.LENGTH_SHORT).show()
+                    return
+                }
+            } catch (e: Exception) { }
+        }
+        val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, sb.toString().take(200000))
+        startActivity(Intent.createChooser(i, null))
     }
 
     private fun showVoices() {
@@ -3134,17 +3408,7 @@ class MainActivity : Activity() {
             clipToOutline = true
             addView(avatarTxt, FrameLayout.LayoutParams(-1, -1))
             addView(avatarImg, FrameLayout.LayoutParams(-1, -1))
-            setOnClickListener {
-                val pm = android.widget.PopupMenu(this@MainActivity, this)
-                pm.menu.add(0, 1, 0, "Choose photo")
-                if (java.io.File(filesDir, "profile.jpg").exists()) pm.menu.add(0, 2, 1, "Remove photo")
-                pm.setOnMenuItemClickListener {
-                    if (it.itemId == 1) pick(105)
-                    else { java.io.File(filesDir, "profile.jpg").delete(); showProfile() }
-                    true
-                }
-                pm.show()
-            }
+            setOnClickListener { showAccount() }
         }
         avatarTxtV = avatarTxt
         header.addView(avatar, LinearLayout.LayoutParams(dp(36), dp(36)))

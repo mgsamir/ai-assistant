@@ -64,6 +64,22 @@ object Usage {
         } catch (e: Exception) { }
     }
 
+    // aaj ki ginti har provider ki: (provider, requests, tokens)
+    fun summary(): List<Triple<String, Int, Int>> {
+        val a = all()
+        val m = LinkedHashMap<String, IntArray>()
+        val it = a.keys()
+        while (it.hasNext()) {
+            val k = it.next()
+            val o = a.optJSONObject(k) ?: continue
+            val prov = k.substringBefore('|')
+            if (o.optString("d") != day(prov)) continue
+            val x = m.getOrPut(prov) { IntArray(2) }
+            x[0] += o.optInt("r"); x[1] += o.optInt("t")
+        }
+        return m.map { Triple(it.key, it.value[0], it.value[1]) }
+    }
+
     // Groq har jawab ke saath asli baaki limit bhejta hai
     fun groqHeaders(model: String, c: HttpURLConnection) {
         val sp = p ?: return
