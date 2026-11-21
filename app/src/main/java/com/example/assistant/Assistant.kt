@@ -1116,7 +1116,12 @@ The user is an adult. Answer questions about the human body, sex education, repr
                 // live sawaal + Brave ki key ho to pehle Brave search (model ka intezaar nahi), jawab wahi se
                 // phone ke kaam (message, call, gmail, alarm, app kholna...) internet mein nahi jaate
                 val phoneWork = Regex("(?i)\\b(message|msg|whatsapp|sms|call|gmail|mail|email|alarm|reminder|timer|open|close|play|send|youtube|contact|set)\\b").containsMatchIn(q)
-                if (att == null && Extra.brave.isNotEmpty() && !phoneWork && Providers.isLive(q)) {
+                // jo sawaal log Google par poochte hain (kya, kaun, kab, kitna, kaise, kahan, how, what...) wo bhi Brave se
+                // likhna, code, banana, translate jaise kaam model ke paas hi rahenge
+                val infoQ = Regex("(?i)\\b(kya|kaun|kab|kahan|kitna|kitne|kaise|kyon|kyu|kis|kisne|batao|bataiye|what|who|when|where|how|why|which|price|meaning|definition|mtlb|matlab)\\b|\\?\\s*$|[\u0915\u0916\u0917\u0918\u0919]\u094D?\u093F|\u0915\u094D\u092F\u093E|\u0915\u094C\u0928|\u0915\u092C|\u0915\u0939\u093E\u0901|\u0915\u093F\u0924\u0928\u093E|\u0915\u0948\u0938\u0947|\u0915\u094D\u092F\u094B\u0902").containsMatchIn(q)
+                val makeQ = Regex("(?i)\\b(likho|likh|kahani|poem|poetry|banao|bana|translate|anuvad|code|lyrics|gana|shayari|email likh|letter)\\b").containsMatchIn(q) || codeQ
+                val webQ = Providers.isLive(q) || (infoQ && !makeQ)
+                if (att == null && Extra.brave.isNotEmpty() && !phoneWork && webQ) {
                     val rLive = webAnswer(key, q)
                     postG(g) { deliver(rLive, q, true) }
                     return@thread
