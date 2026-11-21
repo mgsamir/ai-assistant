@@ -2905,7 +2905,6 @@ class MainActivity : Activity() {
                 r.addView(TextView(this).apply { text = if (on) "On" else "Off"; textSize = 13f; setTextColor(Color.parseColor(if (on) "#34D399" else "#8A8A92")) })
                 col.addView(r)
             }
-            svc("brave", "Brave Search", "Web search and sources", Extra.brave.isNotBlank())
             svc("virustotal", "VirusTotal", "App security scan", Extra.vt.isNotBlank())
             // sirf free models dikhte hain, paid sab hata diye
             for ((k, _) in Models.CATS) Models.sel(p, k)?.let { if (!it.free || Usage.paidOnly(it)) Models.setSel(p, k, null) }
