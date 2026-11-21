@@ -1114,7 +1114,9 @@ The user is an adult. Answer questions about the human body, sex education, repr
             try {
                 val codeQ = Regex("(?i)\\b(code|coding|program|script|function|bug|error|kotlin|java|python|html|css|javascript|sql|api|app banao|website banao)\\b|कोड|प्रोग्राम").containsMatchIn(q)
                 // live sawaal + Brave ki key ho to pehle Brave search (model ka intezaar nahi), jawab wahi se
-                if (att == null && Extra.brave.isNotEmpty() && Providers.isLive(q)) {
+                // phone ke kaam (message, call, gmail, alarm, app kholna...) internet mein nahi jaate
+                val phoneWork = Regex("(?i)\\b(message|msg|whatsapp|sms|call|gmail|mail|email|alarm|reminder|timer|open|close|play|send|youtube|contact|set)\\b").containsMatchIn(q)
+                if (att == null && Extra.brave.isNotEmpty() && !phoneWork && Providers.isLive(q)) {
                     val rLive = webAnswer(key, q)
                     postG(g) { deliver(rLive, q, true) }
                     return@thread
