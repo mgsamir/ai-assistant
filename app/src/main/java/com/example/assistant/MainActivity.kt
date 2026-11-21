@@ -725,6 +725,7 @@ class MainActivity : Activity() {
     // ---- purani baat-cheet ka sangrah: Branch in new chat aur Chat history ----
     // naya chat shuru: purana chat history mein pehle se save hai
     private fun newChat() {
+        aurora?.stopNow()
         val eng = AssistantService.engine ?: return
         GlowGate.armed = true
         Chats.setCur(getSharedPreferences("p", Context.MODE_PRIVATE), "")
