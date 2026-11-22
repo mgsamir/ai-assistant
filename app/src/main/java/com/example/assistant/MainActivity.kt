@@ -735,6 +735,7 @@ class MainActivity : Activity() {
     private fun newChat() {
         aurora?.stopNow()
         val eng = AssistantService.engine ?: return
+        if (eng.speakState != 0) eng.stopSpeaking()
         GlowGate.armed = true
         Chats.setCur(getSharedPreferences("p", Context.MODE_PRIVATE), "")
         eng.loadChat("")
@@ -780,6 +781,7 @@ class MainActivity : Activity() {
     private fun showChatHistory() {
         val sp = getSharedPreferences("p", Context.MODE_PRIVATE)
         val dlg = fullDlg()
+        dlg.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
         val top = FrameLayout(this)
         val back = icon(23, 40) { dlg.dismiss() }
@@ -837,7 +839,7 @@ class MainActivity : Activity() {
                     text = "\u22EE"; textSize = 22f; setTextColor(Color.parseColor("#C8C8CC")); setPadding(dp(14), dp(4), dp(14), dp(4))
                 }
                 more.setOnClickListener {
-                    val pm = android.widget.PopupMenu(this@MainActivity, more)
+                    val pm = android.widget.PopupMenu(this@MainActivity, more, Gravity.END)
                     pm.menu.add(0, 1, 0, "Rename")
                     pm.menu.add(0, 2, 1, if (o.pin) "Unpin" else "Pin")
                     pm.menu.add(0, 3, 2, "Delete")
@@ -1644,30 +1646,6 @@ class MainActivity : Activity() {
         r3.setOnClickListener { dlg.dismiss(); showChatHistory() }
         col.addView(r3)
         // Smali ki entry menu se hata di (code showAppPicker() mein maujood hai, chahe to ek line mein wapas aa jaayegi)
-        val r5 = LinearLayout(this)
-        r5.gravity = Gravity.CENTER_VERTICAL
-        r5.setPadding(0, dp(14), 0, dp(14))
-        r5.addView(IconView(this).apply { kind = 40 }, LinearLayout.LayoutParams(dp(48), dp(40)))
-        r5.addView(TextView(this).apply { text = "Models"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
-            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
-        r5.setOnClickListener { dlg.dismiss(); showModelSettings() }
-        col.addView(r5, 1)
-        val r6 = LinearLayout(this)
-        r6.gravity = Gravity.CENTER_VERTICAL
-        r6.setPadding(0, dp(14), 0, dp(14))
-        r6.addView(IconView(this).apply { kind = 2 }, LinearLayout.LayoutParams(dp(48), dp(40)))
-        r6.addView(TextView(this).apply { text = "Voice"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
-            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
-        r6.setOnClickListener { dlg.dismiss(); showVoices() }
-        col.addView(r6, 2)
-        val r7 = LinearLayout(this)
-        r7.gravity = Gravity.CENTER_VERTICAL
-        r7.setPadding(0, dp(14), 0, dp(14))
-        r7.addView(IconView(this).apply { kind = 44 }, LinearLayout.LayoutParams(dp(48), dp(40)))
-        r7.addView(TextView(this).apply { text = "Settings"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
-            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
-        r7.setOnClickListener { dlg.dismiss(); showSettings() }
-        col.addView(r7)
         dlg.setContentView(col)
         dlg.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -2768,10 +2746,7 @@ class MainActivity : Activity() {
     private fun showAccount() {
         val p = getSharedPreferences("p", Context.MODE_PRIVATE)
         val dlg = fullDlg()
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(48), dp(16), dp(16)) }
-        val top = FrameLayout(this)
-        top.addView(icon(1, 40) { dlg.dismiss() }.apply { rotation = 45f }, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.END or Gravity.CENTER_VERTICAL))
-        root.addView(top, LinearLayout.LayoutParams(-1, dp(56)))
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK); setPadding(dp(16), dp(64), dp(16), dp(16)) }
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         lateinit var draw: () -> Unit
         draw = {
@@ -2779,8 +2754,8 @@ class MainActivity : Activity() {
             val name = p.getString("user_name", "") ?: ""
             val card = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(18), dp(18), dp(18), dp(18))
-                background = GradientDrawable().apply { cornerRadius = dp(34).toFloat(); setColor(Color.parseColor("#101010")) }
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                background = GradientDrawable().apply { cornerRadius = dp(26).toFloat(); setColor(Color.parseColor("#101010")) }
             }
             val photo = java.io.File(filesDir, "profile.jpg")
             val face = FrameLayout(this).apply {
@@ -2793,24 +2768,16 @@ class MainActivity : Activity() {
             if (photo.exists()) face.addView(ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; setImageBitmap(android.graphics.BitmapFactory.decodeFile(photo.absolutePath)) }, FrameLayout.LayoutParams(-1, -1))
             else face.addView(TextView(this).apply { text = if (name.isNotBlank()) name.trim().take(1).uppercase() else "S"; textSize = 28f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE) }, FrameLayout.LayoutParams(-1, -1))
             val holder = FrameLayout(this)
-            holder.addView(face, FrameLayout.LayoutParams(dp(72), dp(72)))
+            holder.addView(face, FrameLayout.LayoutParams(dp(56), dp(56)))
             val badge = FrameLayout(this).apply { background = oval("#2A2A2E") }
             badge.addView(IconView(this).apply { kind = 32; tint = Color.WHITE }, FrameLayout.LayoutParams(-1, -1))
-            holder.addView(badge, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.END or Gravity.BOTTOM))
-            holder.setOnClickListener {
-                val pm = android.widget.PopupMenu(this@MainActivity, holder)
-                pm.menu.add(0, 1, 0, "Choose photo")
-                if (photo.exists()) pm.menu.add(0, 2, 1, "Remove photo")
-                pm.setOnMenuItemClickListener {
-                    if (it.itemId == 1) pick(105) else { photo.delete(); showProfile() }
-                    true
-                }
-                pm.show()
-            }
-            card.addView(holder, LinearLayout.LayoutParams(dp(76), dp(76)))
+            holder.addView(badge, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.END or Gravity.BOTTOM))
+            holder.setOnClickListener { pick(105) }
+            holder.setOnLongClickListener { if (photo.exists()) { photo.delete(); showProfile() }; true }
+            card.addView(holder, LinearLayout.LayoutParams(dp(58), dp(58)))
             val nameV = TextView(this).apply {
                 text = if (name.isNotBlank()) name else "Your name"
-                textSize = 22f; typeface = Typeface.DEFAULT_BOLD
+                textSize = 19f; typeface = Typeface.DEFAULT_BOLD
                 setTextColor(if (name.isNotBlank()) Color.WHITE else Color.parseColor("#8E8E96"))
                 setOnClickListener {
                     val et = EditText(this@MainActivity).apply {
@@ -2837,8 +2804,7 @@ class MainActivity : Activity() {
                         .setMessage("This cannot be undone.")
                         .setPositiveButton("Delete") { _, _ -> Chats.clearAll(p); newChat(); dlg.dismiss() }
                         .setNegativeButton("Cancel", null).show()
-                },
-                AccRow(65, "Export chats", "") { exportChats() }
+                }
             )), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
             list.addView(accGroup(listOf(
                 AccRow(66, "About", "") {
@@ -2900,6 +2866,8 @@ class MainActivity : Activity() {
                 rows.add(AccRow(62, Models.provName(prov), line) { })
             }
             list.addView(accGroup(rows), LinearLayout.LayoutParams(-1, -2))
+            list.addView(accGroup(listOf(AccRow(40, "Models", "Usage and limit of each model") { showModelSettings() })),
+                LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
             val spent = p.getFloat("or_used", -1f)
             if (spent >= 0f) list.addView(TextView(this).apply {
                 text = "OpenRouter spent so far: \$" + String.format(java.util.Locale.US, "%.3f", spent)
@@ -4098,7 +4066,7 @@ class MainActivity : Activity() {
         orbInput.clearFocus()
         volumeControlStream = AudioManager.USE_DEFAULT_STREAM_TYPE
         orbScreen.visibility = View.GONE
-        AssistantService.engine?.stopConvo()
+        AssistantService.engine?.let { it.stopConvo(); if (it.speakState != 0) it.stopSpeaking() }
     }
 
     private fun styleMic() {

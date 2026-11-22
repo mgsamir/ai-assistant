@@ -226,6 +226,8 @@ The user is an adult. Answer questions about the human body, sex education, repr
         else { val t = spokenText; if (t != null) speak(t) else setSpeak(0) }
     }
 
+    fun stopSpeaking() = stopSpeech()
+
     private fun stopSpeech() {
         setSpeak(0)
         speakGen++
