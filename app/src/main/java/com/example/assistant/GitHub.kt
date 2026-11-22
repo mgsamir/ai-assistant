@@ -65,8 +65,7 @@ object GitHub {
             val o = arr.getJSONObject(i)
             if (o.optString("type") == "blob") paths.add(o.optString("path"))
         }
-        return FileResult(true, paths.sorted().joinToString("
-"))
+        return FileResult(true, paths.sorted().joinToString("\n"))
     }
 
     // Repo ke code mein koi shabd/function/variable dhoondo (file ka naam pata na ho tab)
@@ -77,11 +76,10 @@ object GitHub {
         val (code, body) = api("/search/code?q=$q&per_page=15", token)
         if (code != 200) return FileResult(false, "Search nahi ho paya ($code)")
         val items = JSONObject(body).optJSONArray("items")
-        if (items == null || items.length() == 0) return FileResult(true, ""$query" se koi file nahi mili.")
+        if (items == null || items.length() == 0) return FileResult(true, "\"$query\" se koi file nahi mili.")
         val paths = ArrayList<String>()
         for (i in 0 until items.length()) paths.add(items.getJSONObject(i).optString("path"))
-        return FileResult(true, paths.joinToString("
-"))
+        return FileResult(true, paths.joinToString("\n"))
     }
 
     fun readFile(p: SharedPreferences, path: String): FileResult {
