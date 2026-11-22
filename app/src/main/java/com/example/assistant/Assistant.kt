@@ -872,6 +872,8 @@ When the user asks you to change the code of this very app (for example "ye butt
             JSONObject().put("seconds", num("How many seconds to keep it on, default 20")), listOf()))
         f.put(fn("stop_assistant", "Completely stop and close this assistant when the user asks it to quit",
             JSONObject().put("reason", str("Why, can be empty")), listOf()))
+        f.put(fn("update_app", "Build and install a new version of this assistant app itself: starts the GitHub build, watches it, and when it succeeds downloads the APK and shows the install prompt. Use when the user says update my app, build the app, or similar",
+            JSONObject().put("note", str("Usually empty")), emptyList()))
         f.put(fn("repo_list_files", "List every file path in the user's own GitHub repo (mgsamir/ai-assistant). Call this FIRST when you don't already know the exact file path for what the user wants changed",
             JSONObject().put("note", str("Usually empty")), emptyList()))
         f.put(fn("repo_search_code", "Search the code inside the user's GitHub repo (mgsamir/ai-assistant) for a function name, variable, string or keyword, to find which file it is in. Use this when repo_list_files alone isn't enough to tell which file has the code the user means",
@@ -1133,6 +1135,12 @@ When the user asks you to change the code of this very app (for example "ye butt
         if (echo) { chat("\nTum: " + imgTag + q + "\n"); imgTag = "" }
         thread {
             try {
+                // "update my app" / "build the app" jaisa seedha command: model ka intezaar kiye bina
+                if (att == null && Regex("(?i)^\\s*(please\\s+)?(update|build|rebuild)\\s+(my\\s+|the\\s+)?(app|apk|assistant)\\s*[.!]*\\s*$|app\\s+(update|build)\\s+(karo|kar do|kardo)|\u0910\u092a\\s*\u0905\u092a\u0921\u0947\u091f").containsMatchIn(q)) {
+                    val rU = updateApp()
+                    postG(g) { deliver(rU, q, true) }
+                    return@thread
+                }
                 val codeQ = Regex("(?i)\\b(code|coding|program|script|function|bug|error|kotlin|java|python|html|css|javascript|sql|api|app banao|website banao)\\b|कोड|प्रोग्राम").containsMatchIn(q)
                 // live sawaal + Brave ki key ho to pehle Brave search (model ka intezaar nahi), jawab wahi se
                 // phone ke kaam (message, call, gmail, alarm, app kholna...) internet mein nahi jaate
@@ -1336,6 +1344,49 @@ When the user asks you to change the code of this very app (for example "ye butt
         app.startActivity(i)
     }
 
+    // ---------- "Update my app": build chalao -> har 10 sec status -> green ho to download + install, red ho to error batao ----------
+    private val updating = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private fun tell(text: String, voice: String = text) {
+        main.post { chat("\nAI: $text\n"); speak(voice) }
+    }
+
+    private fun updateApp(): Reply {
+        if (GitHub.token(prefs).isEmpty()) return Reply("Add your GitHub token in Settings first.", "Add your GitHub token in Settings first.")
+        if (!updating.compareAndSet(false, true)) return Reply("An update is already running.", "An update is already running.")
+        thread {
+            try {
+                val id = ApkUpdate.triggerGithubApkPatch(prefs)
+                if (id <= 0L) { tell("Couldn't start the build. Check the GitHub token permissions (Actions: Read and write).", "Couldn't start the build."); return@thread }
+                val end = System.currentTimeMillis() + 15 * 60_000
+                var state = "running"
+                while (System.currentTimeMillis() < end) {
+                    try { Thread.sleep(10_000) } catch (e: Exception) { }
+                    val (st, concl) = ApkUpdate.checkPatchStatus(prefs, id)
+                    if (st == "completed") { state = if (concl == "success") "success" else "failure"; break }
+                }
+                when (state) {
+                    "success" -> {
+                        tell("Build successful, installing new update.")
+                        val err = ApkUpdate.downloadAndInstallApk(app, prefs, id)
+                        if (err != null) tell("Build was fine but the download failed: $err", "Download failed.")
+                    }
+                    "failure" -> {
+                        tell("Build failed, checking logs.")
+                        val log = GitHub.failureLog(prefs, id).lines().filter { it.isNotBlank() }.takeLast(6).joinToString("\n").take(600)
+                        tell(if (log.isBlank()) "I couldn't read the error log. Open the run on GitHub Actions." else "Error:\n$log", "I've put the error in the chat.")
+                    }
+                    else -> tell("The build is taking too long. Check GitHub Actions.", "The build is taking too long.")
+                }
+            } catch (e: Exception) {
+                tell("Update failed: " + (e.message ?: "error"), "Update failed.")
+            } finally {
+                updating.set(false)
+            }
+        }
+        return Reply("Build started. I'll tell you when it's done.", "Build started. I'll tell you when it's done.")
+    }
+
     // Repo mein file save karo, uska GitHub Actions build poora hone tak dekhte raho; fail ho to
     // error padh kar khud fix karke phir se bhejo (jab tak green na ho ya koshishein khatam ho jaayein)
     private fun autoPush(path: String, content: String, message: String, attempt: Int = 1): Reply {
@@ -1391,6 +1442,7 @@ When the user asks you to change the code of this very app (for example "ye butt
                 "wake_screen" -> wakeScreen(a.optInt("seconds", 20))
                 "remember" -> remember(a.getString("fact"))
                 "forget" -> forget(a.getString("keyword"))
+                "update_app" -> updateApp()
                 "stop_assistant" -> {
                     main.postDelayed({ onQuit?.invoke() }, 3000)
                     Reply("Band ho raha hoon, phir milte hain", "बंद हो रहा हूँ, फिर मिलते हैं")

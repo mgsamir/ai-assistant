@@ -2813,29 +2813,6 @@ class MainActivity : Activity() {
                 }
             )), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
             list.addView(accGroup(listOf(
-                AccRow(65, "Install latest build", "") {
-                    Toast.makeText(this, "Downloading latest build...", Toast.LENGTH_SHORT).show()
-                    Thread {
-                        val id = try { ApkUpdate.latestSuccessfulRunId(p) } catch (e: Exception) { -1L }
-                        val err = if (id <= 0L) "No finished build found (check GitHub token)" else (try { ApkUpdate.downloadAndInstallApk(this, p, id) } catch (e: Exception) { e.message })
-                        if (err != null) runOnUiThread { Toast.makeText(this, err, Toast.LENGTH_LONG).show() }
-                    }.start()
-                },
-                AccRow(65, "Build new APK and install", "") {
-                    Toast.makeText(this, "Build started, this takes a few minutes", Toast.LENGTH_LONG).show()
-                    Thread {
-                        var err: String? = null
-                        try {
-                            val id = ApkUpdate.triggerGithubApkPatch(p)
-                            err = if (id <= 0L) "Could not start the build (check token permissions: Actions)"
-                            else if (!ApkUpdate.waitUntilDone(p, id)) "Build did not finish successfully"
-                            else ApkUpdate.downloadAndInstallApk(this, p, id)
-                        } catch (e: Exception) { err = e.message }
-                        if (err != null) runOnUiThread { Toast.makeText(this, err, Toast.LENGTH_LONG).show() }
-                    }.start()
-                }
-            )), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
-            list.addView(accGroup(listOf(
                 AccRow(66, "About", "") {
                     val v = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (e: Exception) { "" }
                     android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("Ai Assistant")
