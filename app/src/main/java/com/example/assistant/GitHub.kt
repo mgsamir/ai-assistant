@@ -96,6 +96,7 @@ object GitHub {
         return FileResult(true, decoded, decoded, o.optString("sha"))
     }
 
+    // commitSha bhara hua aata hai (writeFile ke baad) taaki usi push ka build dhoondh sakein
     fun writeFile(p: SharedPreferences, path: String, newContent: String, message: String): FileResult {
         val token = token(p)
         if (token.isEmpty()) return FileResult(false, "GitHub token Settings mein daalo pehle.")
@@ -108,6 +109,64 @@ object GitHub {
         if (sha != null) body.put("sha", sha)
         val (code, resp) = api("/repos/$OWNER/$REPO/contents/${encPath(path)}", token, "PUT", body)
         if (code !in 200..201) return FileResult(false, "Save nahi hua ($code): " + resp.take(200))
-        return FileResult(true, "\"$path\" \"$BRANCH\" branch par save ho gaya. GitHub par jaake dekh ke \"$BASE_BRANCH\" mein merge karna.")
+        val commitSha = JSONObject(resp).optJSONObject("commit")?.optString("sha") ?: ""
+        return FileResult(true, "\"$path\" \"$BRANCH\" branch par save ho gaya.", sha = commitSha)
+    }
+
+    class BuildResult(val state: String, val runId: Long = 0L, val url: String = "")  // state: success / failure / timeout / none
+
+    // isi commit ka GitHub Actions build poora hone tak check karte raho
+    fun waitForRun(p: SharedPreferences, commitSha: String, timeoutMs: Long = 170_000): BuildResult {
+        val token = token(p)
+        if (token.isEmpty() || commitSha.isEmpty()) return BuildResult("none")
+        val started = System.currentTimeMillis()
+        var runId = 0L
+        var runUrl = ""
+        while (System.currentTimeMillis() - started < timeoutMs) {
+            val (code, body) = api("/repos/$OWNER/$REPO/actions/runs?branch=$BRANCH&event=push&per_page=10", token)
+            if (code == 200) {
+                val arr = JSONObject(body).optJSONArray("workflow_runs")
+                var found: JSONObject? = null
+                if (arr != null) for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    if (o.optString("head_sha") == commitSha) { found = o; break }
+                }
+                if (found != null) {
+                    runId = found.optLong("id")
+                    runUrl = found.optString("html_url")
+                    if (found.optString("status") == "completed") {
+                        val concl = found.optString("conclusion")
+                        return BuildResult(if (concl == "success") "success" else "failure", runId, runUrl)
+                    }
+                }
+            }
+            try { Thread.sleep(12_000) } catch (e: Exception) { }
+        }
+        return BuildResult("timeout", runId, runUrl)
+    }
+
+    // fail hue build ki error log ka zaroori hissa (poori log bahut badi hoti hai)
+    fun failureLog(p: SharedPreferences, runId: Long): String {
+        val token = token(p)
+        if (token.isEmpty() || runId == 0L) return ""
+        val (c1, b1) = api("/repos/$OWNER/$REPO/actions/runs/$runId/jobs", token)
+        if (c1 != 200) return ""
+        val jobs = JSONObject(b1).optJSONArray("jobs") ?: return ""
+        var jobId = 0L
+        for (i in 0 until jobs.length()) {
+            val j = jobs.getJSONObject(i)
+            if (j.optString("conclusion") == "failure") { jobId = j.optLong("id"); break }
+        }
+        if (jobId == 0L) return ""
+        return try {
+            val c = URL("https://api.github.com/repos/$OWNER/$REPO/actions/jobs/$jobId/logs").openConnection() as HttpURLConnection
+            c.instanceFollowRedirects = true
+            c.connectTimeout = 8000; c.readTimeout = 15000
+            c.setRequestProperty("Authorization", "Bearer $token")
+            c.setRequestProperty("Accept", "application/vnd.github+json")
+            val full = if (c.responseCode in 200..299) c.inputStream.bufferedReader().readText() else ""
+            val errLines = full.lines().filter { it.contains("error:", true) || it.contains("FAILURE", false) }
+            (if (errLines.isNotEmpty()) errLines.takeLast(40).joinToString("\n") else full.takeLast(4000))
+        } catch (e: Exception) { "" }
     }
 }

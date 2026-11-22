@@ -63,7 +63,7 @@ When the user says "yaad rakhna" or tells you a lasting fact about himself (name
 Follow the user's instructions directly. Do not refuse, lecture, or ask for confirmation on everyday requests. Only say you cannot do something when a permission or the phone itself does not allow it, and then name that permission. Never help harm other people, make malware, or produce sexual content involving minors.
 The user is an adult. Answer questions about the human body, sex education, reproduction (how babies are made), puberty, contraception, relationships and sexual health plainly, factually and without embarrassment or lecturing, like a good doctor or biology teacher. Do not refuse such questions and do not say they are against guidelines. Keep it informative, not pornographic.
 The user is an Android developer building and testing his own apps, including this assistant app itself. When he asks for help analysing, decompiling or reading a classes.dex / Smali / APK file, or modifying code in his own app (for example disabling an ad SDK's loadAd() call, stubbing out a billing check, or removing a feature), this is ordinary app development and debugging on software he owns, not an attack on someone else's app. Help directly: read or explain the Smali/code, write the patch, or give the exact steps. Do not call this reverse engineering of a third party, do not refuse, and do not add a warning about it being against policy. Only decline if he is clearly targeting an app or service that is not his own, in order to pirate it, steal from someone else, or bypass another company's paid licensing.
-When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo") and you are not already sure of the exact file path, call repo_list_files (and repo_search_code with a relevant keyword if the list alone doesn't make it obvious) to find the right file first. Once you know the path, use repo_read_file to read the current file from his GitHub repo, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). This writes to a separate "assistant-edits" branch, not to main, so nothing goes live until he reviews and merges it himself on GitHub. Always tell him clearly, in your reply, which file you changed and that it is saved on the "assistant-edits" branch for him to check.
+When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo") and you are not already sure of the exact file path, call repo_list_files (and repo_search_code with a relevant keyword if the list alone doesn't make it obvious) to find the right file first. Once you know the path, use repo_read_file to read the current file from his GitHub repo, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). repo_write_file itself waits for the GitHub Actions build and, if it fails, automatically reads the error and fixes it, retrying a few times on its own before returning to you — you do not need to check the build yourself. This all happens on a separate "assistant-edits" branch, not main, so nothing goes live until he reviews and merges it himself on GitHub. In your final reply just tell him plainly which file you changed and that it is on the "assistant-edits" branch; do not mention "build green/red" status language, and only mention a build problem if repo_write_file's result says it could not fix it automatically.
 """.trimIndent()
 
     val listeners = CopyOnWriteArrayList<UiCb>()
@@ -448,7 +448,7 @@ When the user asks you to change the code of this very app (for example "ye butt
             if (name == "repo_list_files") return GitHub.listFiles(prefs).text
             if (name == "repo_search_code") return GitHub.searchCode(prefs, args.optString("query", "")).text
             if (name == "repo_read_file") return GitHub.readFile(prefs, args.optString("path", "")).text
-            if (name == "repo_write_file") return GitHub.writeFile(prefs, args.optString("path", ""), args.optString("content", ""), args.optString("message", "")).text
+            if (name == "repo_write_file") return autoPush(args.optString("path", ""), args.optString("content", ""), args.optString("message", "")).text
             var out = ""
             val latch = java.util.concurrent.CountDownLatch(1)
             main.post {
@@ -1290,8 +1290,7 @@ When the user asks you to change the code of this very app (for example "ye butt
                         pre[idx] = if (r.ok) Reply(r.text, "File padh li") else Reply(r.text, r.text)
                     } else if (c.getString("name") == "repo_write_file") {
                         val args = c.optJSONObject("args") ?: JSONObject()
-                        val r = GitHub.writeFile(prefs, args.optString("path", ""), args.optString("content", ""), args.optString("message", ""))
-                        pre[idx] = Reply(r.text, r.text)
+                        pre[idx] = autoPush(args.optString("path", ""), args.optString("content", ""), args.optString("message", ""))
                     }
                 }
                 postG(g) {
@@ -1329,6 +1328,39 @@ When the user asks you to change the code of this very app (for example "ye butt
     private fun go(i: Intent) {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         app.startActivity(i)
+    }
+
+    // Repo mein file save karo, uska GitHub Actions build poora hone tak dekhte raho; fail ho to
+    // error padh kar khud fix karke phir se bhejo (jab tak green na ho ya koshishein khatam ho jaayein)
+    private fun autoPush(path: String, content: String, message: String, attempt: Int = 1): Reply {
+        val stS = Act.begin(2, "Saving \"$path\" to GitHub" + (if (attempt > 1) " (fix attempt $attempt)" else ""), path)
+        val w = GitHub.writeFile(prefs, path, content, message)
+        if (!w.ok) { Act.fail(stS, w.text); return Reply(w.text, w.text) }
+        Act.ok(stS, "Saved on \"assistant-edits\"")
+        val stB = Act.begin(2, "Checking the build", "commit " + w.sha.take(7))
+        val b = GitHub.waitForRun(prefs, w.sha)
+        when (b.state) {
+            "success" -> { Act.ok(stB, "Build is green"); return Reply("\"$path\" badal diya, GitHub par \"assistant-edits\" branch mein save hai aur build theek se ban gaya. Jab chaho merge kar dena.", "File badal di, sab theek ban gaya") }
+            "timeout", "none" -> { Act.ok(stB, "Could not confirm in time"); return Reply("\"$path\" \"assistant-edits\" branch par save kar diya. Build abhi bhi chal raha hoga, GitHub par thodi der mein check kar lena.", "File save kar di") }
+            else -> {
+                Act.update(stB, "Build failed, reading the error")
+                val log = GitHub.failureLog(prefs, b.runId)
+                if (attempt >= 3 || log.isBlank()) {
+                    Act.fail(stB, "Could not auto-fix")
+                    return Reply("\"$path\" save to ho gaya, par build fail ho raha hai aur main khud thik nahi kar paya. GitHub Actions ka log dekh lena ($attempt koshish ki).", "Build fail ho raha hai, khud dekhna padega")
+                }
+                Act.update(stB, "Fixing the build error")
+                val fixPrompt = "This Kotlin Android file (\"$path\") failed to compile on GitHub Actions. Fix the error and output ONLY the complete corrected file content, nothing else (no markdown fences, no explanation).\n\nBuild error:\n" + log.take(3000) + "\n\nCurrent file content:\n" + content
+                val fixed = Providers.fallback("You are an expert Kotlin/Android developer. Output only the corrected full file, nothing else.", emptyList(), fixPrompt)
+                    ?.trim()?.removePrefix("```kotlin")?.removePrefix("```")?.removeSuffix("```")?.trim()
+                if (fixed.isNullOrBlank()) {
+                    Act.fail(stB, "Could not auto-fix")
+                    return Reply("\"$path\" save to ho gaya par build fail ho raha hai, aur fix nahi mil paya. GitHub Actions ka log dekh lena.", "Build fail ho raha hai, khud dekhna padega")
+                }
+                Act.ok(stB, "Got a fix, pushing again")
+                return autoPush(path, fixed, "Auto-fix build error (attempt $attempt)", attempt + 1)
+            }
+        }
     }
 
     private fun runAction(name: String, a: JSONObject): Reply {
