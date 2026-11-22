@@ -2682,6 +2682,12 @@ class MainActivity : Activity() {
                     .setNegativeButton("Cancel", null)
                     .show()
             }
+            header("CODING ASSISTANT")
+            keyRow("GitHub token", "gh_token", "")
+            list.addView(TextView(this).apply {
+                text = "Taaki assistant bolkar is app ka khud ka code padh sake aur badal sake (\"assistant-edits\" branch par, main par kabhi nahi). GitHub par Settings → Developer settings → Fine-grained tokens se banao, repo mgsamir/ai-assistant tak seemit, Contents = Read and write."
+                textSize = 12.5f; setTextColor(Color.parseColor("#6E6E76")); setPadding(dp(4), dp(4), dp(4), dp(10))
+            })
         }
         draw()
         root.addView(ScrollView(this).apply { addView(list) }, LinearLayout.LayoutParams(-1, 0, 1f))

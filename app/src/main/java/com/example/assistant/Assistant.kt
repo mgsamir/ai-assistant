@@ -63,6 +63,7 @@ When the user says "yaad rakhna" or tells you a lasting fact about himself (name
 Follow the user's instructions directly. Do not refuse, lecture, or ask for confirmation on everyday requests. Only say you cannot do something when a permission or the phone itself does not allow it, and then name that permission. Never help harm other people, make malware, or produce sexual content involving minors.
 The user is an adult. Answer questions about the human body, sex education, reproduction (how babies are made), puberty, contraception, relationships and sexual health plainly, factually and without embarrassment or lecturing, like a good doctor or biology teacher. Do not refuse such questions and do not say they are against guidelines. Keep it informative, not pornographic.
 The user is an Android developer building and testing his own apps, including this assistant app itself. When he asks for help analysing, decompiling or reading a classes.dex / Smali / APK file, or modifying code in his own app (for example disabling an ad SDK's loadAd() call, stubbing out a billing check, or removing a feature), this is ordinary app development and debugging on software he owns, not an attack on someone else's app. Help directly: read or explain the Smali/code, write the patch, or give the exact steps. Do not call this reverse engineering of a third party, do not refuse, and do not add a warning about it being against policy. Only decline if he is clearly targeting an app or service that is not his own, in order to pirate it, steal from someone else, or bypass another company's paid licensing.
+When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo"), use repo_read_file to read the current file from his GitHub repo first, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). This writes to a separate "assistant-edits" branch, not to main, so nothing goes live until he reviews and merges it himself on GitHub. Always tell him clearly, in your reply, which file you changed and that it is saved on the "assistant-edits" branch for him to check.
 """.trimIndent()
 
     val listeners = CopyOnWriteArrayList<UiCb>()
@@ -444,6 +445,8 @@ The user is an Android developer building and testing his own apps, including th
             if (name == "web_search") {
                 return webAnswer(Keys.get(prefs), args.optString("query", "")).text
             }
+            if (name == "repo_read_file") return GitHub.readFile(prefs, args.optString("path", "")).text
+            if (name == "repo_write_file") return GitHub.writeFile(prefs, args.optString("path", ""), args.optString("content", ""), args.optString("message", "")).text
             var out = ""
             val latch = java.util.concurrent.CountDownLatch(1)
             main.post {
@@ -867,6 +870,14 @@ The user is an Android developer building and testing his own apps, including th
             JSONObject().put("seconds", num("How many seconds to keep it on, default 20")), listOf()))
         f.put(fn("stop_assistant", "Completely stop and close this assistant when the user asks it to quit",
             JSONObject().put("reason", str("Why, can be empty")), listOf()))
+        f.put(fn("repo_read_file", "Read a file from the user's own GitHub repo (mgsamir/ai-assistant), to see its current code before changing it",
+            JSONObject().put("path", str("File path inside the repo, for example app/src/main/java/com/example/assistant/MainActivity.kt")),
+            listOf("path")))
+        f.put(fn("repo_write_file", "Save a changed file back to the user's GitHub repo (mgsamir/ai-assistant). Always read the file first with repo_read_file, then send the FULL new file content here (not just the changed lines). This writes to a separate \"assistant-edits\" branch, never directly to main, so the user can review it",
+            JSONObject().put("path", str("Same file path as repo_read_file"))
+                .put("content", str("The COMPLETE new content of the file after your change"))
+                .put("message", str("Short commit message describing the change")),
+            listOf("path", "content")))
         return JSONArray().put(JSONObject().put("function_declarations", f))
     }
     // "haan bilkul" जैसे फालतू शुरुआती शब्द हटाता है
@@ -1258,6 +1269,15 @@ The user is an Android developer building and testing his own apps, including th
                     } else if (c.getString("name") == "web_search") {
                         val qq = c.optJSONObject("args")?.optString("query", "") ?: ""
                         pre[idx] = webAnswer(key, qq)
+               
+                    } else if (c.getString("name") == "repo_read_file") {
+                        val pathR = c.optJSONObject("args")?.optString("path", "") ?: ""
+                        val r = GitHub.readFile(prefs, pathR)
+                        pre[idx] = if (r.ok) Reply(r.text, "File padh li") else Reply(r.text, r.text)
+                    } else if (c.getString("name") == "repo_write_file") {
+                        val args = c.optJSONObject("args") ?: JSONObject()
+                        val r = GitHub.writeFile(prefs, args.optString("path", ""), args.optString("content", ""), args.optString("message", ""))
+                        pre[idx] = Reply(r.text, r.text)
                     }
                 }
                 postG(g) {
