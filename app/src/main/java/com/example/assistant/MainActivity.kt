@@ -2685,7 +2685,7 @@ class MainActivity : Activity() {
             header("CODING ASSISTANT")
             keyRow("GitHub token", "gh_token", "")
             list.addView(TextView(this).apply {
-                text = "Taaki assistant bolkar is app ka khud ka code padh sake aur badal sake (\"assistant-edits\" branch par, main par kabhi nahi). GitHub par Settings → Developer settings → Fine-grained tokens se banao, repo mgsamir/ai-assistant tak seemit, Contents = Read and write."
+                text = "Taaki assistant bolkar is app ka khud ka code padh sake aur badal sake (\"assistant-edits\" branch par, main par kabhi nahi). GitHub par Settings → Developer settings → Fine-grained tokens se banao, repo mgsamir/ai-assistant tak seemit, Contents = Read and write aur Actions = Read and write."
                 textSize = 12.5f; setTextColor(Color.parseColor("#6E6E76")); setPadding(dp(4), dp(4), dp(4), dp(10))
             })
         }
@@ -2810,6 +2810,29 @@ class MainActivity : Activity() {
                         .setMessage("This cannot be undone.")
                         .setPositiveButton("Delete") { _, _ -> Chats.clearAll(p); newChat(); dlg.dismiss() }
                         .setNegativeButton("Cancel", null).show()
+                }
+            )), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+            list.addView(accGroup(listOf(
+                AccRow(65, "Install latest build", "") {
+                    Toast.makeText(this, "Downloading latest build...", Toast.LENGTH_SHORT).show()
+                    Thread {
+                        val id = try { ApkUpdate.latestSuccessfulRunId(p) } catch (e: Exception) { -1L }
+                        val err = if (id <= 0L) "No finished build found (check GitHub token)" else (try { ApkUpdate.downloadAndInstallApk(this, p, id) } catch (e: Exception) { e.message })
+                        if (err != null) runOnUiThread { Toast.makeText(this, err, Toast.LENGTH_LONG).show() }
+                    }.start()
+                },
+                AccRow(65, "Build new APK and install", "") {
+                    Toast.makeText(this, "Build started, this takes a few minutes", Toast.LENGTH_LONG).show()
+                    Thread {
+                        var err: String? = null
+                        try {
+                            val id = ApkUpdate.triggerGithubApkPatch(p)
+                            err = if (id <= 0L) "Could not start the build (check token permissions: Actions)"
+                            else if (!ApkUpdate.waitUntilDone(p, id)) "Build did not finish successfully"
+                            else ApkUpdate.downloadAndInstallApk(this, p, id)
+                        } catch (e: Exception) { err = e.message }
+                        if (err != null) runOnUiThread { Toast.makeText(this, err, Toast.LENGTH_LONG).show() }
+                    }.start()
                 }
             )), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
             list.addView(accGroup(listOf(
