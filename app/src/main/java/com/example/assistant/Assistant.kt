@@ -1278,15 +1278,21 @@ When the user asks you to change the code of this very app (for example "ye butt
                         pre[idx] = webAnswer(key, qq)
                
                     } else if (c.getString("name") == "repo_list_files") {
+                        val stG = Act.begin(2, "Listing repo files", "repo_list_files()")
                         val r = GitHub.listFiles(prefs)
+                        if (r.ok) Act.ok(stG, r.text.lines().size.toString() + " files", r.text.take(1500)) else Act.fail(stG, r.text, r.text)
                         pre[idx] = Reply(r.text, if (r.ok) "File list mil gayi" else r.text)
                     } else if (c.getString("name") == "repo_search_code") {
                         val qq = c.optJSONObject("args")?.optString("query", "") ?: ""
+                        val stG = Act.begin(2, "Searching code: $qq", "repo_search_code(query=\"$qq\")")
                         val r = GitHub.searchCode(prefs, qq)
+                        if (r.ok) Act.ok(stG, r.text.take(120), r.text) else Act.fail(stG, r.text, r.text)
                         pre[idx] = Reply(r.text, if (r.ok) "Search ho gaya" else r.text)
                     } else if (c.getString("name") == "repo_read_file") {
                         val pathR = c.optJSONObject("args")?.optString("path", "") ?: ""
+                        val stG = Act.begin(2, "Reading $pathR", "repo_read_file(path=\"$pathR\")")
                         val r = GitHub.readFile(prefs, pathR)
+                        if (r.ok) Act.ok(stG, r.text.lines().size.toString() + " lines", r.text.take(1500)) else Act.fail(stG, r.text, r.text)
                         pre[idx] = if (r.ok) Reply(r.text, "File padh li") else Reply(r.text, r.text)
                     } else if (c.getString("name") == "repo_write_file") {
                         val args = c.optJSONObject("args") ?: JSONObject()

@@ -1,10 +1,10 @@
 name: Build APK
 on:
   push:
-    branches: [main]
+    branches: [main, assistant-edits]
   workflow_dispatch:
 concurrency:
-  group: build-apk
+  group: build-apk-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
