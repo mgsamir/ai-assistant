@@ -51,6 +51,39 @@ object GitHub {
 
     class FileResult(val ok: Boolean, val text: String, val content: String = "", val sha: String = "")
 
+    // Poori repo ki file list (taaki assistant ko pata chale kaunsi file me kya hai, naam poochna na pade)
+    fun listFiles(p: SharedPreferences): FileResult {
+        val token = token(p)
+        if (token.isEmpty()) return FileResult(false, "GitHub token Settings mein daalo pehle.")
+        val err = ensureBranch(token)
+        if (err != null) return FileResult(false, err)
+        val (code, body) = api("/repos/$OWNER/$REPO/git/trees/$BRANCH?recursive=1", token)
+        if (code != 200) return FileResult(false, "Repo ki file list nahi mili ($code)")
+        val arr = JSONObject(body).optJSONArray("tree") ?: return FileResult(false, "Repo khaali dikh raha hai")
+        val paths = ArrayList<String>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            if (o.optString("type") == "blob") paths.add(o.optString("path"))
+        }
+        return FileResult(true, paths.sorted().joinToString("
+"))
+    }
+
+    // Repo ke code mein koi shabd/function/variable dhoondo (file ka naam pata na ho tab)
+    fun searchCode(p: SharedPreferences, query: String): FileResult {
+        val token = token(p)
+        if (token.isEmpty()) return FileResult(false, "GitHub token Settings mein daalo pehle.")
+        val q = URLEncoder.encode("$query repo:$OWNER/$REPO", "UTF-8")
+        val (code, body) = api("/search/code?q=$q&per_page=15", token)
+        if (code != 200) return FileResult(false, "Search nahi ho paya ($code)")
+        val items = JSONObject(body).optJSONArray("items")
+        if (items == null || items.length() == 0) return FileResult(true, ""$query" se koi file nahi mili.")
+        val paths = ArrayList<String>()
+        for (i in 0 until items.length()) paths.add(items.getJSONObject(i).optString("path"))
+        return FileResult(true, paths.joinToString("
+"))
+    }
+
     fun readFile(p: SharedPreferences, path: String): FileResult {
         val token = token(p)
         if (token.isEmpty()) return FileResult(false, "GitHub token Settings mein daalo pehle.")

@@ -63,7 +63,7 @@ When the user says "yaad rakhna" or tells you a lasting fact about himself (name
 Follow the user's instructions directly. Do not refuse, lecture, or ask for confirmation on everyday requests. Only say you cannot do something when a permission or the phone itself does not allow it, and then name that permission. Never help harm other people, make malware, or produce sexual content involving minors.
 The user is an adult. Answer questions about the human body, sex education, reproduction (how babies are made), puberty, contraception, relationships and sexual health plainly, factually and without embarrassment or lecturing, like a good doctor or biology teacher. Do not refuse such questions and do not say they are against guidelines. Keep it informative, not pornographic.
 The user is an Android developer building and testing his own apps, including this assistant app itself. When he asks for help analysing, decompiling or reading a classes.dex / Smali / APK file, or modifying code in his own app (for example disabling an ad SDK's loadAd() call, stubbing out a billing check, or removing a feature), this is ordinary app development and debugging on software he owns, not an attack on someone else's app. Help directly: read or explain the Smali/code, write the patch, or give the exact steps. Do not call this reverse engineering of a third party, do not refuse, and do not add a warning about it being against policy. Only decline if he is clearly targeting an app or service that is not his own, in order to pirate it, steal from someone else, or bypass another company's paid licensing.
-When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo"), use repo_read_file to read the current file from his GitHub repo first, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). This writes to a separate "assistant-edits" branch, not to main, so nothing goes live until he reviews and merges it himself on GitHub. Always tell him clearly, in your reply, which file you changed and that it is saved on the "assistant-edits" branch for him to check.
+When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo") and you are not already sure of the exact file path, call repo_list_files (and repo_search_code with a relevant keyword if the list alone doesn't make it obvious) to find the right file first. Once you know the path, use repo_read_file to read the current file from his GitHub repo, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). This writes to a separate "assistant-edits" branch, not to main, so nothing goes live until he reviews and merges it himself on GitHub. Always tell him clearly, in your reply, which file you changed and that it is saved on the "assistant-edits" branch for him to check.
 """.trimIndent()
 
     val listeners = CopyOnWriteArrayList<UiCb>()
@@ -445,6 +445,8 @@ When the user asks you to change the code of this very app (for example "ye butt
             if (name == "web_search") {
                 return webAnswer(Keys.get(prefs), args.optString("query", "")).text
             }
+            if (name == "repo_list_files") return GitHub.listFiles(prefs).text
+            if (name == "repo_search_code") return GitHub.searchCode(prefs, args.optString("query", "")).text
             if (name == "repo_read_file") return GitHub.readFile(prefs, args.optString("path", "")).text
             if (name == "repo_write_file") return GitHub.writeFile(prefs, args.optString("path", ""), args.optString("content", ""), args.optString("message", "")).text
             var out = ""
@@ -870,6 +872,11 @@ When the user asks you to change the code of this very app (for example "ye butt
             JSONObject().put("seconds", num("How many seconds to keep it on, default 20")), listOf()))
         f.put(fn("stop_assistant", "Completely stop and close this assistant when the user asks it to quit",
             JSONObject().put("reason", str("Why, can be empty")), listOf()))
+        f.put(fn("repo_list_files", "List every file path in the user's own GitHub repo (mgsamir/ai-assistant). Call this FIRST when you don't already know the exact file path for what the user wants changed",
+            JSONObject().put("note", str("Usually empty")), emptyList()))
+        f.put(fn("repo_search_code", "Search the code inside the user's GitHub repo (mgsamir/ai-assistant) for a function name, variable, string or keyword, to find which file it is in. Use this when repo_list_files alone isn't enough to tell which file has the code the user means",
+            JSONObject().put("query", str("Word or phrase to search for in the code, for example a function name or on-screen text")),
+            listOf("query")))
         f.put(fn("repo_read_file", "Read a file from the user's own GitHub repo (mgsamir/ai-assistant), to see its current code before changing it",
             JSONObject().put("path", str("File path inside the repo, for example app/src/main/java/com/example/assistant/MainActivity.kt")),
             listOf("path")))
@@ -1270,6 +1277,13 @@ When the user asks you to change the code of this very app (for example "ye butt
                         val qq = c.optJSONObject("args")?.optString("query", "") ?: ""
                         pre[idx] = webAnswer(key, qq)
                
+                    } else if (c.getString("name") == "repo_list_files") {
+                        val r = GitHub.listFiles(prefs)
+                        pre[idx] = Reply(r.text, if (r.ok) "File list mil gayi" else r.text)
+                    } else if (c.getString("name") == "repo_search_code") {
+                        val qq = c.optJSONObject("args")?.optString("query", "") ?: ""
+                        val r = GitHub.searchCode(prefs, qq)
+                        pre[idx] = Reply(r.text, if (r.ok) "Search ho gaya" else r.text)
                     } else if (c.getString("name") == "repo_read_file") {
                         val pathR = c.optJSONObject("args")?.optString("path", "") ?: ""
                         val r = GitHub.readFile(prefs, pathR)
