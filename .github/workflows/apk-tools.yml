@@ -1,0 +1,70 @@
+name: APK Tools (decompile / remove AdMob / rebuild)
+# Sirf tumhare apne APK par chalta hai. input.apk tum khud is path par commit karte ho:
+#   tools/apk-tools/input.apk
+# Phir GitHub ke "Actions" tab me jaake isi workflow ko "Run workflow" se manually chalao.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "decompile_only = sirf Manifest+Smali dekhne ke liye | remove_ads_and_rebuild = AdMob hata kar test APK banao"
+        required: true
+        default: "decompile_only"
+        type: choice
+        options:
+          - decompile_only
+          - remove_ads_and_rebuild
+
+jobs:
+  apk-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check input.apk
+        run: |
+          if [ ! -f tools/apk-tools/input.apk ]; then
+            echo "::error::tools/apk-tools/input.apk nahi mila. Apna APK is exact path par commit karke phir se chalao."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Apktool
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y apktool
+          apktool --version
+
+      - name: Decompile
+        run: apktool d -f -o decompiled tools/apk-tools/input.apk
+
+      - name: Remove AdMob (only in remove_ads_and_rebuild mode)
+        if: ${{ inputs.mode == 'remove_ads_and_rebuild' }}
+        run: python3 tools/apk-tools/remove_admob.py decompiled
+
+      - name: Upload Manifest + Smali (for you to inspect)
+        uses: actions/upload-artifact@v4
+        with:
+          name: decompiled-manifest-and-smali
+          path: |
+            decompiled/AndroidManifest.xml
+            decompiled/smali*/**
+
+      - name: Rebuild + sign (only in remove_ads_and_rebuild mode)
+        if: ${{ inputs.mode == 'remove_ads_and_rebuild' }}
+        run: |
+          apktool b decompiled -o output-unsigned.apk
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          "$BT/zipalign" -p -f 4 output-unsigned.apk output-aligned.apk
+          "$BT/apksigner" sign --ks app/debug.keystore --ks-pass pass:android \
+            --key-pass pass:android --out output-ads-removed-signed.apk output-aligned.apk
+
+      - name: Upload rebuilt APK (only in remove_ads_and_rebuild mode)
+        if: ${{ inputs.mode == 'remove_ads_and_rebuild' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ads-removed-signed-apk
+          path: output-ads-removed-signed.apk
