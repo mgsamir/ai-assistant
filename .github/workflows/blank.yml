@@ -38,8 +38,10 @@ jobs:
           ELEVEN_KEY: ${{ secrets.ELEVENLABS_API_KEY || secrets.ELEVENLABS_KEY || secrets.ELEVENLABS }}
           VT_KEY: ${{ secrets.VIRUSTOTAL_API_KEY || secrets.VIRUSTOTAL_KEY || secrets.VT_API_KEY }}
           POLLI_KEY: ${{ secrets.POLLINATIONS_API_KEY || secrets.POLLINATIONS_KEY || secrets.POLLINATIONS }}
+          GNEWS_KEY: ${{ secrets.GNEWS_API_KEY || secrets.GNEWS_KEY }}
+          NEWSDATA_KEY: ${{ secrets.NEWSDATA_API_KEY || secrets.NEWSDATA_KEY }}
         run: |
-          for n in BRAVE_KEY GROQ_KEY OPENROUTER_KEY ELEVEN_KEY VT_KEY POLLI_KEY; do
+          for n in BRAVE_KEY GROQ_KEY OPENROUTER_KEY ELEVEN_KEY VT_KEY POLLI_KEY GNEWS_KEY NEWSDATA_KEY; do
             if [ -z "${!n}" ]; then echo "::warning::$n khaali hai"; else echo "$n mil gayi"; fi
           done
       - run: gradle assembleDebug --no-daemon
@@ -51,6 +53,8 @@ jobs:
           ELEVEN_KEY: ${{ secrets.ELEVENLABS_API_KEY || secrets.ELEVENLABS_KEY || secrets.ELEVENLABS }}
           VT_KEY: ${{ secrets.VIRUSTOTAL_API_KEY || secrets.VIRUSTOTAL_KEY || secrets.VT_API_KEY }}
           POLLI_KEY: ${{ secrets.POLLINATIONS_API_KEY || secrets.POLLINATIONS_KEY || secrets.POLLINATIONS }}
+          GNEWS_KEY: ${{ secrets.GNEWS_API_KEY || secrets.GNEWS_KEY }}
+          NEWSDATA_KEY: ${{ secrets.NEWSDATA_API_KEY || secrets.NEWSDATA_KEY }}
       - uses: actions/upload-artifact@v4
         with:
           name: my-assistant-apk

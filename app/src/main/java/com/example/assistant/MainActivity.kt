@@ -2682,6 +2682,13 @@ class MainActivity : Activity() {
                     .setNegativeButton("Cancel", null)
                     .show()
             }
+            header("NEWS")
+            keyRow("GNews key", "k_gnews", BuildConfig.GNEWS_KEY)
+            keyRow("NewsData.io key", "k_newsdata", BuildConfig.NEWSDATA_KEY)
+            list.addView(TextView(this).apply {
+                text = "In mein se ek key daalo taaki \"news\" poochne par taaza headlines mil sakein. Dono free hain: gnews.io (100/din) ya newsdata.io (200/din) par bina card ke signup karke key copy karo."
+                textSize = 12.5f; setTextColor(Color.parseColor("#6E6E76")); setPadding(dp(4), dp(4), dp(4), dp(10))
+            })
             header("CODING ASSISTANT")
             keyRow("GitHub token", "gh_token", "")
             list.addView(TextView(this).apply {

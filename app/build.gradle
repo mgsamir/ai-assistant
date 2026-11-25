@@ -30,6 +30,8 @@ android {
         buildConfigField "String", "OPENAI_KEY", "\"\""
         buildConfigField "String", "VT_KEY", "\"${System.getenv('VT_KEY') ?: ''}\""
         buildConfigField "String", "POLLI_KEY", "\"${System.getenv('POLLI_KEY') ?: ''}\""
+        buildConfigField "String", "GNEWS_KEY", "\"${System.getenv('GNEWS_KEY') ?: ''}\""
+        buildConfigField "String", "NEWSDATA_KEY", "\"${System.getenv('NEWSDATA_KEY') ?: ''}\""
     }
 
     buildFeatures { buildConfig true }

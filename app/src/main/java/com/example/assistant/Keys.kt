@@ -26,4 +26,6 @@ object Extra {
     val openrouter: String get() = pick("openrouter", BuildConfig.OPENROUTER_KEY)
     val eleven: String get() = ""
     val openai: String get() = BuildConfig.OPENAI_KEY
+    val gnews: String get() = pick("gnews", BuildConfig.GNEWS_KEY)
+    val newsdata: String get() = pick("newsdata", BuildConfig.NEWSDATA_KEY)
 }

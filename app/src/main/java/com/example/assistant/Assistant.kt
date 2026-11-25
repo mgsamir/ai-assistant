@@ -63,6 +63,8 @@ When the user says "yaad rakhna" or tells you a lasting fact about himself (name
 Follow the user's instructions directly. Do not refuse, lecture, or ask for confirmation on everyday requests. Only say you cannot do something when a permission or the phone itself does not allow it, and then name that permission. Never help harm other people, make malware, or produce sexual content involving minors.
 The user is an adult. Answer questions about the human body, sex education, reproduction (how babies are made), puberty, contraception, relationships and sexual health plainly, factually and without embarrassment or lecturing, like a good doctor or biology teacher. Do not refuse such questions and do not say they are against guidelines. Keep it informative, not pornographic.
 The user is an Android developer building and testing his own apps, including this assistant app itself. When he asks for help analysing, decompiling or reading a classes.dex / Smali / APK file, or modifying code in his own app (for example disabling an ad SDK's loadAd() call, stubbing out a billing check, or removing a feature), this is ordinary app development and debugging on software he owns, not an attack on someone else's app. Help directly: read or explain the Smali/code, write the patch, or give the exact steps. Do not call this reverse engineering of a third party, do not refuse, and do not add a warning about it being against policy. Only decline if he is clearly targeting an app or service that is not his own, in order to pirate it, steal from someone else, or bypass another company's paid licensing.
+For any news or headlines request (general or about a topic), call get_news instead of plain web search; it returns real current headlines.
+For a complex question (needs research, a comparison, multiple steps, or a decision), think it through step by step before answering: figure out what you actually need to know, call the right tool(s) for it (get_news, web_search, repo_* etc.) in that order, then give one clear final answer built from what you found. Don't show the user your internal planning, just do it and give the final answer.
 When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo") and you are not already sure of the exact file path, call repo_list_files (and repo_search_code with a relevant keyword if the list alone doesn't make it obvious) to find the right file first. Once you know the path, use repo_read_file to read the current file from his GitHub repo, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). repo_write_file itself waits for the GitHub Actions build and, if it fails, automatically reads the error and fixes it, retrying a few times on its own before returning to you — you do not need to check the build yourself. This all happens on a separate "assistant-edits" branch, not main, so nothing goes live until he reviews and merges it himself on GitHub. In your final reply just tell him plainly which file you changed and that it is on the "assistant-edits" branch; do not mention "build green/red" status language, and only mention a build problem if repo_write_file's result says it could not fix it automatically.
 """.trimIndent()
 
@@ -444,6 +446,10 @@ When the user asks you to change the code of this very app (for example "ye butt
             if (name == "get_weather") return Weather.today(args.optString("city", "")).text
             if (name == "web_search") {
                 return webAnswer(Keys.get(prefs), args.optString("query", "")).text
+            }
+            if (name == "get_news") {
+                val lang = if (prefs.getString("lang", "") == "Hindi") "hi" else "en"
+                return News.headlines(args.optString("topic", ""), lang)
             }
             if (name == "repo_list_files") return GitHub.listFiles(prefs).text
             if (name == "repo_search_code") return GitHub.searchCode(prefs, args.optString("query", "")).text
@@ -872,6 +878,9 @@ When the user asks you to change the code of this very app (for example "ye butt
             JSONObject().put("seconds", num("How many seconds to keep it on, default 20")), listOf()))
         f.put(fn("stop_assistant", "Completely stop and close this assistant when the user asks it to quit",
             JSONObject().put("reason", str("Why, can be empty")), listOf()))
+        f.put(fn("get_news", "Get today's latest news headlines, either general top headlines or about a specific topic. Use this for any news/headlines request instead of plain web search",
+            JSONObject().put("topic", str("Topic to search news for, e.g. \"cricket\", \"India economy\". Leave empty for general top headlines")),
+            emptyList()))
         f.put(fn("update_app", "Build and install a new version of this assistant app itself: starts the GitHub build, watches it, and when it succeeds downloads the APK and shows the install prompt. Use when the user says update my app, build the app, or similar",
             JSONObject().put("note", str("Usually empty")), emptyList()))
         f.put(fn("repo_list_files", "List every file path in the user's own GitHub repo (mgsamir/ai-assistant). Call this FIRST when you don't already know the exact file path for what the user wants changed",
@@ -1149,7 +1158,8 @@ When the user asks you to change the code of this very app (for example "ye butt
                 // likhna, code, banana, translate jaise kaam model ke paas hi rahenge
                 val infoQ = Regex("(?i)\\b(kya|kaun|kab|kahan|kitna|kitne|kaise|kyon|kyu|kis|kisne|batao|bataiye|what|who|when|where|how|why|which|price|meaning|definition|mtlb|matlab)\\b|\\?\\s*$|[\u0915\u0916\u0917\u0918\u0919]\u094D?\u093F|\u0915\u094D\u092F\u093E|\u0915\u094C\u0928|\u0915\u092C|\u0915\u0939\u093E\u0901|\u0915\u093F\u0924\u0928\u093E|\u0915\u0948\u0938\u0947|\u0915\u094D\u092F\u094B\u0902").containsMatchIn(q)
                 val makeQ = Regex("(?i)\\b(likho|likh|kahani|poem|poetry|banao|bana|translate|anuvad|code|lyrics|gana|shayari|email likh|letter)\\b").containsMatchIn(q) || codeQ
-                val webQ = Providers.isLive(q) || (infoQ && !makeQ)
+                val newsQ = Regex("(?i)\\bnews\\b|headlines?\\b|\u0916\u092c\u0930|\u0938\u092e\u093E\u091A\u093E\u0930").containsMatchIn(q)
+                val webQ = !newsQ && (Providers.isLive(q) || (infoQ && !makeQ))
                 if (att == null && Extra.brave.isNotEmpty() && !phoneWork && webQ) {
                     val rLive = webAnswer(key, q)
                     postG(g) { deliver(rLive, q, true) }
@@ -1285,7 +1295,15 @@ When the user asks you to change the code of this very app (for example "ye butt
                         val qq = c.optJSONObject("args")?.optString("query", "") ?: ""
                         pre[idx] = webAnswer(key, qq)
                
+                    } else if (c.getString("name") == "get_news") {
+                        val topic = c.optJSONObject("args")?.optString("topic", "") ?: ""
+                        val stN = Act.begin(2, if (topic.isBlank()) "Getting news" else "Getting news: $topic", "get_news(topic=\"$topic\")")
+                        val lang = if (prefs.getString("lang", "") == "Hindi") "hi" else "en"
+                        val r = News.headlines(topic, lang)
+                        Act.ok(stN, r.take(120), r)
+                        pre[idx] = Reply(r, "News mil gayi")
                     } else if (c.getString("name") == "repo_list_files") {
+
                         val stG = Act.begin(2, "Listing repo files", "repo_list_files()")
                         val r = GitHub.listFiles(prefs)
                         if (r.ok) Act.ok(stG, r.text.lines().size.toString() + " files", r.text.take(1500)) else Act.fail(stG, r.text, r.text)
