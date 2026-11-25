@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ai Assistant &mdash; PC Dashboard</title>
+<style>
+  :root{color-scheme:dark;}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0a0a;color:#eee;font:15px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  header{display:flex;align-items:center;gap:12px;padding:14px 18px;background:#111;border-bottom:1px solid #222;position:sticky;top:0;z-index:5}
+  header h1{font-size:17px;margin:0;font-weight:600}
+  nav{display:flex;gap:4px;flex-wrap:wrap;padding:10px 18px;background:#0f0f0f;border-bottom:1px solid #1e1e22}
+  nav button{background:#1a1a1a;color:#ccc;border:1px solid #262626;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:13.5px}
+  nav button.active{background:#2b6cff;color:#fff;border-color:#2b6cff}
+  main{max-width:900px;margin:0 auto;padding:18px}
+  section{display:none}
+  section.active{display:block}
+  .card{background:#101010;border:1px solid #1e1e22;border-radius:16px;padding:16px;margin-bottom:14px}
+  label{display:block;font-size:12.5px;color:#8e8e96;margin:10px 0 4px}
+  input,select,textarea{width:100%;background:#1a1a1a;color:#fff;border:1px solid #2a2a2e;border-radius:10px;padding:10px;font-size:14px;font-family:inherit}
+  textarea{min-height:90px;resize:vertical}
+  button.btn{background:#2b6cff;color:#fff;border:none;border-radius:10px;padding:10px 16px;cursor:pointer;font-size:14px;margin-top:10px;margin-right:8px}
+  button.btn.gray{background:#262626}
+  button.btn.red{background:#5b2020}
+  button.btn:disabled{opacity:.5;cursor:default}
+  pre{white-space:pre-wrap;word-break:break-word;background:#000;border:1px solid #222;border-radius:10px;padding:10px;font-size:13px;max-height:420px;overflow:auto}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .pill{display:inline-block;background:#1a1a1a;border:1px solid #2a2a2e;border-radius:20px;padding:4px 10px;font-size:12px;color:#aaa;margin:3px 4px 0 0;cursor:pointer}
+  .msg{padding:10px 14px;border-radius:14px;margin:8px 0;max-width:85%;white-space:pre-wrap}
+  .msg.user{background:#2b6cff;color:#fff;margin-left:auto}
+  .msg.ai{background:#1a1a1a}
+  .small{font-size:12.5px;color:#8e8e96}
+  .ok{color:#6fd48a}
+  .err{color:#ff8a80}
+  a{color:#7aa2ff}
+</style>
+</head>
+<body>
+<header>
+  <h1>Ai Assistant &mdash; PC Dashboard</h1>
+  <span class="small" id="repoLabel">mgsamir/ai-assistant</span>
+</header>
+<nav id="tabs"></nav>
+<main>
+  <section id="tab-chat">
+    <div class="card">
+      <div id="chatBox" style="max-height:60vh;overflow:auto"></div>
+      <div class="row" style="margin-top:10px">
+        <textarea id="chatInput" placeholder="Kuch poochho..." style="flex:1"></textarea>
+      </div>
+      <button class="btn" onclick="sendChat()">Bhejo</button>
+      <button class="btn gray" onclick="document.getElementById('chatBox').innerHTML=''; chatHistory=[]">Clear</button>
+      <div class="small" id="chatStatus"></div>
+    </div>
+  </section>
+
+  <section id="tab-files">
+    <div class="card">
+      <label>File list filter (optional)</label>
+      <input id="fileFilter" placeholder="jaise: MainActivity">
+      <button class="btn" onclick="listFiles()">List files</button>
+      <label>Code search</label>
+      <input id="searchQ" placeholder="function/keyword">
+      <button class="btn gray" onclick="searchCode()">Search</button>
+      <pre id="fileListOut"></pre>
+    </div>
+    <div class="card">
+      <label>File path</label>
+      <input id="filePath" placeholder="app/src/main/java/com/example/assistant/MainActivity.kt">
+      <button class="btn" onclick="readFile()">Padho</button>
+      <textarea id="fileContent" style="min-height:300px;font-family:monospace;font-size:12.5px"></textarea>
+      <label>Commit message</label>
+      <input id="commitMsg" placeholder="What changed">
+      <button class="btn" onclick="writeFile()">assistant-edits par save karo</button>
+      <div class="small" id="fileStatus"></div>
+    </div>
+  </section>
+
+  <section id="tab-build">
+    <div class="card">
+      <h3 style="margin-top:0">Normal app build</h3>
+      <button class="btn" onclick="triggerBuild('blank.yml')">Build chalao (main)</button>
+      <button class="btn gray" onclick="checkLatest('blank.yml')">Latest run dekho</button>
+      <div class="small" id="buildStatus"></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">APK Tools (decompile / AdMob remove)</h3>
+      <label>Mode</label>
+      <select id="apkMode"><option value="decompile_only">decompile_only</option><option value="remove_ads_and_rebuild">remove_ads_and_rebuild</option></select>
+      <button class="btn" onclick="triggerBuild('apk-tools.yml', document.getElementById('apkMode').value)">Chalao</button>
+      <div class="small">input.apk pehle tools/apk-tools/input.apk par commit hona chahiye (Files tab se).</div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Artifacts</h3>
+      <input id="runIdBox" placeholder="Run id (upar se copy karo)">
+      <button class="btn" onclick="listArtifacts()">Artifacts dekho</button>
+      <div id="artifactsOut"></div>
+    </div>
+  </section>
+
+  <section id="tab-memory">
+    <div class="card">
+      <div class="small">Ye memory GitHub repo ki <code>data/memory.json</code> file mein rehti hai &mdash; phone ki local memory se abhi alag hai.</div>
+      <div id="memList"></div>
+      <label>Nayi baat</label>
+      <input id="memNew" placeholder="jaise: user ka naam Samir hai">
+      <button class="btn" onclick="addMemory()">Add + Save</button>
+      <button class="btn gray" onclick="loadMemory()">Reload</button>
+      <div class="small" id="memStatus"></div>
+    </div>
+  </section>
+
+  <section id="tab-news">
+    <div class="card">
+      <label>Topic (khaali = top headlines)</label>
+      <input id="newsTopic" placeholder="jaise: cricket">
+      <button class="btn" onclick="getNews()">Laao</button>
+      <pre id="newsOut"></pre>
+    </div>
+  </section>
+
+  <section id="tab-settings">
+    <div class="card">
+      <label>GitHub token (Contents + Actions = Read and write, sirf is repo tak)</label>
+      <input id="s_gh" type="password">
+      <label>Gemini API key</label>
+      <input id="s_gemini" type="password">
+      <label>Groq API key</label>
+      <input id="s_groq" type="password">
+      <label>OpenRouter API key</label>
+      <input id="s_or" type="password">
+      <label>GNews key</label>
+      <input id="s_gnews" type="password">
+      <label>NewsData.io key</label>
+      <input id="s_newsdata" type="password">
+      <button class="btn" onclick="saveSettings()">Save</button>
+      <div class="small" id="setStatus"></div>
+      <div class="small" style="margin-top:10px">Ye sab sirf is browser ki localStorage mein rehti hain, kahin aur nahi jaatin. Ye page public GitHub Pages par hai, isliye apna token kisi shared/public computer par mat daalna &mdash; kaam khatam hone par "Clear" dabana ya browser data clear karna.</div>
+      <button class="btn red" onclick="clearSettings()">Clear all keys from this browser</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const OWNER='mgsamir', REPO='ai-assistant', BASE='main', BRANCH='assistant-edits';
+const tabs=[['chat','Chat'],['files','Files'],['build','Build'],['memory','Memory'],['news','News'],['settings','Settings']];
+const nav=document.getElementById('tabs');
+tabs.forEach(([id,label],i)=>{
+  const b=document.createElement('button');
+  b.textContent=label; b.onclick=()=>showTab(id);
+  if(i===0) b.classList.add('active');
+  nav.appendChild(b);
+});
+function showTab(id){
+  document.querySelectorAll('section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  [...nav.children].forEach((b,i)=>b.classList.toggle('active', tabs[i][0]===id));
+}
+showTab('chat');
+
+function ls(k,d=''){ return localStorage.getItem('aa_'+k) ?? d; }
+function setLs(k,v){ localStorage.setItem('aa_'+k, v); }
+['gh','gemini','groq','or','gnews','newsdata'].forEach(k=>{ document.getElementById('s_'+k).value = ls(k); });
+function saveSettings(){
+  ['gh','gemini','groq','or','gnews','newsdata'].forEach(k=>setLs(k, document.getElementById('s_'+k).value.trim()));
+  document.getElementById('setStatus').textContent='Saved.';
+}
+function clearSettings(){
+  ['gh','gemini','groq','or','gnews','newsdata'].forEach(k=>{ localStorage.removeItem('aa_'+k); document.getElementById('s_'+k).value=''; });
+  document.getElementById('setStatus').textContent='Cleared.';
+}
+
+// ---------- GitHub helpers ----------
+async function gh(path, opts={}){
+  const token = ls('gh');
+  const r = await fetch('https://api.github.com'+path, {
+    ...opts,
+    headers: { 'Authorization':'Bearer '+token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28', ...(opts.body?{'Content-Type':'application/json'}:{}) , ...(opts.headers||{}) }
+  });
+  const text = await r.text();
+  let json=null; try{ json=JSON.parse(text); }catch(e){}
+  return { ok:r.ok, status:r.status, text, json };
+}
+async function ensureBranch(){
+  let r = await gh(`/repos/${OWNER}/${REPO}/git/ref/heads/${BRANCH}`);
+  if (r.ok) return null;
+  r = await gh(`/repos/${OWNER}/${REPO}/git/ref/heads/${BASE}`);
+  if (!r.ok) return 'Base branch nahi mila ('+r.status+')';
+  const sha = r.json?.object?.sha;
+  const r2 = await gh(`/repos/${OWNER}/${REPO}/git/refs`, {method:'POST', body:JSON.stringify({ref:'refs/heads/'+BRANCH, sha})});
+  return r2.ok ? null : 'Branch nahi bana ('+r2.status+')';
+}
+function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
+function b64decode(str){ return decodeURIComponent(escape(atob(str.replace(/\n/g,'')))); }
+
+// ---------- Files tab ----------
+async function listFiles(){
+  const out=document.getElementById('fileListOut'); out.textContent='Loading...';
+  const err = await ensureBranch(); if (err){ out.textContent=err; return; }
+  const r = await gh(`/repos/${OWNER}/${REPO}/git/trees/${BRANCH}?recursive=1`);
+  if (!r.ok){ out.textContent='Error '+r.status; return; }
+  const filt = document.getElementById('fileFilter').value.trim().toLowerCase();
+  let paths = (r.json.tree||[]).filter(t=>t.type==='blob').map(t=>t.path).sort();
+  if (filt) paths = paths.filter(p=>p.toLowerCase().includes(filt));
+  out.textContent = paths.join('\n') || 'Kuch nahi mila';
+}
+async function searchCode(){
+  const q = document.getElementById('searchQ').value.trim();
+  const out=document.getElementById('fileListOut'); out.textContent='Searching...';
+  const r = await gh(`/search/code?q=${encodeURIComponent(q+' repo:'+OWNER+'/'+REPO)}&per_page=15`);
+  if (!r.ok){ out.textContent='Error '+r.status; return; }
+  out.textContent = (r.json.items||[]).map(i=>i.path).join('\n') || 'Kuch nahi mila';
+}
+async function readFile(){
+  const path = document.getElementById('filePath').value.trim();
+  const st=document.getElementById('fileStatus'); st.textContent='Loading...';
+  const err = await ensureBranch(); if (err){ st.textContent=err; return; }
+  const r = await gh(`/repos/${OWNER}/${REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${BRANCH}`);
+  if (!r.ok){ st.textContent='File nahi mili ('+r.status+')'; return; }
+  document.getElementById('fileContent').value = b64decode(r.json.content||'');
+  st.textContent = 'Padh liya.';
+}
+async function writeFile(){
+  const path = document.getElementById('filePath').value.trim();
+  const content = document.getElementById('fileContent').value;
+  const msg = document.getElementById('commitMsg').value.trim() || ('Dashboard edit: '+path);
+  const st=document.getElementById('fileStatus'); st.textContent='Saving...';
+  const err = await ensureBranch(); if (err){ st.textContent=err; return; }
+  const existing = await gh(`/repos/${OWNER}/${REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${BRANCH}`);
+  const body = { message: msg, content: b64encode(content), branch: BRANCH };
+  if (existing.ok) body.sha = existing.json.sha;
+  const r = await gh(`/repos/${OWNER}/${REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}`, {method:'PUT', body:JSON.stringify(body)});
+  st.innerHTML = r.ok ? `<span class="ok">"${path}" assistant-edits par save ho gaya.</span>` : `<span class="err">Error ${r.status}: ${r.text.slice(0,200)}</span>`;
+}
+
+// ---------- Build tab ----------
+async function triggerBuild(workflow, mode){
+  const st=document.getElementById('buildStatus'); st.textContent='Starting...';
+  const body = mode ? {ref:BASE, inputs:{mode}} : {ref:BASE};
+  const r = await gh(`/repos/${OWNER}/${REPO}/actions/workflows/${workflow}/dispatches`, {method:'POST', body:JSON.stringify(body)});
+  st.textContent = r.status===204 ? 'Build shuru ho gaya. Kuch second baad "Latest run dekho" dabao.' : 'Error '+r.status;
+}
+async function checkLatest(workflow){
+  const st=document.getElementById('buildStatus'); st.textContent='Loading...';
+  const r = await gh(`/repos/${OWNER}/${REPO}/actions/workflows/${workflow}/runs?per_page=1`);
+  if (!r.ok){ st.textContent='Error '+r.status; return; }
+  const run = r.json.workflow_runs?.[0];
+  if (!run){ st.textContent='Koi run nahi mila'; return; }
+  st.innerHTML = `Run <b>${run.id}</b> &mdash; ${run.status} ${run.conclusion?('('+run.conclusion+')'):''} &mdash; <a href="${run.html_url}" target="_blank">GitHub par dekho</a>`;
+  document.getElementById('runIdBox').value = run.id;
+}
+async function listArtifacts(){
+  const runId = document.getElementById('runIdBox').value.trim();
+  const out=document.getElementById('artifactsOut'); out.textContent='Loading...';
+  const r = await gh(`/repos/${OWNER}/${REPO}/actions/runs/${runId}/artifacts`);
+  if (!r.ok){ out.textContent='Error '+r.status; return; }
+  out.innerHTML='';
+  (r.json.artifacts||[]).forEach(a=>{
+    const b=document.createElement('button'); b.className='btn gray'; b.textContent='Download '+a.name;
+    b.onclick=async()=>{
+      b.disabled=true; b.textContent='Downloading...';
+      const token=ls('gh');
+      const resp = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/actions/artifacts/${a.id}/zip`, {headers:{'Authorization':'Bearer '+token}});
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const link=document.createElement('a'); link.href=url; link.download=a.name+'.zip'; link.click();
+      b.disabled=false; b.textContent='Download '+a.name;
+    };
+    out.appendChild(b);
+  });
+  if (!(r.json.artifacts||[]).length) out.textContent='Is run mein artifact nahi mila';
+}
+
+// ---------- Memory tab ----------
+async function loadMemory(){
+  const st=document.getElementById('memStatus'); st.textContent='Loading...';
+  const r = await gh(`/repos/${OWNER}/${REPO}/contents/data/memory.json?ref=${BASE}`);
+  let arr=[];
+  if (r.ok) { try{ arr=JSON.parse(b64decode(r.json.content)); }catch(e){} }
+  window._mem = arr; window._memSha = r.ok ? r.json.sha : null;
+  renderMemory();
+  st.textContent = r.ok ? 'Loaded.' : (r.status===404 ? 'Abhi koi memory nahi hai.' : 'Error '+r.status);
+}
+function renderMemory(){
+  const el=document.getElementById('memList'); el.innerHTML='';
+  (window._mem||[]).forEach((m,i)=>{
+    const p=document.createElement('div'); p.className='pill'; p.textContent=m+' ✕';
+    p.onclick=()=>{ window._mem.splice(i,1); saveMemory(); };
+    el.appendChild(p);
+  });
+}
+async function saveMemory(){
+  const st=document.getElementById('memStatus'); st.textContent='Saving...';
+  const body = { message:'Update memory', content:b64encode(JSON.stringify(window._mem||[], null, 2)), branch: BASE };
+  if (window._memSha) body.sha = window._memSha;
+  const r = await gh(`/repos/${OWNER}/${REPO}/contents/data/memory.json`, {method:'PUT', body:JSON.stringify(body)});
+  if (r.ok) window._memSha = r.json.content.sha;
+  renderMemory();
+  st.textContent = r.ok ? 'Saved.' : 'Error '+r.status;
+}
+function addMemory(){
+  const v = document.getElementById('memNew').value.trim();
+  if (!v) return;
+  window._mem = window._mem || [];
+  window._mem.push(v);
+  document.getElementById('memNew').value='';
+  saveMemory();
+}
+loadMemory();
+
+// ---------- News tab ----------
+async function getNews(){
+  const topic = document.getElementById('newsTopic').value.trim();
+  const out=document.getElementById('newsOut'); out.textContent='Loading...';
+  const gkey = ls('gnews'), nkey = ls('newsdata');
+  try{
+    if (gkey){
+      const url = topic ? `https://gnews.io/api/v4/search?q=${encodeURIComponent(topic)}&lang=en&max=6&token=${gkey}` : `https://gnews.io/api/v4/top-headlines?lang=en&max=6&token=${gkey}`;
+      const r = await fetch(url); const j = await r.json();
+      if (r.ok && j.articles){ out.textContent = j.articles.map(a=>'- '+a.title+' ('+(a.source?.name||'')+')'+(a.description?('\n  '+a.description):'')).join('\n'); return; }
+    }
+    if (nkey){
+      const url = `https://newsdata.io/api/1/news?apikey=${nkey}&language=en`+(topic?('&q='+encodeURIComponent(topic)):'');
+      const r = await fetch(url); const j = await r.json();
+      if (r.ok && j.results){ out.textContent = j.results.slice(0,6).map(a=>'- '+a.title+' ('+(a.source_id||'')+')'+(a.description?('\n  '+a.description):'')).join('\n'); return; }
+    }
+    out.textContent = (gkey||nkey) ? 'News nahi mili.' : 'Settings mein GNews ya NewsData.io key daalo.';
+  }catch(e){ out.textContent='Error: '+e.message; }
+}
+
+// ---------- Chat tab ----------
+let chatHistory = [];
+function addMsg(role, text){
+  const box=document.getElementById('chatBox');
+  const d=document.createElement('div'); d.className='msg '+(role==='user'?'user':'ai'); d.textContent=text;
+  box.appendChild(d); box.scrollTop=box.scrollHeight;
+}
+async function sendChat(){
+  const inp=document.getElementById('chatInput'); const q=inp.value.trim();
+  if (!q) return;
+  inp.value=''; addMsg('user', q);
+  const st=document.getElementById('chatStatus'); st.textContent='Thinking...';
+  const sys = "You are the user's own personal assistant (PC dashboard version of his Android AI Assistant app). Reply clearly and concisely, using headings/bullets when it helps.";
+  try{
+    let reply = await askGemini(sys, q);
+    if (!reply) reply = await askGroq(sys, q);
+    if (!reply) reply = await askOpenRouter(sys, q);
+    if (!reply) reply = 'Koi bhi AI key kaam nahi kiya. Settings mein Gemini/Groq/OpenRouter key check karo.';
+    addMsg('ai', reply);
+    chatHistory.push({q, reply});
+  } finally { st.textContent=''; }
+}
+async function askGemini(sys,q){
+  const key = ls('gemini'); if (!key) return null;
+  try{
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ systemInstruction:{parts:[{text:sys}]}, contents:[{role:'user',parts:[{text:q}]}] })
+    });
+    const j = await r.json();
+    return j?.candidates?.[0]?.content?.parts?.map(p=>p.text).join('') || null;
+  }catch(e){ return null; }
+}
+async function askGroq(sys,q){
+  const key = ls('groq'); if (!key) return null;
+  try{
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body: JSON.stringify({model:'llama-3.3-70b-versatile', messages:[{role:'system',content:sys},{role:'user',content:q}]})
+    });
+    const j = await r.json();
+    return j?.choices?.[0]?.message?.content || null;
+  }catch(e){ return null; }
+}
+async function askOpenRouter(sys,q){
+  const key = ls('or'); if (!key) return null;
+  try{
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions',{
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body: JSON.stringify({model:'openrouter/auto', messages:[{role:'system',content:sys},{role:'user',content:q}]})
+    });
+    const j = await r.json();
+    return j?.choices?.[0]?.message?.content || null;
+  }catch(e){ return null; }
+}
+</script>
+</body>
+</html>
