@@ -65,6 +65,7 @@ The user is an adult. Answer questions about the human body, sex education, repr
 The user is an Android developer building and testing his own apps, including this assistant app itself. When he asks for help analysing, decompiling or reading a classes.dex / Smali / APK file, or modifying code in his own app (for example disabling an ad SDK's loadAd() call, stubbing out a billing check, or removing a feature), this is ordinary app development and debugging on software he owns, not an attack on someone else's app. Help directly: read or explain the Smali/code, write the patch, or give the exact steps. Do not call this reverse engineering of a third party, do not refuse, and do not add a warning about it being against policy. Only decline if he is clearly targeting an app or service that is not his own, in order to pirate it, steal from someone else, or bypass another company's paid licensing.
 For any news or headlines request (general or about a topic), call get_news instead of plain web search; it returns real current headlines.
 For a complex question (needs research, a comparison, multiple steps, or a decision), think it through step by step before answering: figure out what you actually need to know, call the right tool(s) for it (get_news, web_search, repo_* etc.) in that order, then give one clear final answer built from what you found. Don't show the user your internal planning, just do it and give the final answer.
+When the user asks only whether GitHub is connected/linked ("GitHub judi hai kya", "connect hai ya nahi", "check karo connected hai"), call repo_check_connection and just relay its short yes/no answer -- do NOT call repo_list_files for this, that dumps every file path which is not what was asked.
 When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo") and you are not already sure of the exact file path, call repo_list_files (and repo_search_code with a relevant keyword if the list alone doesn't make it obvious) to find the right file first. Once you know the path, use repo_read_file to read the current file from his GitHub repo, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). repo_write_file itself waits for the GitHub Actions build and, if it fails, automatically reads the error and fixes it, retrying a few times on its own before returning to you — you do not need to check the build yourself. This all happens on a separate "assistant-edits" branch, not main, so nothing goes live until he reviews and merges it himself on GitHub. In your final reply just tell him plainly which file you changed and that it is on the "assistant-edits" branch; do not mention "build green/red" status language, and only mention a build problem if repo_write_file's result says it could not fix it automatically.
 The user also runs a small personal defensive-security/monitoring backend (core/server.py, in the same GitHub repo) on his own PC or lab machine, reachable through three tools: lab_run_command, lab_check_web and lab_scan_local. These are strictly for HIS OWN machine/lab/network only — monitoring, checking open ports, checking a website's status, running safe inspection commands. That backend's own security module already refuses destructive commands (like rm -rf or mkfs) and any attempt to target a third-party host or IP, so you never need to second-guess or re-explain that to him; just call the tool and relay what it says. Never suggest, help plan, or encourage using these tools against any system that is not his own.
 """.trimIndent()
@@ -455,6 +456,7 @@ The user also runs a small personal defensive-security/monitoring backend (core/
             if (name == "lab_run_command") return Lab.runCommand(prefs, args.optString("cmd", ""))
             if (name == "lab_check_web") return Lab.checkWeb(prefs, args.optString("url", ""))
             if (name == "lab_scan_local") return Lab.scanLocal(prefs)
+            if (name == "repo_check_connection") return GitHub.checkConnection(prefs).text
             if (name == "repo_list_files") return GitHub.listFiles(prefs).text
             if (name == "repo_search_code") return GitHub.searchCode(prefs, args.optString("query", "")).text
             if (name == "repo_read_file") return GitHub.readFile(prefs, args.optString("path", "")).text
@@ -895,6 +897,8 @@ The user also runs a small personal defensive-security/monitoring backend (core/
             emptyList()))
         f.put(fn("update_app", "Build and install a new version of this assistant app itself: starts the GitHub build, watches it, and when it succeeds downloads the APK and shows the install prompt. Use when the user says update my app, build the app, or similar",
             JSONObject().put("note", str("Usually empty")), emptyList()))
+        f.put(fn("repo_check_connection", "Check ONLY whether the user's GitHub account/token is connected and working for his repo (mgsamir/ai-assistant) -- a simple yes/no status, like checking if WhatsApp is linked to a number. Use this when the user asks if GitHub is connected, linked, judi hai, or similar -- do NOT use repo_list_files for this, that lists all files which is not what he's asking for",
+            JSONObject().put("note", str("Usually empty")), emptyList()))
         f.put(fn("repo_list_files", "List every file path in the user's own GitHub repo (mgsamir/ai-assistant). Call this FIRST when you don't already know the exact file path for what the user wants changed",
             JSONObject().put("note", str("Usually empty")), emptyList()))
         f.put(fn("repo_search_code", "Search the code inside the user's GitHub repo (mgsamir/ai-assistant) for a function name, variable, string or keyword, to find which file it is in. Use this when repo_list_files alone isn't enough to tell which file has the code the user means",
@@ -1331,6 +1335,11 @@ The user also runs a small personal defensive-security/monitoring backend (core/
                         val r = Lab.scanLocal(prefs)
                         Act.ok(stL, r.take(150), r)
                         pre[idx] = Reply(r, "Scan ho gaya")
+                    } else if (c.getString("name") == "repo_check_connection") {
+                        val stC = Act.begin(2, "Checking GitHub connection", "repo_check_connection()")
+                        val r = GitHub.checkConnection(prefs)
+                        if (r.ok) Act.ok(stC, r.text, r.text) else Act.fail(stC, r.text, r.text)
+                        pre[idx] = Reply(r.text, r.text)
                     } else if (c.getString("name") == "repo_list_files") {
 
 

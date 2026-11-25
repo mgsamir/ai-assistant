@@ -17,6 +17,20 @@ object GitHub {
 
     fun token(p: SharedPreferences): String = p.getString("gh_token", "") ?: ""
 
+    // Sirf ye check karta hai ki GitHub judi hai ya nahi (jaise WhatsApp number se juda hota hai) —
+    // file list nahi deta, bas haan/na aur uski wajah.
+    fun checkConnection(p: SharedPreferences): FileResult {
+        val token = token(p)
+        if (token.isEmpty()) return FileResult(false, "Nahi, GitHub abhi judi nahi hai. Settings → Coding Assistant mein GitHub token daalo.")
+        val (code, body) = api("/repos/$OWNER/$REPO", token)
+        return when (code) {
+            200 -> FileResult(true, "Haan, GitHub judi hui hai — repo \"$OWNER/$REPO\" tak pahunch sakta hoon.")
+            401, 403 -> FileResult(false, "GitHub token daala hua hai lekin kaam nahi kar raha (code $code) — token expire ho gaya ya galat hai, Settings mein naya daalo.")
+            404 -> FileResult(false, "Token toh hai lekin repo \"$OWNER/$REPO\" tak pahunch nahi mil raha (code 404) — token ki repo permission check karo.")
+            else -> FileResult(false, "GitHub se abhi jawab nahi mila (code $code), thodi der mein dobara try karo.")
+        }
+    }
+
     private fun api(path: String, token: String, method: String = "GET", body: JSONObject? = null): Pair<Int, String> {
         val c = URL("https://api.github.com$path").openConnection() as HttpURLConnection
         c.connectTimeout = 8000
