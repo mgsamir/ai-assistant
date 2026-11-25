@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ai Assistant &mdash; PC Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#0a0a0a">
 <style>
   :root{color-scheme:dark;}
   *{box-sizing:border-box}
@@ -40,6 +43,7 @@
 <header>
   <h1>Ai Assistant &mdash; PC Dashboard</h1>
   <span class="small" id="repoLabel">mgsamir/ai-assistant</span>
+  <button class="btn" id="installBtn" style="display:none;margin-left:auto">Install app</button>
 </header>
 <nav id="tabs"></nav>
 <main>
@@ -383,6 +387,25 @@ async function askOpenRouter(sys,q){
     const j = await r.json();
     return j?.choices?.[0]?.message?.content || null;
   }catch(e){ return null; }
+}
+
+// ---------- PWA: install button + service worker ----------
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBtn').style.display = 'inline-block';
+});
+document.getElementById('installBtn').onclick = async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById('installBtn').style.display = 'none';
+};
+window.addEventListener('appinstalled', () => { document.getElementById('installBtn').style.display = 'none'; });
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 </script>
 </body>
