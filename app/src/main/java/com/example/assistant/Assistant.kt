@@ -66,6 +66,7 @@ The user is an Android developer building and testing his own apps, including th
 For any news or headlines request (general or about a topic), call get_news instead of plain web search; it returns real current headlines.
 For a complex question (needs research, a comparison, multiple steps, or a decision), think it through step by step before answering: figure out what you actually need to know, call the right tool(s) for it (get_news, web_search, repo_* etc.) in that order, then give one clear final answer built from what you found. Don't show the user your internal planning, just do it and give the final answer.
 When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo") and you are not already sure of the exact file path, call repo_list_files (and repo_search_code with a relevant keyword if the list alone doesn't make it obvious) to find the right file first. Once you know the path, use repo_read_file to read the current file from his GitHub repo, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). repo_write_file itself waits for the GitHub Actions build and, if it fails, automatically reads the error and fixes it, retrying a few times on its own before returning to you — you do not need to check the build yourself. This all happens on a separate "assistant-edits" branch, not main, so nothing goes live until he reviews and merges it himself on GitHub. In your final reply just tell him plainly which file you changed and that it is on the "assistant-edits" branch; do not mention "build green/red" status language, and only mention a build problem if repo_write_file's result says it could not fix it automatically.
+The user also runs a small personal defensive-security/monitoring backend (core/server.py, in the same GitHub repo) on his own PC or lab machine, reachable through three tools: lab_run_command, lab_check_web and lab_scan_local. These are strictly for HIS OWN machine/lab/network only — monitoring, checking open ports, checking a website's status, running safe inspection commands. That backend's own security module already refuses destructive commands (like rm -rf or mkfs) and any attempt to target a third-party host or IP, so you never need to second-guess or re-explain that to him; just call the tool and relay what it says. Never suggest, help plan, or encourage using these tools against any system that is not his own.
 """.trimIndent()
 
     val listeners = CopyOnWriteArrayList<UiCb>()
@@ -451,6 +452,9 @@ When the user asks you to change the code of this very app (for example "ye butt
                 val lang = if (prefs.getString("lang", "") == "Hindi") "hi" else "en"
                 return News.headlines(args.optString("topic", ""), lang)
             }
+            if (name == "lab_run_command") return Lab.runCommand(prefs, args.optString("cmd", ""))
+            if (name == "lab_check_web") return Lab.checkWeb(prefs, args.optString("url", ""))
+            if (name == "lab_scan_local") return Lab.scanLocal(prefs)
             if (name == "repo_list_files") return GitHub.listFiles(prefs).text
             if (name == "repo_search_code") return GitHub.searchCode(prefs, args.optString("query", "")).text
             if (name == "repo_read_file") return GitHub.readFile(prefs, args.optString("path", "")).text
@@ -878,6 +882,14 @@ When the user asks you to change the code of this very app (for example "ye butt
             JSONObject().put("seconds", num("How many seconds to keep it on, default 20")), listOf()))
         f.put(fn("stop_assistant", "Completely stop and close this assistant when the user asks it to quit",
             JSONObject().put("reason", str("Why, can be empty")), listOf()))
+        f.put(fn("lab_run_command", "Run a safe, allow-listed Linux command on the user's own lab/PC machine (the one running core/server.py) and return its output. Only monitoring/inspection commands pass; destructive or third-party-targeting commands are refused by that machine's own security module",
+            JSONObject().put("cmd", str("The shell command to run, e.g. \"ps aux\" or \"df -h\"")),
+            listOf("cmd")))
+        f.put(fn("lab_check_web", "Check a public website's HTTP status and headers via the user's lab backend",
+            JSONObject().put("url", str("Full URL, e.g. https://example.com")),
+            listOf("url")))
+        f.put(fn("lab_scan_local", "Check which common ports are open on the user's OWN lab machine (127.0.0.1 only) for basic security monitoring. Never targets any other host",
+            JSONObject().put("note", str("Usually empty")), emptyList()))
         f.put(fn("get_news", "Get today's latest news headlines, either general top headlines or about a specific topic. Use this for any news/headlines request instead of plain web search",
             JSONObject().put("topic", str("Topic to search news for, e.g. \"cricket\", \"India economy\". Leave empty for general top headlines")),
             emptyList()))
@@ -1302,7 +1314,25 @@ When the user asks you to change the code of this very app (for example "ye butt
                         val r = News.headlines(topic, lang)
                         Act.ok(stN, r.take(120), r)
                         pre[idx] = Reply(r, "News mil gayi")
+                    } else if (c.getString("name") == "lab_run_command") {
+                        val cmdL = c.optJSONObject("args")?.optString("cmd", "") ?: ""
+                        val stL = Act.begin(2, "Lab: $cmdL", "lab_run_command(cmd=\"$cmdL\")")
+                        val r = Lab.runCommand(prefs, cmdL)
+                        Act.ok(stL, r.take(150), r)
+                        pre[idx] = Reply(r, "Lab command chal gaya")
+                    } else if (c.getString("name") == "lab_check_web") {
+                        val urlL = c.optJSONObject("args")?.optString("url", "") ?: ""
+                        val stL = Act.begin(2, "Checking $urlL", "lab_check_web(url=\"$urlL\")")
+                        val r = Lab.checkWeb(prefs, urlL)
+                        Act.ok(stL, r.take(150), r)
+                        pre[idx] = Reply(r, "Check ho gaya")
+                    } else if (c.getString("name") == "lab_scan_local") {
+                        val stL = Act.begin(2, "Scanning localhost", "lab_scan_local()")
+                        val r = Lab.scanLocal(prefs)
+                        Act.ok(stL, r.take(150), r)
+                        pre[idx] = Reply(r, "Scan ho gaya")
                     } else if (c.getString("name") == "repo_list_files") {
+
 
                         val stG = Act.begin(2, "Listing repo files", "repo_list_files()")
                         val r = GitHub.listFiles(prefs)

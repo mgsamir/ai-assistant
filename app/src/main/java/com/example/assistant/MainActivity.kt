@@ -2654,6 +2654,25 @@ class MainActivity : Activity() {
                 b.show()
             }
         }
+        fun textRow(title: String, pref: String, hint: String, secret: Boolean) {
+            val own = p.getString(pref, "") ?: ""
+            val state = if (own.isBlank()) "Not set" else if (secret) "Set" else own
+            row(title, state) {
+                val et = EditText(this)
+                et.hint = hint
+                et.setSingleLine()
+                if (own.isNotBlank() && !secret) et.setText(own)
+                val b = android.app.AlertDialog.Builder(this).setTitle(title).setView(et)
+                    .setPositiveButton("Save") { _, _ ->
+                        val v = et.text.toString().trim()
+                        if (v.isNotEmpty()) p.edit().putString(pref, v).apply()
+                        draw()
+                    }
+                    .setNegativeButton("Cancel", null)
+                if (own.isNotBlank()) b.setNeutralButton("Remove") { _, _ -> p.edit().remove(pref).apply(); draw() }
+                b.show()
+            }
+        }
         draw = {
             list.removeAllViews()
             header("LANGUAGE")
@@ -2693,6 +2712,13 @@ class MainActivity : Activity() {
             keyRow("GitHub token", "gh_token", "")
             list.addView(TextView(this).apply {
                 text = "Taaki assistant bolkar is app ka khud ka code padh sake aur badal sake (\"assistant-edits\" branch par, main par kabhi nahi). GitHub par Settings → Developer settings → Fine-grained tokens se banao, repo mgsamir/ai-assistant tak seemit, Contents = Read and write aur Actions = Read and write."
+                textSize = 12.5f; setTextColor(Color.parseColor("#6E6E76")); setPadding(dp(4), dp(4), dp(4), dp(10))
+            })
+            header("LAB")
+            textRow("Lab backend URL", "lab_url", "jaise http://192.168.1.5:8765", false)
+            textRow("Lab secret", "lab_secret", "core/server.py ka LAB_SECRET", true)
+            list.addView(TextView(this).apply {
+                text = "Apne hi PC/lab machine par core/server.py chalao (ek baar: pip install karo, phir export LAB_SECRET=apna_secret aur python3 -m core.server), yahan wahi URL (http://<PC ka LAN IP>:8765) aur secret daalo. Phone us PC ke sath usi WiFi par hona chahiye. Isse \"localhost scan karo\" ya \"ye website up hai kya check karo\" jaise command sirf apne hi machine/network par chalenge — kisi aur ke system par nahi."
                 textSize = 12.5f; setTextColor(Color.parseColor("#6E6E76")); setPadding(dp(4), dp(4), dp(4), dp(10))
             })
         }

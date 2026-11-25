@@ -1,0 +1,17 @@
+[
+  {
+    "time": "2026-11-25 12:24:11",
+    "kind": "scan",
+    "detail": "Open ports on 127.0.0.1: []"
+  },
+  {
+    "time": "2026-11-25 12:24:31",
+    "kind": "command",
+    "detail": "uptime -> exit 0"
+  },
+  {
+    "time": "2026-11-25 12:24:31",
+    "kind": "scan",
+    "detail": "Open ports on 127.0.0.1: []"
+  }
+]
