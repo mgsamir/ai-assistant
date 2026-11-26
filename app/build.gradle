@@ -22,16 +22,18 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
-        buildConfigField "String", "GEMINI_API_KEY", "\"${System.getenv('GEMINI_API_KEY') ?: ''}\""
-        buildConfigField "String", "BRAVE_KEY", "\"${System.getenv('BRAVE_KEY') ?: ''}\""
-        buildConfigField "String", "GROQ_KEY", "\"${System.getenv('GROQ_KEY') ?: ''}\""
-        buildConfigField "String", "OPENROUTER_KEY", "\"${System.getenv('OPENROUTER_KEY') ?: ''}\""
-        buildConfigField "String", "ELEVEN_KEY", "\"${System.getenv('ELEVEN_KEY') ?: ''}\""
-        buildConfigField "String", "OPENAI_KEY", "\"\""
-        buildConfigField "String", "VT_KEY", "\"${System.getenv('VT_KEY') ?: ''}\""
-        buildConfigField "String", "POLLI_KEY", "\"${System.getenv('POLLI_KEY') ?: ''}\""
-        buildConfigField "String", "GNEWS_KEY", "\"${System.getenv('GNEWS_KEY') ?: ''}\""
-        buildConfigField "String", "NEWSDATA_KEY", "\"${System.getenv('NEWSDATA_KEY') ?: ''}\""
+        // Never embed provider secrets in an APK: APK contents can be inspected.
+        // Users may supply their own keys in app settings instead.
+        buildConfigField "String", "GEMINI_API_KEY", '""'
+        buildConfigField "String", "BRAVE_KEY", '""'
+        buildConfigField "String", "GROQ_KEY", '""'
+        buildConfigField "String", "OPENROUTER_KEY", '""'
+        buildConfigField "String", "ELEVEN_KEY", '""'
+        buildConfigField "String", "OPENAI_KEY", '""'
+        buildConfigField "String", "VT_KEY", '""'
+        buildConfigField "String", "POLLI_KEY", '""'
+        buildConfigField "String", "GNEWS_KEY", '""'
+        buildConfigField "String", "NEWSDATA_KEY", '""'
     }
 
     buildFeatures { buildConfig true }
@@ -49,9 +51,7 @@ android {
                          'META-INF/DEPENDENCIES', 'META-INF/INDEX.LIST', 'META-INF/MANIFEST.MF', 'META-INF/*.md',
                          'META-INF/versions/**', 'META-INF/maven/**', 'META-INF/proguard/**', 'META-INF/*.kotlin_module',
                          'META-INF/AL2.0', 'META-INF/LGPL2.1', 'META-INF/native-image/**', 'META-INF/*.version', 'META-INF/gradle/**']
-            // jadx apne plugin ServiceLoader se dhoondhta hai, isliye ye files rakhni hain
             merges += ['META-INF/services/**']
-            // baksmali 2.5 aur jadx wala smali 3.x dono ek hi naam ki properties file laate hain
             pickFirsts += ['*.properties', '**/*.properties']
         }
     }
@@ -60,7 +60,6 @@ android {
 dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'org.smali:baksmali:2.5.2'
-    // Java jaisa code + XML/resources decode (jadx)
     implementation 'io.github.skylot:jadx-core:1.5.1'
     implementation 'io.github.skylot:jadx-dex-input:1.5.1'
 }
