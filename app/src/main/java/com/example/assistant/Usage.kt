@@ -115,6 +115,51 @@ object Usage {
         } catch (e: Exception) { }
     }
 
+    // Chhote free-tier features (news, web-search, lab) ki roz ki ginti -- paisa/token ka hisaab nahi,
+    // bas "aaj kitni baar use hua" taaki free quota khatam hone se pehle pata chal sake.
+    private fun simpleAll(): JSONObject = try { JSONObject(p?.getString("usage_simple", "{}") ?: "{}") } catch (e: Exception) { JSONObject() }
+    fun hitSimple(key: String) {
+        val sp = p ?: return
+        try {
+            synchronized(this) {
+                val a = simpleAll()
+                val o = a.optJSONObject(key) ?: JSONObject()
+                if (o.optString("d") != day()) { o.put("d", day()); o.put("r", 0) }
+                o.put("r", o.optInt("r") + 1)
+                a.put(key, o)
+                sp.edit().putString("usage_simple", a.toString()).apply()
+            }
+        } catch (e: Exception) { }
+    }
+    fun simpleToday(key: String): Int {
+        val o = simpleAll().optJSONObject(key) ?: return 0
+        return if (o.optString("d") == day()) o.optInt("r") else 0
+    }
+    // Free-tier daily caps jo tu khud jaanta hai (approx), sirf user ko batane ke liye
+    private val simpleCaps = mapOf("news_gnews" to 100, "news_newsdata" to 200, "brave" to 2000)
+
+    // Ek saaf, bolne-laayak summary: AI models + news/search ki aaj ki ginti
+    fun textSummary(p: SharedPreferences): String {
+        Usage.p = p
+        val sb = StringBuilder()
+        val models = try { Models.list(p).filter { info(it) != null } } catch (e: Exception) { emptyList() }
+        if (models.isNotEmpty()) {
+            sb.append("AI models (aaj):\n")
+            for (m in models) { info(m)?.let { sb.append("- ${m.name}: ${it.text}\n") } }
+        }
+        val simpleNames = mapOf("news_gnews" to "GNews", "news_newsdata" to "NewsData.io", "brave" to "Brave search")
+        val simpleLines = simpleNames.mapNotNull { (k, label) ->
+            val n = simpleToday(k)
+            if (n == 0) null else {
+                val cap = simpleCaps[k]
+                if (cap != null) "- $label: $n / $cap aaj (${if (cap - n <= 5) "kam bacha hai!" else "${cap - n} bache"})"
+                else "- $label: $n aaj"
+            }
+        }
+        if (simpleLines.isNotEmpty()) sb.append("\nNews/Search (aaj):\n").append(simpleLines.joinToString("\n"))
+        return if (sb.isBlank()) "Abhi tak aaj koi usage record nahi hua." else sb.toString().trim()
+    }
+
     class Info(val frac: Float?, val text: String)
 
     fun limitOf(m: Models.M): Int = p?.getInt("lim_" + m.key, 0) ?: 0

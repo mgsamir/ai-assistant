@@ -55,6 +55,7 @@ object Providers {
     fun brave(q: String): String? {
         val key = Extra.brave
         if (key.isEmpty() || q.isBlank()) return null
+        Usage.hitSimple("brave")
         val web = braveGet("web/search", q, "&count=6", key)
         val arr = web?.optJSONObject("web")?.optJSONArray("results")
         val news = if (FRESH.containsMatchIn(q)) braveGet("news/search", q, "&count=5&freshness=pd", key)?.optJSONArray("results") else null

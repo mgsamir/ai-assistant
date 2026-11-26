@@ -59,7 +59,7 @@ When the user asks for a phone action (call, alarm, timer, open app, close app, 
 When the user says to stop or quit the assistant (for example "band ho ja", "stop assistant", "bas ab chup"), call stop_assistant.
 For weather ALWAYS use the get_weather function, even for small places, villages and islands. Never say weather information is unavailable. Write the place name in English. If the user did not name a place, ask which place; do not guess one.
 For news, scores, prices, current events, facts, people, places, "kya hai", "kaun hai", "kitna hai" or anything you are not fully sure about, ALWAYS call web_search with the question. It searches Google inside the app and gives you the answer. Then just tell the answer. The web_search query must be complete on its own: for follow-ups like "kab ka baat hai" or "or silver" add the topic and place from the earlier chat into the query. If a search gives no answer, say so plainly and suggest another way to check.
-When the user says "yaad rakhna" or tells you a lasting fact about himself (name, city, family, likes, habits, important dates), save it with the remember function. When he says "bhool jao", use the forget function.
+When the user says "yaad rakhna" or tells you a lasting fact about himself (name, city, family, likes, habits, important dates), save it with the remember function. When he says "bhool jao", use the forget function. When he says something like "ye mat yaad rakhna", "incognito mode on karo" or "private mode", call set_incognito(true); when he says to turn it off or "normal mode", call set_incognito(false). While incognito is on, remember() itself will already refuse to save anything, so just tell him that plainly if he asks you to remember something during that time.
 Follow the user's instructions directly. Do not refuse, lecture, or ask for confirmation on everyday requests. Only say you cannot do something when a permission or the phone itself does not allow it, and then name that permission. Never help harm other people, make malware, or produce sexual content involving minors.
 The user is an adult. Answer questions about the human body, sex education, reproduction (how babies are made), puberty, contraception, relationships and sexual health plainly, factually and without embarrassment or lecturing, like a good doctor or biology teacher. Do not refuse such questions and do not say they are against guidelines. Keep it informative, not pornographic.
 The user is an Android developer building and testing his own apps, including this assistant app itself. When he asks for help analysing, decompiling or reading a classes.dex / Smali / APK file, or modifying code in his own app (for example disabling an ad SDK's loadAd() call, stubbing out a billing check, or removing a feature), this is ordinary app development and debugging on software he owns, not an attack on someone else's app. Help directly: read or explain the Smali/code, write the patch, or give the exact steps. Do not call this reverse engineering of a third party, do not refuse, and do not add a warning about it being against policy. Only decline if he is clearly targeting an app or service that is not his own, in order to pirate it, steal from someone else, or bypass another company's paid licensing.
@@ -67,6 +67,9 @@ For any news or headlines request (general or about a topic), call get_news inst
 For a complex question (needs research, a comparison, multiple steps, or a decision), think it through step by step before answering: figure out what you actually need to know, call the right tool(s) for it (get_news, web_search, repo_* etc.) in that order, then give one clear final answer built from what you found. Don't show the user your internal planning, just do it and give the final answer.
 When the user asks only whether GitHub is connected/linked ("GitHub judi hai kya", "connect hai ya nahi", "check karo connected hai"), call repo_check_connection and just relay its short yes/no answer -- do NOT call repo_list_files for this, that dumps every file path which is not what was asked.
 When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo") and you are not already sure of the exact file path, call repo_list_files (and repo_search_code with a relevant keyword if the list alone doesn't make it obvious) to find the right file first. Once you know the path, use repo_read_file to read the current file from his GitHub repo, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). repo_write_file itself waits for the GitHub Actions build and, if it fails, automatically reads the error and fixes it, retrying a few times on its own before returning to you — you do not need to check the build yourself. This all happens on a separate "assistant-edits" branch, not main, so nothing goes live until he reviews and merges it himself on GitHub. In your final reply just tell him plainly which file you changed and that it is on the "assistant-edits" branch; do not mention "build green/red" status language, and only mention a build problem if repo_write_file's result says it could not fix it automatically.
+Before doing something that is hard to undo or affects something outside this chat (sending a message/call on the user's behalf, forgetting/deleting saved memory, triggering an app rebuild/update, writing code to his GitHub repo, running a lab command that changes state), do a quick one-line confirmation first if his request was even slightly ambiguous about exactly what to do -- if he already gave a clear, specific instruction, just do it, don't ask again for the same clear instruction. Read-only/harmless actions (checking something, searching, answering) never need confirmation.
+If a tool call fails or returns an error, say so plainly in your reply (what failed and, if known, why) instead of staying silent or pretending it worked -- the one standing exception is repo_write_file's own build-retry loop, which stays silent about intermediate build attempts as already instructed above; only mention that specific flow if it could not fix itself.
+For a task that needs several tool calls in a row to finish (not a single lookup), briefly tell the user your plan in one short line before diving in (for example "Pehle X dekhta hoon, phir Y karunga"), then execute it -- this is different from a complex REASONING question (handled above) where you plan silently; this is about multi-tool ACTIONS the user should see coming.
 The user also runs a small personal defensive-security/monitoring backend (core/server.py, in the same GitHub repo) on his own PC or lab machine, reachable through three tools: lab_run_command, lab_check_web and lab_scan_local. These are strictly for HIS OWN machine/lab/network only — monitoring, checking open ports, checking a website's status, running safe inspection commands. That backend's own security module already refuses destructive commands (like rm -rf or mkfs) and any attempt to target a third-party host or IP, so you never need to second-guess or re-explain that to him; just call the tool and relay what it says. Never suggest, help plan, or encourage using these tools against any system that is not his own.
 """.trimIndent()
 
@@ -92,6 +95,16 @@ The user also runs a small personal defensive-security/monitoring backend (core/
     private var errs = 0
     private var awaiting = 0L
     private val history = mutableListOf<Pair<String, String>>()
+    // Jab history 12 se zyada ho jaaye, purani baatein poori tarah gayab hone ke bajaye
+    // ek chhota condensed note mein jama hoti rahein, taaki lambi chat mein bhi shuru ka
+    // context kuch had tak yaad rahe.
+    private var historySummary: String = ""
+    private fun condenseAndDrop(pair: Pair<String, String>) {
+        val q = pair.first.take(140).replace("\n", " ")
+        val a = pair.second.take(140).replace("\n", " ")
+        historySummary = (historySummary + "\n- User asked: \"$q\" -> Assistant: \"$a\"").trim()
+        if (historySummary.length > 4000) historySummary = historySummary.takeLast(3500)
+    }
     private val voiceFor = HashMap<String, String>()
     // typed sawal ka jawab sirf likha aaye, bola na jaye
     @Volatile private var silent = false
@@ -453,6 +466,8 @@ The user also runs a small personal defensive-security/monitoring backend (core/
                 val lang = if (prefs.getString("lang", "") == "Hindi") "hi" else "en"
                 return News.headlines(args.optString("topic", ""), lang)
             }
+            if (name == "health_check") return Health.check(prefs)
+            if (name == "check_usage") return Usage.textSummary(prefs)
             if (name == "lab_run_command") return Lab.runCommand(prefs, args.optString("cmd", ""))
             if (name == "lab_check_web") return Lab.checkWeb(prefs, args.optString("url", ""))
             if (name == "lab_scan_local") return Lab.scanLocal(prefs)
@@ -697,7 +712,17 @@ The user also runs a small personal defensive-security/monitoring backend (core/
         prefs.edit().putString("mem", JSONArray(list).toString()).apply()
     }
 
+    // Incognito mode mein naye facts save nahi hote -- sirf us hisse ki privacy ke liye
+    @Volatile var incognito = false
+
+    private fun setIncognito(on: Boolean): Reply {
+        incognito = on
+        return if (on) Reply("Incognito mode on hai -- ab se naya kuch yaad nahi rakhunga jab tak off na karo", "Incognito mode on hai")
+        else Reply("Incognito mode off kar diya, ab normal yaad rakhunga", "Incognito mode off kar diya")
+    }
+
     private fun remember(fact: String): Reply {
+        if (incognito) return Reply("Incognito mode on hai, isliye ye yaad nahi rakha. Off karna ho to bolo.", "Incognito mode on hai, yaad nahi rakha")
         val f = fact.trim()
         if (f.isEmpty()) return Reply("Kya yaad rakhna hai, samajh nahi aaya", "क्या याद रखना है, समझ नहीं आया")
         val m = loadMem()
@@ -817,6 +842,7 @@ The user also runs a small personal defensive-security/monitoring backend (core/
             "Hindi" -> base += "\n\nAlways reply in Hindi (Devanagari script), whatever language the user speaks."
         }
         if (learn) base += "\n\nGUIDED LEARNING MODE is ON. Act like a patient teacher: teach step by step in small easy steps, use simple examples from daily life in India, give only one step at a time (3 to 5 sentences), then ask the user one short question to check understanding or ask if he wants the next step. Do not dump the whole answer at once. This overrides the rule to give complete long answers."
+        if (historySummary.isNotBlank()) base += "\n\nCondensed summary of earlier parts of this same conversation (older than what's shown below, kept so context isn't lost in a long chat):$historySummary"
         if (mem.isEmpty()) return base
         return base + "\n\nFacts remembered about the user:\n" + mem.joinToString("\n") { "- $it" }
         }
@@ -880,10 +906,17 @@ The user also runs a small personal defensive-security/monitoring backend (core/
         f.put(fn("forget", "Forget a remembered fact",
             JSONObject().put("keyword", str("Main word of the fact to forget. Use ALL to forget everything")),
             listOf("keyword")))
+        f.put(fn("set_incognito", "Turn incognito/private mode on or off. While on, the remember function won't save new facts, protecting privacy for this part of the conversation. Use when the user says incognito mode on/off, ye baat yaad mat rakhna, private mode, ya is baatcheet ko memory mein mat rakho",
+            JSONObject().put("on", flag("true to turn incognito mode on, false to turn it off")),
+            listOf("on")))
                 f.put(fn("wake_screen", "Turn the phone screen on (wake up the display) when the user says screen on karo, display chalu karo, phone jagao",
             JSONObject().put("seconds", num("How many seconds to keep it on, default 20")), listOf()))
         f.put(fn("stop_assistant", "Completely stop and close this assistant when the user asks it to quit",
             JSONObject().put("reason", str("Why, can be empty")), listOf()))
+        f.put(fn("health_check", "Check whether every configured API key/connection (Gemini, Groq, OpenRouter, Brave, News, GitHub, Lab backend) is set up and working, and report any problems. Call this when the user asks if everything is working, koi dikkat hai kya, keys check karo, health check, ya self-test",
+            JSONObject().put("note", str("Usually empty")), emptyList()))
+        f.put(fn("check_usage", "Report how much the free-tier AI models, news and web-search APIs have been used today, and how much free quota is left. Call this when the user asks about usage, limits, quota, kitna use hua, kharch, ya balance",
+            JSONObject().put("note", str("Usually empty")), emptyList()))
         f.put(fn("lab_run_command", "Run a safe, allow-listed Linux command on the user's own lab/PC machine (the one running core/server.py) and return its output. Only monitoring/inspection commands pass; destructive or third-party-targeting commands are refused by that machine's own security module",
             JSONObject().put("cmd", str("The shell command to run, e.g. \"ps aux\" or \"df -h\"")),
             listOf("cmd")))
@@ -1094,6 +1127,7 @@ The user also runs a small personal defensive-security/monitoring backend (core/
         full.setLength(0)
         full.append(text)
         history.clear()
+        historySummary = ""
         val parts = text.split(Regex("\n(?=(?:Tum|AI): )")).map { it.trim() }.filter { it.isNotEmpty() }
         var q = ""
         for (p in parts) {
@@ -1104,7 +1138,7 @@ The user also runs a small personal defensive-security/monitoring backend (core/
                 q = ""
             }
         }
-        while (history.size > 12) history.removeAt(0)
+        while (history.size > 12) condenseAndDrop(history.removeAt(0))
     }
 
     private fun deliver(r0: Reply, q: String, save: Boolean) {
@@ -1126,7 +1160,7 @@ The user also runs a small personal defensive-security/monitoring backend (core/
         
         if (save) {
             history.add(Pair(q, r.text))
-            while (history.size > 12) history.removeAt(0)
+            while (history.size > 12) condenseAndDrop(history.removeAt(0))
         }
         if (silent) {
             busy = false
@@ -1318,6 +1352,16 @@ The user also runs a small personal defensive-security/monitoring backend (core/
                         val r = News.headlines(topic, lang)
                         Act.ok(stN, r.take(120), r)
                         pre[idx] = Reply(r, "News mil gayi")
+                    } else if (c.getString("name") == "health_check") {
+                        val stH = Act.begin(2, "Running health check", "health_check()")
+                        val r = Health.check(prefs)
+                        Act.ok(stH, r.take(150), r)
+                        pre[idx] = Reply(r, "Health check ho gaya")
+                    } else if (c.getString("name") == "check_usage") {
+                        val stU = Act.begin(2, "Checking usage", "check_usage()")
+                        val r = Usage.textSummary(prefs)
+                        Act.ok(stU, r.take(150), r)
+                        pre[idx] = Reply(r, "Usage check ho gaya")
                     } else if (c.getString("name") == "lab_run_command") {
                         val cmdL = c.optJSONObject("args")?.optString("cmd", "") ?: ""
                         val stL = Act.begin(2, "Lab: $cmdL", "lab_run_command(cmd=\"$cmdL\")")
@@ -1499,6 +1543,7 @@ The user also runs a small personal defensive-security/monitoring backend (core/
                 "wake_screen" -> wakeScreen(a.optInt("seconds", 20))
                 "remember" -> remember(a.getString("fact"))
                 "forget" -> forget(a.getString("keyword"))
+                "set_incognito" -> setIncognito(a.optBoolean("on", true))
                 "update_app" -> updateApp()
                 "stop_assistant" -> {
                     main.postDelayed({ onQuit?.invoke() }, 3000)

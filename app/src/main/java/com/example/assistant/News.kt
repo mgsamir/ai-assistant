@@ -25,6 +25,7 @@ object News {
         else
             "https://gnews.io/api/v4/search?q=$q&lang=$lang&max=6&token=$key"
         val (code, body) = get(url)
+        Usage.hitSimple("news_gnews")
         if (code != 200) return null
         val arr = JSONObject(body).optJSONArray("articles") ?: return null
         if (arr.length() == 0) return ""
@@ -43,6 +44,7 @@ object News {
         val q = if (query.isBlank()) "" else "&q=" + URLEncoder.encode(query, "UTF-8")
         val url = "https://newsdata.io/api/1/news?apikey=$key&language=$lang$q"
         val (code, body) = get(url)
+        Usage.hitSimple("news_newsdata")
         if (code != 200) return null
         val arr = JSONObject(body).optJSONArray("results") ?: return null
         if (arr.length() == 0) return ""
