@@ -1,101 +1,215 @@
 """
 Vision — Guardrails & Security Module.
 
-Ek hi kaam: koi bhi command/action chalne se PEHLE check karo ki wo surakshit hai ya nahi.
-Design: default-deny. Sirf ALLOWED list me jo hai wo chalega, baaki sab block.
-- Sirf localhost/127.0.0.1 par network-targeting tools chal sakte hain (koi third-party IP/host scan nahi).
-- Destructive commands (rm -rf, mkfs, dd, shutdown, iptables flush, sudo, ...) hamesha block.
-- Shell metacharacters (; | & ` $() > <) block — taaki koi command allowlist ko bypass na kar sake
-  (jaise "ls; rm -rf /" allowlist me "ls" dikhega lekin asal me kuch aur bhi karega).
+Default-deny checks for the local lab runner. Network URLs are restricted to
+publicly-routable destinations, including DNS-resolved addresses, to reduce SSRF
+risk. File-reading commands are limited to approved roots and sensitive files
+are denied even when they are inside an approved root.
 """
 from __future__ import annotations
+
+import ipaddress
+import os
 import re
 import shlex
+import socket
 import urllib.parse
 
-# Jo binaries chalne ki ijaazat hai (sirf inspection/monitoring, kuch bhi destructive nahi)
+# Commands with only read/inspection behavior. Network and service-control
+# programs are intentionally excluded: their option grammars are too broad to
+# safely validate with a generic shell-command allowlist.
 ALLOWED_BINARIES = {
     "ls", "pwd", "whoami", "id", "uptime", "uname", "date", "df", "du", "free",
-    "ps", "top", "htop", "who", "w", "last",
-    "ss", "netstat", "ip", "ifconfig", "route",
-    "systemctl", "journalctl", "service",
+    "ps", "top", "htop", "who", "w", "last", "ss", "netstat",
     "cat", "head", "tail", "grep", "find", "stat", "file", "wc",
-    "ping", "curl", "wget", "nmap", "traceroute", "dig", "nslookup", "host",
 }
 
-# Binaries jo kisi host/IP ko target karte hain — inka target sirf localhost/loopback ho sakta hai
-NETWORK_TOOLS = {"ping", "curl", "wget", "nmap", "traceroute", "dig", "nslookup", "host", "nc", "netcat"}
-LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
+PROJECT_ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), os.pardir))
+ALLOWED_PATHS = ("/var/log", "/tmp", PROJECT_ROOT)
+PATH_COMMANDS = {"cat", "head", "tail", "grep", "ls", "du", "stat", "file", "wc", "find"}
 
-# Ye binaries/patterns kabhi bhi nahi chalenge, allowlist me ho ya na ho
-DENY_PATTERNS = [
-    r"\brm\b.*-rf", r"\bmkfs\b", r"\bdd\b", r"\bshutdown\b", r"\breboot\b",
-    r"\bsudo\b", r"\bsu\b\s", r"\bchmod\b.*-R.*/", r"\bchown\b.*-R.*/",
-    r"\biptables\b.*-F", r"\bmount\b", r"\bumount\b", r":(){ :|:& };:",
-    r"\bkillall\b", r"\bpkill\b", r"\bfdisk\b", r"\bparted\b", r"\bmkswap\b",
-    r"\bcrontab\b", r"\buseradd\b", r"\buserdel\b", r"\bpasswd\b",
-    r"\bnmap\b.*(-sS|-O|--script)",  # nmap ke aggressive/exploit scripts kabhi nahi
-]
+# Shell syntax is never accepted; commands are invoked with shell=False too.
+SHELL_META = set(";&|`$()< >\n\r") - {" "}
 
-SHELL_META = set(";&|`$()<>\n")
+# Options which consume a following argument. Paths supplied to file-reading
+# options (-f for grep, for example) are also checked separately below.
+_VALUE_OPTIONS = {
+    "head": {"-n", "--lines", "-c", "--bytes"},
+    "tail": {"-n", "--lines", "-c", "--bytes"},
+    "grep": {"-e", "--regexp", "-f", "--file", "-m", "--max-count", "-A", "--after-context",
+             "-B", "--before-context", "-C", "--context", "-d", "--directories", "-D", "--devices",
+             "-w", "--width", "-x", "--line-buffered"},
+    "ls": {"-I", "--ignore", "-T", "--tabsize", "--block-size"},
+    "du": {"-t", "--threshold", "--exclude", "--block-size"},
+    "stat": {"-c", "--format", "--printf"},
+    "file": {"-e", "-F", "-m", "-f"},
+    "wc": {"--files0-from"},
+}
 
 
-def _extract_targets(tokens: list[str]) -> list[str]:
-    """Command ke arguments me se jo IP/host/URL-jaisa dikhe wo nikaal lo (host ke roop mein)."""
-    targets = []
-    ip_re = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
-    host_re = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9\-\.]*\.[a-zA-Z]{2,}$")
-    for raw in tokens[1:]:
-        if raw.startswith("-"):
+def _within_allowed_path(path: str) -> bool:
+    """Check a path after resolving symlinks and user-home shorthand."""
+    expanded = os.path.expanduser(path)
+    resolved = os.path.realpath(expanded)
+    for root in ALLOWED_PATHS:
+        try:
+            if os.path.commonpath((resolved, os.path.realpath(root))) == os.path.realpath(root):
+                return True
+        except (ValueError, OSError):
             continue
-        t = raw
-        if "://" in t:  # curl/wget jaise tools ke liye URL se host nikaalo
-            t = urllib.parse.urlparse(t).hostname or t
-        t = t.split(":")[0].split("/")[0]  # host:port ya host/path se sirf host
-        if ip_re.match(t) or host_re.match(t) or t in LOOPBACK_HOSTS:
-            targets.append(t)
-    return targets
+    return False
+
+
+def _sensitive_path(path: str) -> bool:
+    """Reject common credentials and private-key material, regardless of root."""
+    expanded = os.path.expanduser(path)
+    resolved = os.path.realpath(expanded)
+    for candidate in (expanded, resolved):
+        parts = [part.lower() for part in candidate.replace("\\", "/").split("/")]
+        if any(part == ".ssh" for part in parts):
+            return True
+        for name in parts:
+            if name == ".env" or name.startswith(".env."):
+                return True
+            if name in {"id_rsa", "id_ed25519", "id_ecdsa", "id_dsa", "authorized_keys", "private.key"}:
+                return True
+            if name.endswith((".pem", ".p12", ".pfx", ".keytab")) or name.endswith(".keystore"):
+                return True
+    return False
+
+
+def _path_error(path: str) -> str | None:
+    if path == "-":
+        return None  # stdin/stdout operand; it does not name a filesystem path.
+    if _sensitive_path(path):
+        return f"Sensitive file path blocked: {path}"
+    if not _within_allowed_path(path):
+        return f"File path allowed nahi hai (sirf /var/log, /tmp, aur project folder): {path}"
+    return None
+
+
+def _path_operands(binary: str, args: list[str]) -> tuple[list[str], list[str]]:
+    """Return filesystem operands and paths passed to grep's -f/--file."""
+    if binary == "find":
+        roots = []
+        for arg in args:
+            if arg == "--":
+                continue
+            if arg.startswith("-") or arg in {"!", "(", ")"}:
+                break
+            roots.append(arg)
+        return (roots or ["."], [])
+
+    operands: list[str] = []
+    option_paths: list[str] = []
+    positional_pattern_consumed = binary != "grep"
+    i = 0
+    end_options = False
+    value_options = _VALUE_OPTIONS.get(binary, set())
+    while i < len(args):
+        arg = args[i]
+        if end_options:
+            operands.append(arg)
+            i += 1
+            continue
+        if arg == "--":
+            end_options = True
+            i += 1
+            continue
+        if arg in value_options:
+            if i + 1 >= len(args):
+                break
+            value = args[i + 1]
+            if binary == "grep" and arg in {"-f", "--file"}:
+                option_paths.append(value)
+            i += 2
+            continue
+        # GNU options that attach their value (for example -n10 or --format=%n)
+        if arg.startswith("--") and "=" in arg:
+            option, value = arg.split("=", 1)
+            if binary == "grep" and option in {"--file"}:
+                option_paths.append(value)
+            i += 1
+            continue
+        if arg.startswith("-") and arg != "-":
+            # Short-option bundles and options with an attached value are flags,
+            # except grep -ePATTERN and -fPATH which take meaningful operands.
+            if binary == "grep" and len(arg) > 2 and arg[:2] in {"-e", "-f"}:
+                if arg.startswith("-f"):
+                    option_paths.append(arg[2:])
+                i += 1
+                continue
+            i += 1
+            continue
+        if binary == "grep" and not positional_pattern_consumed:
+            positional_pattern_consumed = True
+        else:
+            operands.append(arg)
+        i += 1
+    return operands, option_paths
+
+
+def _check_paths(binary: str, args: list[str]) -> tuple[bool, str]:
+    if binary not in PATH_COMMANDS:
+        return True, ""
+    operands, option_paths = _path_operands(binary, args)
+    # These commands default to the current directory when no paths are given.
+    if not operands and binary in {"ls", "du", "find"}:
+        operands = ["."]
+    for path in operands + option_paths:
+        error = _path_error(path)
+        if error:
+            return False, error
+    return True, ""
 
 
 def is_safe(cmd: str) -> tuple[bool, str]:
-    """(True, "") agar command chalayi ja sakti hai, warna (False, wajah)."""
-    if not cmd or not cmd.strip():
+    """Return (allowed, reason) for a single read-only command."""
+    if not isinstance(cmd, str) or not cmd.strip():
         return False, "Khaali command."
-
     if any(ch in cmd for ch in SHELL_META):
-        return False, "Shell metacharacters (; | & ` $() > <) allowed nahi hain — ek simple command bhejo."
-
-    for pat in DENY_PATTERNS:
-        if re.search(pat, cmd):
-            return False, f"Ye command hamesha block hai (destructive/dangerous pattern: {pat})."
-
+        return False, "Shell metacharacters allowed nahi hain — ek simple command bhejo."
     try:
         tokens = shlex.split(cmd)
-    except ValueError as e:
-        return False, f"Command parse nahi hui: {e}"
+    except ValueError as exc:
+        return False, f"Command parse nahi hui: {exc}"
     if not tokens:
         return False, "Khaali command."
-
-    binary = tokens[0].split("/")[-1]  # /usr/bin/ls -> ls
+    binary = tokens[0].rsplit("/", 1)[-1]
     if binary not in ALLOWED_BINARIES:
-        return False, f"\"{binary}\" allowlist me nahi hai. Allowed: {', '.join(sorted(ALLOWED_BINARIES))}"
-
-    if binary in NETWORK_TOOLS:
-        targets = _extract_targets(tokens)
-        for t in targets:
-            if t not in LOOPBACK_HOSTS:
-                return False, f"\"{binary}\" sirf localhost par chal sakta hai, \"{t}\" par nahi (third-party host scan allowed nahi)."
-
+        return False, f'"{binary}" allowlist me nahi hai. Allowed: {", ".join(sorted(ALLOWED_BINARIES))}'
+    args = tokens[1:]
+    if binary == "find" and any(a in {"-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprintf"} for a in args):
+        return False, "find ke destructive/executable options allowed nahi hain."
+    ok, reason = _check_paths(binary, args)
+    if not ok:
+        return False, reason
     return True, ""
 
 
 def is_safe_url(url: str) -> tuple[bool, str]:
-    """check_web_status jaise HTTP check ke liye — koi internal/private network na ho."""
-    m = re.match(r"^https?://([^/:]+)", url)
-    if not m:
-        return False, "Sirf http:// ya https:// URL allowed hai."
-    host = m.group(1)
-    private_re = re.compile(r"^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.|169\.254\.|localhost$|0\.0\.0\.0$)")
-    if private_re.match(host):
-        return False, "Private/internal network address check_web_status se allowed nahi (scanning jaisa lagega)."
+    """Allow only HTTP(S) URLs whose host resolves exclusively to public IPs."""
+    if not isinstance(url, str) or not url or len(url) > 2048 or any(ord(c) < 0x20 for c in url):
+        return False, "URL khaali, bahut lamba, ya invalid hai."
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+            return False, "Sirf valid http:// ya https:// URL allowed hai."
+        if parsed.username is not None or parsed.password is not None:
+            return False, "URL mein username/password allowed nahi hai."
+        host = parsed.hostname.rstrip(".").lower()
+        if not host or host == "localhost" or host.endswith(".localhost") or host.endswith(".local"):
+            return False, "Private/internal network address allowed nahi hai."
+        try:
+            addresses = {ipaddress.ip_address(host)}
+        except ValueError:
+            try:
+                records = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme.lower() == "https" else 80), type=socket.SOCK_STREAM)
+                addresses = {ipaddress.ip_address(record[4][0].split("%", 1)[0]) for record in records}
+            except (OSError, ValueError):
+                return False, "URL host resolve nahi hua, isliye request block ki."
+        if not addresses or any(not address.is_global for address in addresses):
+            return False, "Private/internal network address check_web_status se allowed nahi."
+    except (ValueError, UnicodeError):
+        return False, "URL valid nahi hai."
     return True, ""
