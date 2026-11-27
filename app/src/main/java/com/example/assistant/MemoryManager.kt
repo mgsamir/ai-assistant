@@ -7,7 +7,19 @@ import java.util.UUID
 
 /** Bounded local memory; sensitive credential-looking text is never persisted. */
 class MemoryManager(private val prefs: SharedPreferences) {
-    data class Upgrade(val id: String, val title: String, val reason: String, val description: String, val risk: String, val location: String, val source: String, val status: String = "pending", val patchPath: String = "", val patchContent: String = "")
+    data class Upgrade(
+        val id: String,
+        val title: String,
+        val reason: String,
+        val description: String,
+        val risk: String,
+        val location: String,
+        val source: String,
+        val status: String = "pending",
+        val patchPath: String = "",
+        val patchContent: String = ""
+    )
+
     private val lock = Any()
     private val credential = Regex("(?i)(api[_-]?key|access[_-]?token|password|secret|gh[pousr]_[A-Za-z0-9_]{12,})\\s*[:=]\\s*[^\\s,;]+")
 
@@ -24,13 +36,15 @@ class MemoryManager(private val prefs: SharedPreferences) {
 
     fun relevantContext(query: String, maxChars: Int = 1800): String = synchronized(lock) {
         val terms = query.lowercase().split(Regex("\\W+")).filter { it.length > 2 }.toSet()
-        val rows = readArray("assistant_memory")
-        val scored = (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i) }.map { row ->
-            val text = row.optString("text")
-            (terms.count { text.lowercase().contains(it) } to text)
-        }.sortedByDescending { it.first }.filter { it.first > 0 }.take(8)
+        val scored = (0 until readArray("assistant_memory").length()).mapNotNull { i -> readArray("assistant_memory").optJSONObject(i) }
+            .map { row -> terms.count { row.optString("text").lowercase().contains(it) } to row.optString("text") }
+            .sortedByDescending { it.first }.filter { it.first > 0 }.take(8)
         val out = StringBuilder()
-        for ((_, text) in scored) { if (out.length + text.length + 2 > maxChars) break; if (out.isNotEmpty()) out.append('\n'); out.append(text) }
+        for ((_, text) in scored) {
+            if (out.length + text.length + 1 > maxChars.coerceAtLeast(0)) break
+            if (out.isNotEmpty()) out.append('\n')
+            out.append(text)
+        }
         out.toString()
     }
 
@@ -44,29 +58,58 @@ class MemoryManager(private val prefs: SharedPreferences) {
         }
     }
 
-    fun logs(): List<JSONObject> = synchronized(lock) { val a = readArray("assistant_logs"); (0 until a.length()).mapNotNull { a.optJSONObject(it) } }
+    fun logs(): List<JSONObject> = synchronized(lock) {
+        val a = readArray("assistant_logs"); (0 until a.length()).mapNotNull { a.optJSONObject(it) }
+    }
+
     fun pendingUpgrades(): List<Upgrade> = synchronized(lock) { readUpgrades().filter { it.status == "pending" } }
+    fun upgradeHistory(): List<Upgrade> = synchronized(lock) { readUpgrades() }
+
     fun saveUpgrade(upgrade: Upgrade): Upgrade = synchronized(lock) {
         val all = readUpgrades().toMutableList()
-        val key = upgrade.title.trim().lowercase()
-        val existing = all.indexOfFirst { it.title.trim().lowercase() == key && it.status == "pending" }
-        val merged = if (existing >= 0) upgrade.copy(id = all[existing].id, source = mergeSource(all[existing].source, upgrade.source)) else upgrade.copy(id = upgrade.id.ifBlank { UUID.randomUUID().toString() })
+        val existing = all.indexOfFirst { it.title.trim().equals(upgrade.title.trim(), true) && it.status == "pending" }
+        val merged = if (existing >= 0) upgrade.copy(
+            id = all[existing].id,
+            source = if (all[existing].source == upgrade.source) upgrade.source else "dono",
+            patchPath = upgrade.patchPath.ifBlank { all[existing].patchPath },
+            patchContent = upgrade.patchContent.ifBlank { all[existing].patchContent }
+        ) else upgrade.copy(id = upgrade.id.ifBlank { UUID.randomUUID().toString() })
         if (existing >= 0) all[existing] = merged else all.add(merged)
         writeUpgrades(all.takeLast(100)); merged
     }
+
+    fun attachDraft(id: String, path: String, content: String): Upgrade? = synchronized(lock) {
+        if (path.isBlank() || content.isBlank() || content.length > 120_000) return@synchronized null
+        val all = readUpgrades().toMutableList(); val i = all.indexOfFirst { it.id == id && it.status == "pending" }
+        if (i < 0) return@synchronized null
+        all[i] = all[i].copy(patchPath = path, patchContent = content)
+        writeUpgrades(all); all[i]
+    }
+
     fun updateUpgrade(id: String, status: String): Upgrade? = synchronized(lock) {
         if (status !in setOf("approved", "denied")) return@synchronized null
         val all = readUpgrades().toMutableList(); val i = all.indexOfFirst { it.id == id }
         if (i < 0) return@synchronized null
         all[i] = all[i].copy(status = status); writeUpgrades(all); all[i]
     }
-    fun upgradeHistory(): List<Upgrade> = synchronized(lock) { readUpgrades() }
 
-    private fun mergeSource(a: String, b: String) = if (a == b) a else "dono"
     private fun readArray(key: String) = try { JSONArray(prefs.getString(key, "[]")) } catch (_: Exception) { JSONArray() }
     private fun readUpgrades(): List<Upgrade> {
         val a = readArray("pending_upgrades")
-        return (0 until a.length()).mapNotNull { i -> try { val o = a.getJSONObject(i); Upgrade(o.optString("id"), o.optString("title"), o.optString("reason"), o.optString("description"), o.optString("risk"), o.optString("location"), o.optString("source"), o.optString("status", "pending"), o.optString("patchPath"), o.optString("patchContent")) } catch (_: Exception) { null } }
+        return (0 until a.length()).mapNotNull { i ->
+            try {
+                val o = a.getJSONObject(i)
+                Upgrade(o.optString("id"), o.optString("title"), o.optString("reason"), o.optString("description"),
+                    o.optString("risk"), o.optString("location"), o.optString("source"), o.optString("status", "pending"),
+                    o.optString("patchPath"), o.optString("patchContent"))
+            } catch (_: Exception) { null }
+        }
     }
-    private fun writeUpgrades(items: List<Upgrade>) { val a = JSONArray(); items.forEach { a.put(JSONObject().put("id", it.id).put("title", it.title).put("reason", it.reason).put("description", it.description).put("risk", it.risk).put("location", it.location).put("source", it.source).put("status", it.status).put("patchPath", it.patchPath).put("patchContent", it.patchContent)) }; prefs.edit().putString("pending_upgrades", a.toString()).apply() }
+    private fun writeUpgrades(items: List<Upgrade>) {
+        val a = JSONArray()
+        items.forEach { a.put(JSONObject().put("id", it.id).put("title", it.title).put("reason", it.reason)
+            .put("description", it.description).put("risk", it.risk).put("location", it.location).put("source", it.source)
+            .put("status", it.status).put("patchPath", it.patchPath).put("patchContent", it.patchContent)) }
+        prefs.edit().putString("pending_upgrades", a.toString()).apply()
+    }
 }

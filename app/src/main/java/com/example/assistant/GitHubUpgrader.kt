@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
 import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.KeyStore
@@ -13,7 +12,7 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.GCMParameterSpec
 
-/** GitHub token encrypted with an Android Keystore AES-GCM key; never stores plaintext. */
+/** GitHub token encrypted with Android Keystore AES-GCM; changes are always proposed through a PR. */
 class GitHubUpgrader(private val context: Context, private val prefs: SharedPreferences, private val upgrades: UpgradeManager) {
     data class Result(val ok: Boolean, val message: String, val prUrl: String = "")
     private val alias = "assistant.github.token.v1"
@@ -24,18 +23,40 @@ class GitHubUpgrader(private val context: Context, private val prefs: SharedPref
         return try {
             val nonce = ByteArray(12).also { java.security.SecureRandom().nextBytes(it) }
             val cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, key(), GCMParameterSpec(128, nonce))
-            val encrypted = cipher.doFinal(token.toByteArray(Charsets.UTF_8))
-            prefs.edit().putString("gh_token_cipher", Base64.encodeToString(nonce + encrypted, Base64.NO_WRAP)).remove("gh_token").apply()
-            true
+            prefs.edit().putString("gh_token_cipher", Base64.encodeToString(nonce + cipher.doFinal(token.toByteArray()), Base64.NO_WRAP)).remove("gh_token").apply(); true
         } catch (_: Exception) { false }
     }
     fun hasToken(): Boolean = !readToken().isNullOrBlank()
 
-    /** Approval only opens a PR with a user-provided patch. Never pushes to main or self-merges. */
+    /** Draft exactly one new Kotlin source file, then open a PR only after the user tapped Approve. */
+    fun draftAndApprove(id: String): Result {
+        val proposal = upgrades.pending().firstOrNull { it.id == id } ?: return Result(false, "Pending upgrade request not found.")
+        val path = draftPath(proposal.title)
+        val patch = draftPatch(proposal, path) ?: return Result(false, "Could not draft a safe patch from configured free DEEP-tier models. No repository changes were made.")
+        if (!validRepoPath(path) || patch.length !in 1..16_000 || patch.contains("```")) return Result(false, "Generated patch failed safety/size checks; no repository changes were made.")
+        if (upgrades.attachDraft(id, path, patch) == null) return Result(false, "Request is no longer pending; no repository changes were made.")
+        return approveAndOpenPullRequest(id)
+    }
+
+    private fun draftPatch(proposal: MemoryManager.Upgrade, path: String): String? {
+        val prompt = "Create one small, self-contained Kotlin source file for this defensive Android assistant proposal. Return ONLY Kotlin source, no markdown or explanation. Never include secrets, network scanning beyond user-owned targets, shell execution, file writes, permissions escalation, or automatic allowlist changes. Proposal title=${proposal.title}; reason=${proposal.reason}; description=${proposal.description}; intended location=${proposal.location}; target file=$path. Keep under 120 lines and expose a pure helper/data type only; do not make network/API calls or execute actions."
+        val route = ModelRouter.route("security audit code proposal")
+        val hasKey: (String) -> Boolean = { key -> when (key) { "GROQ_KEY" -> Extra.groq.isNotBlank(); "OPENROUTER_KEY" -> Extra.openrouter.isNotBlank(); "GEMINI_API_KEY" -> Keys.get(prefs).isNotBlank(); else -> false } }
+        return ModelRouter.firstSuccessful(route.copy(tier = ModelRouter.Tier.DEEP, choices = route.choices.filter { it.provider == "groq" || it.provider == "openrouter" }), hasKey) { choice ->
+            Providers.chatWith(choice.provider, choice.model, "You draft small safe code for a user-reviewed PR. Output only source code.", emptyList(), prompt)
+                ?.trim()?.removePrefix("```kotlin")?.removePrefix("```")?.removeSuffix("```")?.trim()
+        }?.takeIf { it.isNotBlank() && it.length <= 16_000 && it.lines().size <= 140 && !it.contains("BuildConfig.*KEY") }
+    }
+
+    private fun draftPath(title: String): String {
+        val slug = title.split(Regex("[^A-Za-z0-9]+" )).filter { it.isNotBlank() }.joinToString("") { it.replaceFirstChar(Char::uppercase) }.take(40).ifBlank { "ReviewedUpgrade" }
+        return "app/src/main/java/com/example/assistant/${slug}Proposal.kt"
+    }
+
     fun approveAndOpenPullRequest(id: String): Result {
         val token = readToken() ?: return Result(false, "GitHub token missing/invalid. Save a fine-grained token in secure settings first.")
         val proposal = upgrades.pending().firstOrNull { it.id == id } ?: return Result(false, "Pending upgrade request not found.")
-        if (proposal.patchPath.isBlank() || proposal.patchContent.isBlank()) return Result(false, "This proposal has no reviewed file patch yet; no repository changes were made.")
+        if (proposal.patchPath.isBlank() || proposal.patchContent.isBlank()) return Result(false, "Patch draft is required; approve through draftAndApprove.")
         if (!validRepoPath(proposal.patchPath)) return Result(false, "Patch path must be a relative app source path; rejected.")
         return try {
             val base = api("/repos/$owner/$repo/git/ref/heads/main", token)
@@ -71,7 +92,7 @@ class GitHubUpgrader(private val context: Context, private val prefs: SharedPref
         generator.init(android.security.keystore.KeyGenParameterSpec.Builder(alias, android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or android.security.keystore.KeyProperties.PURPOSE_DECRYPT).setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE).setRandomizedEncryptionRequired(true).build())
         return generator.generateKey()
     }
-    private fun validRepoPath(path: String) = !path.startsWith('/') && !path.contains("..") && !path.contains('\\') && path.startsWith("app/src/main/java/com/example/assistant/")
+    private fun validRepoPath(path: String) = !path.startsWith('/') && !path.contains("..") && !path.contains('\\') && path.startsWith("app/src/main/java/com/example/assistant/") && path.endsWith("Proposal.kt")
     private fun encodePath(path: String) = path.split('/').joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
     private fun api(path: String, token: String, method: String = "GET", body: JSONObject? = null): Pair<Int, String> {
         val c = URL("https://api.github.com$path").openConnection() as HttpURLConnection

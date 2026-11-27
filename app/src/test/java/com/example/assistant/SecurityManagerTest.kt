@@ -1,16 +1,24 @@
 package com.example.assistant
 
-/** JVM-friendly policy checks; invoke from a local test harness without Android APIs. */
-object SecurityManagerTest {
-    @JvmStatic fun main(args: Array<String>) {
-        check(SecurityManager.decide("rm -rf /").level == SecurityManager.Level.BLOCKED)
-        check(SecurityManager.decide("sudo id").level == SecurityManager.Level.BLOCKED)
-        check(SecurityManager.decide("mkfs.ext4 /dev/sda").level == SecurityManager.Level.BLOCKED)
-        check(SecurityManager.decide("dd if=/dev/zero of=/dev/sda").level == SecurityManager.Level.BLOCKED)
-        check(SecurityManager.decide("nmap 8.8.8.8").level == SecurityManager.Level.BLOCKED)
-        check(SecurityManager.decide("cat /etc/shadow").level == SecurityManager.Level.BLOCKED)
-        check(SecurityManager.decide("ls; rm x").level == SecurityManager.Level.BLOCKED)
-        check(SecurityManager.decide("ss -tln").level == SecurityManager.Level.SAFE)
-        check(SecurityManager.decide("uptime").level == SecurityManager.Level.SAFE)
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SecurityManagerTest {
+    @Test fun destructiveAndShellInputsAreBlocked() {
+        listOf("rm -rf /", "sudo id", "mkfs.ext4 /dev/sda", "dd if=/dev/zero of=/dev/sda", "nmap 8.8.8.8", "cat /etc/shadow", "ls; rm x").forEach {
+            assertEquals("$it must be blocked", SecurityManager.Level.BLOCKED, SecurityManager.decide(it).level)
+        }
+    }
+    @Test fun safeReadOnlyCommandsAreAllowed() {
+        assertEquals(SecurityManager.Level.SAFE, SecurityManager.decide("ss -tln").level)
+        assertEquals(SecurityManager.Level.SAFE, SecurityManager.decide("uptime").level)
+        assertEquals(SecurityManager.Level.SAFE, SecurityManager.decide("battery").level)
+    }
+    @Test fun localDownloadPathAllowedAndSensitivePathsRejected() {
+        assertTrue(SecurityManager.isAllowedPath("/sdcard/Download", listOf("/sdcard/Download")))
+        assertFalse(SecurityManager.isAllowedPath("/etc/shadow", listOf("/sdcard/Download")))
+        assertFalse(SecurityManager.isAllowedPath("/home/user/.ssh/id_rsa", listOf("/home/user")))
     }
 }

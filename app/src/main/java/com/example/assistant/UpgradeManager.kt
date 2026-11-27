@@ -1,14 +1,13 @@
 package com.example.assistant
 
-/** Shared approval queue for internet and repo suggestions. No proposal mutates policy/capabilities. */
+/** Shared approval queue for internet and repo suggestions. */
 class UpgradeManager(private val memory: MemoryManager) {
     fun propose(title: String, reason: String, description: String, risk: String, location: String, source: String, patchPath: String = "", patchContent: String = ""): MemoryManager.Upgrade {
-        val merged = listOf(title, reason, description, risk, location).all { it.isNotBlank() }
-        require(merged) { "Upgrade proposal needs title, reason, description, risk and location." }
+        require(listOf(title, reason, description, risk, location).all { it.isNotBlank() }) { "Upgrade proposal needs title, reason, description, risk and location." }
         require(source in setOf("Internet se seekha", "Repo scan se mila", "dono"))
-        // Deliberately store as pending only. Approval creates a review PR; it never activates code.
         return memory.saveUpgrade(MemoryManager.Upgrade("", title.take(120), reason.take(500), description.take(1200), risk.take(500), location.take(240), source, patchPath = patchPath.take(240), patchContent = patchContent.take(120_000)))
     }
+    fun attachDraft(id: String, path: String, content: String) = memory.attachDraft(id, path, content)
     fun deny(id: String): Boolean { memory.updateUpgrade(id, "denied") ?: return false; memory.log("upgrade_denied", id); return true }
     fun approved(id: String): MemoryManager.Upgrade? {
         val proposal = memory.updateUpgrade(id, "approved") ?: return null
