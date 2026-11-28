@@ -79,12 +79,14 @@ class GitHubUpgrader(private val context: Context, private val prefs: SharedPref
         } catch (e: Exception) { Result(false, "GitHub request failed: ${e.javaClass.simpleName}") }
     }
 
-    private fun readToken(): String? = try {
-        val raw = Base64.decode(prefs.getString("gh_token_cipher", "") ?: return null, Base64.DEFAULT)
-        if (raw.size < 29) return null
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, raw.copyOfRange(0, 12)))
-        cipher.doFinal(raw.copyOfRange(12, raw.size)).toString(Charsets.UTF_8).takeIf { it.startsWith("github_pat_") }
-    } catch (_: Exception) { null }
+    private fun readToken(): String? {
+        return try {
+            val raw = Base64.decode(prefs.getString("gh_token_cipher", "") ?: return null, Base64.DEFAULT)
+            if (raw.size < 29) return null
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, raw.copyOfRange(0, 12)))
+            cipher.doFinal(raw.copyOfRange(12, raw.size)).toString(Charsets.UTF_8).takeIf { it.startsWith("github_pat_") }
+        } catch (_: Exception) { null }
+    }
     private fun key(): java.security.Key {
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (ks.getKey(alias, null) as? java.security.Key)?.let { return it }

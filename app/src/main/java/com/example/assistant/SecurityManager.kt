@@ -88,9 +88,11 @@ object SecurityManager {
         if (escaped || quote != null) null else { if (current.isNotEmpty()) tokens.add(current.toString()); tokens }
     } catch (_: Exception) { null }
 
-    private fun parseIp(raw: String): InetAddress? = try {
-        if (raw.contains('/') || raw.any { it.isLetter() && it !in 'a'..'f' && it !in 'A'..'F' }) return null
-        val address = InetAddress.getByName(raw)
-        if (address !is Inet4Address && address.address.size != 16) null else address
-    } catch (_: Exception) { null }
+    private fun parseIp(raw: String): InetAddress? {
+        return try {
+            if (raw.contains('/') || raw.any { it.isLetter() && it !in 'a'..'f' && it !in 'A'..'F' }) return null
+            val address = InetAddress.getByName(raw)
+            if (address !is Inet4Address && address.address.size != 16) null else address
+        } catch (_: Exception) { null }
+    }
 }
