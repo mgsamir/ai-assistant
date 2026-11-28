@@ -1637,6 +1637,22 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
         r2b.setOnClickListener { dlg.dismiss(); showAppPicker() }
         col.addView(r2b)
+        val r2c = LinearLayout(this)
+        r2c.gravity = Gravity.CENTER_VERTICAL
+        r2c.setPadding(0, dp(14), 0, dp(14))
+        r2c.addView(IconView(this).apply { kind = 41 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        r2c.addView(TextView(this).apply { text = "Upgrades"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        r2c.setOnClickListener { dlg.dismiss(); showUpgradesScreen() }
+        col.addView(r2c)
+        val r2d = LinearLayout(this)
+        r2d.gravity = Gravity.CENTER_VERTICAL
+        r2d.setPadding(0, dp(14), 0, dp(14))
+        r2d.addView(IconView(this).apply { kind = 30 }, LinearLayout.LayoutParams(dp(48), dp(40)))
+        r2d.addView(TextView(this).apply { text = "Health check"; textSize = 19f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { leftMargin = dp(8) })
+        r2d.setOnClickListener { dlg.dismiss(); showHealthCheckScreen() }
+        col.addView(r2d)
         val r3 = LinearLayout(this)
         r3.gravity = Gravity.CENTER_VERTICAL
         r3.setPadding(0, dp(14), 0, dp(14))
@@ -1973,6 +1989,96 @@ class MainActivity : Activity() {
     }
 
     // Security log: din ke hisaab se wo app jinpar shak hua tha, aur sunne ke liye speaker
+    // ---------- Upgrades: ek hi queue (internet se seekha + repo scan se mila), Approve/Deny yahin se ----------
+    private fun showUpgradesScreen() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val mm = MemoryManager(p)
+        val um = UpgradeManager(mm)
+        val sa = SelfAuditor(mm)
+        val gw = GitHubUpgrader(this, p, um)
+        val ku = KnowledgeUpdater(um, sa)
+        val dlg = fullDlg()
+        val root = FrameLayout(this)
+        root.setBackgroundColor(Color.BLACK)
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun rebuild() {
+            content.removeAllViews()
+            val research = TextView(this).apply {
+                text = "+ Internet se naya upgrade dhoondo"
+                textSize = 15f; setTextColor(Color.parseColor("#6EA8FF")); setPadding(dp(16), dp(14), dp(16), dp(14))
+            }
+            research.setOnClickListener {
+                val et = EditText(this).apply { hint = "jaise: cybersecurity monitoring, Linux automation" }
+                android.app.AlertDialog.Builder(this).setTitle("Kis vishay par dhoondu?").setView(et)
+                    .setPositiveButton("Dhoondo") { _, _ ->
+                        val topic = et.text.toString().trim()
+                        research.text = "Dhoondh raha hoon..."
+                        Thread {
+                            try { ku.research(topic.ifBlank { "cybersecurity automation" }, SelfAuditor.githubReader(p)) } catch (e: Exception) { }
+                            runOnUiThread { rebuild() }
+                        }.start()
+                    }.setNegativeButton("Cancel", null).show()
+            }
+            content.addView(research)
+            content.addView(AssistantModuleScreens.upgrades(this, um, gw) { })
+        }
+        rebuild()
+        val sv = ScrollView(this); sv.addView(content)
+        root.addView(sv, FrameLayout.LayoutParams(-1, -1))
+        val topBar = FrameLayout(this)
+        topBar.setBackgroundColor(Color.BLACK)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#1A1A1A")
+        topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
+        topBar.addView(TextView(this).apply { text = "Upgrades"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
+        root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
+        dlg.setContentView(root)
+        dlg.show()
+    }
+
+    // ---------- Health Check: SelfAuditor ka READ-ONLY report (repo scan), status ke saath ----------
+    private fun showHealthCheckScreen() {
+        val p = getSharedPreferences("p", Context.MODE_PRIVATE)
+        val mm = MemoryManager(p)
+        val sa = SelfAuditor(mm)
+        val um = UpgradeManager(mm)
+        val dlg = fullDlg()
+        val root = FrameLayout(this)
+        root.setBackgroundColor(Color.BLACK)
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(96), dp(16), dp(30))
+            addView(TextView(this@MainActivity).apply { text = "Self-audit chal raha hai..."; setTextColor(Color.parseColor("#8E8E96")); textSize = 15f })
+        }
+        val sv = ScrollView(this); sv.addView(content)
+        root.addView(sv, FrameLayout.LayoutParams(-1, -1))
+        val topBar = FrameLayout(this)
+        topBar.setBackgroundColor(Color.BLACK)
+        val back = icon(23, 40) { dlg.dismiss() }
+        back.background = oval("#1A1A1A")
+        topBar.addView(back, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.START or Gravity.BOTTOM).apply { leftMargin = dp(16); bottomMargin = dp(10) })
+        topBar.addView(TextView(this).apply { text = "Health check"; textSize = 18f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD },
+            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply { bottomMargin = dp(18) })
+        root.addView(topBar, FrameLayout.LayoutParams(-1, dp(88), Gravity.TOP))
+        dlg.setContentView(root)
+        dlg.show()
+        Thread {
+            val report = try { sa.audit(SelfAuditor.githubReader(p)) } catch (e: Exception) {
+                SelfAuditor.Report(System.currentTimeMillis(), listOf("Audit chal nahi paya: " + (e.message ?: "error")), "")
+            }
+            val proposal = try { sa.submit(report, um) } catch (e: Exception) { null }
+            p.edit().putLong("self_audit_last", System.currentTimeMillis()).apply()
+            runOnUiThread {
+                content.removeAllViews()
+                content.addView(TextView(this).apply { text = report.render(); setTextColor(Color.WHITE); textSize = 14.5f })
+                if (proposal != null) content.addView(TextView(this).apply {
+                    text = "\nEk upgrade request \"Upgrades\" screen mein daal di gayi hai -- review karke Approve/Deny karo."
+                    textSize = 13f; setTextColor(Color.parseColor("#6EA8FF")); setPadding(0, dp(14), 0, 0)
+                })
+            }
+        }.start()
+    }
+
     private fun showSecurityLog() {
         val dlg = fullDlg()
         val root = FrameLayout(this)
@@ -2719,6 +2825,33 @@ class MainActivity : Activity() {
             textRow("Lab secret", "lab_secret", "core/server.py ka LAB_SECRET", true)
             list.addView(TextView(this).apply {
                 text = "Apne hi PC/lab machine par core/server.py chalao (ek baar: pip install karo, phir export LAB_SECRET=apna_secret aur python3 -m core.server), yahan wahi URL (http://<PC ka LAN IP>:8765) aur secret daalo. Phone us PC ke sath usi WiFi par hona chahiye. Isse \"localhost scan karo\" ya \"ye website up hai kya check karo\" jaise command sirf apne hi machine/network par chalenge — kisi aur ke system par nahi."
+                textSize = 12.5f; setTextColor(Color.parseColor("#6E6E76")); setPadding(dp(4), dp(4), dp(4), dp(10))
+            })
+            header("CYBERSECURITY ASSISTANT")
+            textRow("Ghar ke network ki approved IPs", "security_approved_ips", "jaise 192.168.1.10, 192.168.1.20 (comma se alag, exact IP)", false)
+            list.addView(TextView(this).apply {
+                text = "ping/traceroute/nmap jaise network tools SIRF 127.0.0.1 aur yahan daali hui exact IP par chalte hain -- bahar ki koi bhi IP ya domain hamesha BLOCKED hai. Hostname allowed nahi, sirf literal IP."
+                textSize = 12.5f; setTextColor(Color.parseColor("#6E6E76")); setPadding(dp(4), dp(4), dp(4), dp(10))
+            })
+            run {
+                val mm = MemoryManager(p); val um = UpgradeManager(mm); val gw = GitHubUpgrader(this, p, um)
+                val state = if (gw.hasToken()) "Set (encrypted)" else "Not set"
+                row("GitHub Upgrade token", state) {
+                    val et = EditText(this)
+                    et.hint = "github_pat_... (sirf is repo tak, Contents + Pull requests)"
+                    et.setSingleLine()
+                    android.app.AlertDialog.Builder(this).setTitle("GitHub Upgrade token").setView(et)
+                        .setPositiveButton("Save") { _, _ ->
+                            val v = et.text.toString().trim()
+                            if (v.isEmpty()) { }
+                            else if (!gw.saveToken(v)) android.widget.Toast.makeText(this, "Token galat lag raha hai -- fine-grained PAT (github_pat_...) daalo", android.widget.Toast.LENGTH_LONG).show()
+                            draw()
+                        }
+                        .setNegativeButton("Cancel", null).show()
+                }
+            }
+            list.addView(TextView(this).apply {
+                text = "Ye token sirf tabhi use hota hai jab tum \"Upgrades\" screen mein kisi request ko Approve dabao -- tab naya branch + Pull Request banta hai, kabhi seedha main par nahi. Token Android Keystore se encrypt hokar save hota hai. GitHub par Settings -> Developer settings -> Fine-grained tokens se banao, repo mgsamir/ai-assistant tak seemit, Contents = Read and write, Pull requests = Read and write."
                 textSize = 12.5f; setTextColor(Color.parseColor("#6E6E76")); setPadding(dp(4), dp(4), dp(4), dp(10))
             })
         }
