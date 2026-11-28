@@ -26,4 +26,14 @@ class SelfAuditor(private val memory: MemoryManager) {
         return report
     }
     fun submit(report: Report, upgrades: UpgradeManager): MemoryManager.Upgrade? = if (report.findings.any { it.contains("could not") || it.contains("unavailable") }) upgrades.propose("Review self-audit gaps", "Self-audit identified missing or unreadable files.", report.render(), "May be an access/configuration issue; inspect before changes.", report.locationHint, "Repo scan se mila") else null
+
+    companion object {
+        /** Read-only adapter over the existing GitHub.kt bridge (same repo this app already talks to). */
+        fun githubReader(prefs: android.content.SharedPreferences): RepoReader = object : RepoReader {
+            override fun read(path: String): String? {
+                val r = GitHub.readFile(prefs, path)
+                return if (r.ok) r.text else null
+            }
+        }
+    }
 }

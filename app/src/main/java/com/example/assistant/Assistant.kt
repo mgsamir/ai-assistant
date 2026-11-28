@@ -68,6 +68,7 @@ For a complex question (needs research, a comparison, multiple steps, or a decis
 When the user asks only whether GitHub is connected/linked ("GitHub judi hai kya", "connect hai ya nahi", "check karo connected hai"), call repo_check_connection and just relay its short yes/no answer -- do NOT call repo_list_files for this, that dumps every file path which is not what was asked.
 When the user asks you to change the code of this very app (for example "ye button bada karo", "is file mein ye theek karo") and you are not already sure of the exact file path, call repo_list_files (and repo_search_code with a relevant keyword if the list alone doesn't make it obvious) to find the right file first. Once you know the path, use repo_read_file to read the current file from his GitHub repo, write the complete corrected file in your head, then call repo_write_file with the FULL new file content (never partial snippets or diffs). repo_write_file itself waits for the GitHub Actions build and, if it fails, automatically reads the error and fixes it, retrying a few times on its own before returning to you — you do not need to check the build yourself. This all happens on a separate "assistant-edits" branch, not main, so nothing goes live until he reviews and merges it himself on GitHub. In your final reply just tell him plainly which file you changed and that it is on the "assistant-edits" branch; do not mention "build green/red" status language, and only mention a build problem if repo_write_file's result says it could not fix it automatically.
 Before doing something that is hard to undo or affects something outside this chat (sending a message/call on the user's behalf, forgetting/deleting saved memory, triggering an app rebuild/update, writing code to his GitHub repo, running a lab command that changes state), do a quick one-line confirmation first if his request was even slightly ambiguous about exactly what to do -- if he already gave a clear, specific instruction, just do it, don't ask again for the same clear instruction. Read-only/harmless actions (checking something, searching, answering) never need confirmation.
+This app also works as the user's own Cybersecurity & System Automation Assistant -- in the spirit of Jarvis/Vision, never Ultron: it only ever acts on the user's own phone, his own PC (through the existing Lab bridge) and his own home network, and it NEVER acts without being asked or approved first. For phone battery/network/storage/app checks use system_check. For a one-off read-only phone command use run_phone_command; SecurityManager (Vision) decides SAFE/CONFIRM/BLOCKED -- if it comes back CONFIRM, tell the user plainly what it will do and only call confirm_phone_command after he clearly says yes; if BLOCKED, say so and do not try another way around it. Never suggest or attempt scanning, pinging or targeting any device/network that is not the user's own phone, his own lab PC, or an IP he has explicitly approved in Settings -- that is always refused by the security module anyway. Use self_audit when asked for a health check/self-test of this app itself (it only reads its own repo, never changes it). Use research_upgrades when asked to look up new ideas/tools online for this assistant; any finding only becomes a pending Upgrade Request the user must Approve or Deny himself (on the "Upgrades" screen or by voice with approve_upgrade/deny_upgrade) -- nothing is ever added automatically, and approving only opens a GitHub Pull Request for the user to merge, it never pushes to main directly. Never build or suggest tracking/locating other people, scanning or attacking someone else's device/network, cracking passwords, or writing exploits -- refuse that plainly even if asked.
 If a tool call fails or returns an error, say so plainly in your reply (what failed and, if known, why) instead of staying silent or pretending it worked -- the one standing exception is repo_write_file's own build-retry loop, which stays silent about intermediate build attempts as already instructed above; only mention that specific flow if it could not fix itself.
 For a task that needs several tool calls in a row to finish (not a single lookup), briefly tell the user your plan in one short line before diving in (for example "Pehle X dekhta hoon, phir Y karunga"), then execute it -- this is different from a complex REASONING question (handled above) where you plan silently; this is about multi-tool ACTIONS the user should see coming.
 The user also runs a small personal defensive-security/monitoring backend (core/server.py, in the same GitHub repo) on his own PC or lab machine, reachable through three tools: lab_run_command, lab_check_web and lab_scan_local. These are strictly for HIS OWN machine/lab/network only — monitoring, checking open ports, checking a website's status, running safe inspection commands. That backend's own security module already refuses destructive commands (like rm -rf or mkfs) and any attempt to target a third-party host or IP, so you never need to second-guess or re-explain that to him; just call the tool and relay what it says. Never suggest, help plan, or encourage using these tools against any system that is not his own.
@@ -81,6 +82,14 @@ The user also runs a small personal defensive-security/monitoring backend (core/
 
     private val main = Handler(Looper.getMainLooper())
     private val prefs = app.getSharedPreferences("p", Context.MODE_PRIVATE)
+    // Vision/Miss Minutes/Bastion&Nimrod/Ultron module ke objects -- sab isi "p" SharedPreferences
+    // par chalte hain, isliye MainActivity ke Upgrades/Health Check screen se state hamesha milta hai
+    private val memMgr by lazy { MemoryManager(prefs) }
+    private val upgradeMgr by lazy { UpgradeManager(memMgr) }
+    private val selfAuditor by lazy { SelfAuditor(memMgr) }
+    private val sysRunner by lazy { SystemRunner(app, prefs, memMgr) }
+    private val knowledgeUpdater by lazy { KnowledgeUpdater(upgradeMgr, selfAuditor) }
+    private val githubUpgrader by lazy { GitHubUpgrader(app, prefs, upgradeMgr) }
     private val tts: TextToSpeech = TextToSpeech(app, this)
     private var recognizer: SpeechRecognizer? = null
     private var tone: ToneGenerator? = null
@@ -476,6 +485,24 @@ The user also runs a small personal defensive-security/monitoring backend (core/
             if (name == "repo_search_code") return GitHub.searchCode(prefs, args.optString("query", "")).text
             if (name == "repo_read_file") return GitHub.readFile(prefs, args.optString("path", "")).text
             if (name == "repo_write_file") return autoPush(args.optString("path", ""), args.optString("content", ""), args.optString("message", "")).text
+            if (name == "run_phone_command") return sysRunner.runLocal(args.optString("cmd", "")).output
+            if (name == "confirm_phone_command") return sysRunner.runLocal(args.optString("cmd", ""), confirmed = true).output
+            if (name == "self_audit") {
+                val report = selfAuditor.audit(SelfAuditor.githubReader(prefs))
+                try { selfAuditor.submit(report, upgradeMgr) } catch (e: Exception) { }
+                return report.render()
+            }
+            if (name == "research_upgrades") {
+                val found = try { knowledgeUpdater.research(args.optString("topic", ""), SelfAuditor.githubReader(prefs)) } catch (e: Exception) { emptyList() }
+                return if (found.isEmpty()) "Is vishay par koi naya upgrade-laayak cheez nahi mili." else
+                    "${found.size} naya upgrade suggestion Upgrades screen mein daal diya."
+            }
+            if (name == "approve_upgrade") {
+                val q = args.optString("query", "").lowercase()
+                val match = upgradeMgr.pending().firstOrNull { it.title.lowercase().contains(q) } ?: return "\"$q\" se koi pending upgrade request nahi mila."
+                val res = githubUpgrader.draftAndApprove(match.id)
+                return if (res.ok) "\"${match.title}\" approve kar diya, GitHub par Pull Request ban gaya." else res.message
+            }
             var out = ""
             val latch = java.util.concurrent.CountDownLatch(1)
             main.post {
@@ -945,6 +972,22 @@ The user also runs a small personal defensive-security/monitoring backend (core/
                 .put("content", str("The COMPLETE new content of the file after your change"))
                 .put("message", str("Short commit message describing the change")),
             listOf("path", "content")))
+        f.put(fn("system_check", "Check one read-only thing about THIS phone: battery, wifi/network status, free storage, or the list of installed apps. Use for monitoring questions like battery kitni hai, network theek hai kya, storage kitna bacha hai",
+            JSONObject().put("kind", str("One of: battery, wifi, storage, apps")), listOf("kind")))
+        f.put(fn("run_phone_command", "Run a single safe, read-only, allow-listed command on THIS phone only (for example ls, df, uptime, ss, cat on an allowed folder). Vision/SecurityManager checks it first: SAFE runs immediately, CONFIRM means the user must explicitly approve it first (ask him, then call confirm_phone_command), BLOCKED means it never runs no matter what he says",
+            JSONObject().put("cmd", str("The exact command, e.g. \"df -h\" or \"ls /sdcard/Download\"")), listOf("cmd")))
+        f.put(fn("confirm_phone_command", "Actually run a command that system_runner/run_phone_command said needs CONFIRM, ONLY after the user has clearly said yes/confirm to that exact command in this conversation",
+            JSONObject().put("cmd", str("The exact same command that was marked CONFIRM")), listOf("cmd")))
+        f.put(fn("self_audit", "Run SelfAuditor: a READ-ONLY scan of this app's own repo files (Assistant.kt, SecurityManager.kt, ModelRouter.kt, manifest, build.gradle, core/security.py) to report what's missing or not ideal from a security standpoint. It can never change any file itself. Use when user asks for health check, self-test, apna audit karo, kya kami hai",
+            JSONObject().put("note", str("Usually empty")), emptyList()))
+        f.put(fn("research_upgrades", "Search the public internet (read-only learning, nothing is executed) for new cybersecurity/Linux/AI-model/automation info related to a topic, and if something upgrade-worthy is found, queue ONE merged Upgrade Request (what + where in the repo + risk) for the user to Approve/Deny later -- never adds anything automatically",
+            JSONObject().put("topic", str("Topic to research, e.g. \"Linux auth log monitoring\"")), listOf("topic")))
+        f.put(fn("list_upgrades", "List every pending Upgrade Request waiting for the user's Approve/Deny (from internet research or self-audit), with its source and reason",
+            JSONObject().put("note", str("Usually empty")), emptyList()))
+        f.put(fn("approve_upgrade", "Approve a pending Upgrade Request BY NAME: drafts a small reviewed code change and opens it as a GitHub Pull Request on a new branch (NEVER directly to main). Only call this when the user clearly says to approve/accept that specific upgrade",
+            JSONObject().put("query", str("Part of the upgrade's title to match")), listOf("query")))
+        f.put(fn("deny_upgrade", "Deny/dismiss a pending Upgrade Request by name -- it is removed and won't be suggested again unless the user asks again",
+            JSONObject().put("query", str("Part of the upgrade's title to match")), listOf("query")))
         return JSONArray().put(JSONObject().put("function_declarations", f))
     }
     // "haan bilkul" जैसे फालतू शुरुआती शब्द हटाता है
@@ -1406,6 +1449,64 @@ The user also runs a small personal defensive-security/monitoring backend (core/
                     } else if (c.getString("name") == "repo_write_file") {
                         val args = c.optJSONObject("args") ?: JSONObject()
                         pre[idx] = autoPush(args.optString("path", ""), args.optString("content", ""), args.optString("message", ""))
+                    } else if (c.getString("name") == "run_phone_command") {
+                        val cmdP = c.optJSONObject("args")?.optString("cmd", "") ?: ""
+                        val stP = Act.begin(2, "Phone command: $cmdP", "run_phone_command(cmd=\"$cmdP\")")
+                        val r = sysRunner.runLocal(cmdP)
+                        if (r.ok) Act.ok(stP, r.output.take(150), r.output) else Act.fail(stP, r.output)
+                        pre[idx] = Reply(r.output, if (r.level == SecurityManager.Level.CONFIRM) r.output else if (r.ok) "Command chal gaya" else r.output)
+                    } else if (c.getString("name") == "confirm_phone_command") {
+                        val cmdC = c.optJSONObject("args")?.optString("cmd", "") ?: ""
+                        val stC = Act.begin(2, "Confirmed phone command: $cmdC", "confirm_phone_command(cmd=\"$cmdC\")")
+                        val r = sysRunner.runLocal(cmdC, confirmed = true)
+                        if (r.ok) Act.ok(stC, r.output.take(150), r.output) else Act.fail(stC, r.output)
+                        pre[idx] = Reply(r.output, if (r.ok) "Command chal gaya" else r.output)
+                    } else if (c.getString("name") == "self_audit") {
+                        val stH = Act.begin(2, "Running self-audit (read-only)", "self_audit()")
+                        val report = selfAuditor.audit(SelfAuditor.githubReader(prefs))
+                        val proposal = try { selfAuditor.submit(report, upgradeMgr) } catch (e: Exception) { null }
+                        Act.ok(stH, report.render().take(150), report.render())
+                        val extra = if (proposal != null) "\n\nEk upgrade request Upgrades screen mein daal di hai, review karo." else ""
+                        pre[idx] = Reply(report.render() + extra, "Self-audit ho gaya")
+                    } else if (c.getString("name") == "research_upgrades") {
+                        val topicR = c.optJSONObject("args")?.optString("topic", "") ?: ""
+                        val stR = Act.begin(2, "Researching: $topicR", "research_upgrades(topic=\"$topicR\")")
+                        val found = try { knowledgeUpdater.research(topicR, SelfAuditor.githubReader(prefs)) } catch (e: Exception) { emptyList() }
+                        val txt = if (found.isEmpty()) "Is vishay par koi naya upgrade-laayak cheez nahi mili." else
+                            "${found.size} naya upgrade suggestion Upgrades screen mein daal diya:\n" + found.joinToString("\n") { "- " + it.title }
+                        Act.ok(stR, txt.take(150), txt)
+                        pre[idx] = Reply(txt, txt)
+                    } else if (c.getString("name") == "list_upgrades") {
+                        val stL = Act.begin(1, "Listing pending upgrades", "list_upgrades()")
+                        val items = upgradeMgr.pending()
+                        val txt = if (items.isEmpty()) "Koi pending upgrade request nahi hai abhi." else
+                            items.joinToString("\n\n") { "• ${it.title} (${it.source})\n  ${it.reason}" }
+                        Act.ok(stL, txt.take(150), txt)
+                        pre[idx] = Reply(txt, txt)
+                    } else if (c.getString("name") == "approve_upgrade") {
+                        val qA = (c.optJSONObject("args")?.optString("query", "") ?: "").lowercase()
+                        val stA = Act.begin(2, "Approving upgrade: $qA", "approve_upgrade(query=\"$qA\")")
+                        val match = upgradeMgr.pending().firstOrNull { it.title.lowercase().contains(qA) }
+                        if (match == null) {
+                            Act.fail(stA, "Koi matching pending upgrade nahi mila")
+                            pre[idx] = Reply("\"$qA\" se koi pending upgrade request nahi mila.", "Koi matching upgrade nahi mila")
+                        } else {
+                            val res = githubUpgrader.draftAndApprove(match.id)
+                            if (res.ok) Act.ok(stA, "PR khul gaya", res.message) else Act.fail(stA, res.message)
+                            pre[idx] = Reply(if (res.ok) "\"${match.title}\" approve kar diya, GitHub par naya branch + Pull Request ban gaya: ${res.prUrl}. Merge tum khud GitHub par karna." else res.message, if (res.ok) "Approve ho gaya, PR ban gaya" else res.message)
+                        }
+                    } else if (c.getString("name") == "deny_upgrade") {
+                        val qD = (c.optJSONObject("args")?.optString("query", "") ?: "").lowercase()
+                        val stD = Act.begin(1, "Denying upgrade: $qD", "deny_upgrade(query=\"$qD\")")
+                        val match = upgradeMgr.pending().firstOrNull { it.title.lowercase().contains(qD) }
+                        if (match == null) {
+                            Act.fail(stD, "Koi matching pending upgrade nahi mila")
+                            pre[idx] = Reply("\"$qD\" se koi pending upgrade request nahi mila.", "Koi matching upgrade nahi mila")
+                        } else {
+                            upgradeMgr.deny(match.id)
+                            Act.ok(stD, "Deny kar diya")
+                            pre[idx] = Reply("\"${match.title}\" deny kar diya, dobara suggest nahi hoga jab tak khud na kaho.", "Deny kar diya")
+                        }
                     }
                 }
                 postG(g) {
@@ -1545,6 +1646,27 @@ The user also runs a small personal defensive-security/monitoring backend (core/
                 "forget" -> forget(a.getString("keyword"))
                 "set_incognito" -> setIncognito(a.optBoolean("on", true))
                 "update_app" -> updateApp()
+                "system_check" -> {
+                    val r = when (a.optString("kind", "").lowercase()) {
+                        "wifi", "network" -> sysRunner.network()
+                        "storage" -> sysRunner.storage()
+                        "apps" -> sysRunner.apps()
+                        else -> sysRunner.battery()
+                    }
+                    Reply(r.output, r.output)
+                }
+                "list_upgrades" -> {
+                    val items = upgradeMgr.pending()
+                    val txt = if (items.isEmpty()) "Koi pending upgrade request nahi hai abhi." else
+                        items.joinToString("\n\n") { "• ${it.title} (${it.source})\n  ${it.reason}" }
+                    Reply(txt, txt)
+                }
+                "deny_upgrade" -> {
+                    val q = a.optString("query", "").lowercase()
+                    val match = upgradeMgr.pending().firstOrNull { it.title.lowercase().contains(q) }
+                    if (match == null) Reply("\"$q\" se koi pending upgrade request nahi mila.", "Koi matching upgrade nahi mila")
+                    else { upgradeMgr.deny(match.id); Reply("\"${match.title}\" deny kar diya, dobara suggest nahi hoga jab tak khud na kaho.", "Deny kar diya") }
+                }
                 "stop_assistant" -> {
                     main.postDelayed({ onQuit?.invoke() }, 3000)
                     Reply("Band ho raha hoon, phir milte hain", "बंद हो रहा हूँ, फिर मिलते हैं")
